@@ -195,6 +195,18 @@
 
   /* LOADING */
   #loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:14px}
+  #pw-gate{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:0}
+  .pw-logo{font-family:var(--font-display);font-weight:800;font-size:22px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);margin-bottom:24px}
+  .pw-logo span{color:var(--text-muted);font-weight:400}
+  .pw-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:32px 36px;display:flex;flex-direction:column;gap:14px;width:320px}
+  .pw-label{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted)}
+  .pw-input{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-mono);font-size:14px;padding:10px 14px;outline:none;width:100%;transition:border-color 0.2s}
+  .pw-input:focus{border-color:var(--accent)}
+  .pw-input.shake{animation:shake 0.35s ease}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+  .pw-btn{background:var(--accent);color:var(--bg);border:none;border-radius:var(--radius);padding:10px;font-family:var(--font-display);font-weight:700;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:all 0.15s;width:100%}
+  .pw-btn:hover{background:#d8c4ff}
+  .pw-error{font-size:11px;color:var(--danger);text-align:center;min-height:14px}
   .spinner{width:30px;height:30px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
   .loading-text{font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted)}
@@ -244,7 +256,16 @@
 </head>
 <body>
 
-<div id="loading-screen"><div class="spinner"></div><div class="loading-text">Connecting to monday.com</div></div>
+<div id="pw-gate">
+  <div class="pw-logo">Carnal <span>Media</span></div>
+  <div class="pw-box">
+    <div class="pw-label">Passphrase</div>
+    <input class="pw-input" id="pw-input" type="password" placeholder="Enter passphrase..." onkeydown="if(event.key==='Enter')checkPw()">
+    <button class="pw-btn" onclick="checkPw()">Enter</button>
+    <div class="pw-error" id="pw-error"></div>
+  </div>
+</div>
+<div id="loading-screen" style="display:none"><div class="spinner"></div><div class="loading-text">Connecting to monday.com</div></div>
 <div id="toast"></div>
 
 <!-- HEADER -->
@@ -1622,7 +1643,44 @@ function showToast(msg,type='success'){
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.className='';},3000);
 }
 
-init();
+// ── PASSWORD GATE ──
+const PW_HASH = '8a1d6aa28a2c2be0e083bc66a782c9a51a14efe57ae10a0b3da2a24c76f02e7a'; // sha256 of "carnalmedia"
+
+async function sha256(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function checkPw(){
+  const val = document.getElementById('pw-input').value;
+  const hash = await sha256(val);
+  if(hash === PW_HASH){
+    localStorage.setItem('cm_auth', hash);
+    document.getElementById('pw-gate').style.display = 'none';
+    document.getElementById('loading-screen').style.display = '';
+    init();
+  } else {
+    const inp = document.getElementById('pw-input');
+    document.getElementById('pw-error').textContent = 'Incorrect passphrase';
+    inp.classList.remove('shake');
+    void inp.offsetWidth;
+    inp.classList.add('shake');
+    inp.value = '';
+    setTimeout(()=>document.getElementById('pw-error').textContent='', 2500);
+  }
+}
+
+async function bootCheck(){
+  const stored = localStorage.getItem('cm_auth');
+  if(stored && stored === PW_HASH){
+    document.getElementById('pw-gate').style.display = 'none';
+    document.getElementById('loading-screen').style.display = '';
+    init();
+  }
+  // else: pw-gate stays visible, waiting for input
+}
+
+bootCheck();
 </script>
 </body>
 </html>
