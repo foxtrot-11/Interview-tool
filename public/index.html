@@ -159,6 +159,9 @@
 
   /* INTERVIEW VIEW SPECIFIC */
   #interview-view { max-width: 600px; }
+  /* In interview mode the strip is moved inside the scrolling form so it scrolls away;
+     only the General Notes box stays sticky */
+  #interview-view .candidate-strip { border:1px solid var(--border); border-radius:6px; margin-bottom:16px; padding:12px 14px; max-height:none; overflow:visible; }
 
   /* BIGGER HEADSHOT IN STRIP */
   .candidate-avatar { width:64px!important; height:64px!important; border-radius:6px!important; }
@@ -872,6 +875,16 @@ async function setMode(mode){
   currentMode=mode;
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
   resetForm();
+  // INTERVIEW mode: strip lives inside the scrollable form (scrolls away, notes stay sticky).
+  // All other modes: strip pinned above the form as usual.
+  const strip = document.getElementById('candidate-strip');
+  if(mode === '3'){
+    const iv = document.getElementById('interview-view');
+    if(strip && iv && strip.parentElement !== iv) iv.insertBefore(strip, iv.firstChild);
+  } else {
+    const mainEl = document.querySelector('.main');
+    if(strip && mainEl && strip.parentElement !== document.body) document.body.insertBefore(strip, mainEl);
+  }
   if(mode==='new'){
     hide('selector-bar');
     hide('candidate-strip');
