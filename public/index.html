@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carnal Media — Model Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0d0d0f;--surface:#141416;--surface2:#1c1c1f;
+    --border:#2a2a2e;--border-active:#5a5a6e;
+    --accent:#c8b4ff;--accent2:#ff7eb3;--accent3:#7ef4c8;
+    --text:#e8e8f0;--text-muted:#6b6b7e;--text-dim:#3a3a4a;
+    --success:#4ade80;--warning:#facc15;--danger:#f87171;
+    --radius:6px;--font-display:'Syne',sans-serif;--font-mono:'DM Mono',monospace;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-size:13px;display:flex;flex-direction:column}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:0.4}
+
+  /* HEADER */
+  header{flex-shrink:0;height:56px;background:rgba(13,13,15,0.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;z-index:100;position:relative}
+  .logo{font-family:var(--font-display);font-weight:800;font-size:14px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);flex-shrink:0}
+  .logo span{color:var(--text-muted);font-weight:400}
+
+  /* MODE SELECTOR */
+  .mode-selector{display:flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;flex-shrink:0}
+  .mode-btn{padding:6px 14px;font-family:var(--font-mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;border:none;background:transparent;color:var(--text-muted);transition:all 0.15s;white-space:nowrap;border-right:1px solid var(--border)}
+  .mode-btn:last-child{border-right:none}
+  .mode-btn:hover{color:var(--text);background:var(--surface2)}
+  .mode-btn.active{color:var(--bg);background:var(--accent);font-weight:600}
+  /* color overrides per status */
+  .mode-btn.active[data-mode="0"]{background:#c4c4c4;color:#111}
+  .mode-btn.active[data-mode="1"]{background:#cab641;color:#111}
+  .mode-btn.active[data-mode="2"]{background:#ff6d3b;color:#fff}
+  .mode-btn.active[data-mode="3"]{background:#ffcb00;color:#111}
+  .mode-btn.active[data-mode="4"]{background:#579bfc;color:#fff}
+  .mode-btn.active[data-mode="5a"]{background:#037f4c;color:#fff}
+  .mode-btn.active[data-mode="5r"]{background:#df2f4a;color:#fff}
+  .mode-btn.active[data-mode="new"]{background:var(--accent);color:var(--bg)}
+
+  .save-area{display:flex;align-items:center;gap:10px;flex-shrink:0}
+  .unsaved-dot{width:6px;height:6px;border-radius:50%;background:var(--warning);display:none}
+  .unsaved-dot.visible{display:block}
+  .save-status{font-size:11px;color:var(--text-muted);white-space:nowrap}
+  .save-btn{background:var(--accent);color:var(--bg);border:none;border-radius:var(--radius);padding:7px 18px;font-family:var(--font-display);font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:all 0.15s;white-space:nowrap}
+  .save-btn:hover{background:#d8c4ff;transform:translateY(-1px)}
+  .save-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+
+  /* SELECTOR BAR */
+  .selector-bar{flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 28px;z-index:90;position:relative}
+  .selector-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .search-wrap{position:relative;flex:1;min-width:180px;max-width:300px}
+  .search-wrap input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 12px 8px 32px;outline:none;transition:border-color 0.2s}
+  .search-wrap input:focus{border-color:var(--accent)}
+  .search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px}
+  .candidate-select{flex:1;min-width:180px;max-width:380px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 30px 8px 12px;outline:none;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6b7e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;transition:border-color 0.2s}
+  .candidate-select:focus{border-color:var(--accent)}
+  .status-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:4px 9px;border-radius:2px;font-weight:500;white-space:nowrap}
+  .status-dot{width:5px;height:5px;border-radius:50%}
+
+  /* CANDIDATE STRIP */
+  .candidate-strip{flex-shrink:0;background:var(--surface2);border-bottom:1px solid var(--border);padding:10px 28px;display:none;align-items:center;gap:16px}
+  .candidate-strip.visible{display:flex}
+  .candidate-avatar{width:40px;height:40px;border-radius:4px;background:var(--border);overflow:hidden;flex-shrink:0;border:1px solid var(--border)}
+  .candidate-avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--text-muted);background:linear-gradient(135deg,var(--surface),var(--border))}
+  .candidate-name{font-family:var(--font-display);font-weight:700;font-size:16px;color:var(--text)}
+  .candidate-meta{display:flex;gap:14px;margin-top:2px;flex-wrap:wrap}
+  .candidate-meta-item{font-size:11px;color:var(--text-muted)}
+
+  /* MAIN */
+  .main{flex:1;display:grid;grid-template-columns:200px 1fr;min-height:0;position:relative;z-index:1}
+  .sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;height:100%}
+  .sidebar-nav{flex:1;overflow-y:auto;padding:16px 0 0}
+  .sidebar-nav::-webkit-scrollbar{width:3px}
+  .sidebar-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+  .nav-section-label{font-size:9px;letter-spacing:0.25em;text-transform:uppercase;color:var(--text-dim);padding:6px 18px 3px;font-weight:500}
+  .nav-item{display:flex;align-items:center;gap:9px;padding:7px 18px;font-size:12px;color:var(--text-muted);cursor:pointer;transition:all 0.15s;border-left:2px solid transparent;user-select:none}
+  .nav-item:hover{color:var(--text);background:var(--surface2)}
+  .nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(200,180,255,0.06)}
+  .nav-item-dot{width:4px;height:4px;border-radius:50%;background:currentColor;opacity:0.5;flex-shrink:0}
+
+  /* SIDEBAR NOTES PIN */
+  .sidebar-notes-pin{flex-shrink:0;border-top:1px solid var(--border);padding:10px 14px;display:none}
+  .sidebar-notes-pin.visible{display:block}
+  .sidebar-notes-label{font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;font-weight:500}
+  .sidebar-notes-textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 9px;outline:none;resize:none;height:120px;line-height:1.5;transition:border-color 0.15s}
+  .sidebar-notes-textarea:focus{border-color:var(--accent);background:var(--surface2)}
+
+  /* FORM AREA */
+  .form-area{padding:24px 32px;overflow-y:auto;height:100%}
+  .form-area::-webkit-scrollbar{width:4px}
+  .form-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+  /* SECTIONS */
+  .section{margin-bottom:40px;display:none}
+  .section.active{display:block}
+  .section-header{display:flex;align-items:baseline;gap:14px;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+  .section-title{font-family:var(--font-display);font-weight:700;font-size:20px;color:var(--text)}
+  .section-count{font-size:10px;color:var(--text-muted);letter-spacing:0.15em;text-transform:uppercase}
+
+  /* FIELD GRID */
+  .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .field-grid.single{grid-template-columns:1fr}
+  .field-grid.triple{grid-template-columns:1fr 1fr 1fr}
+  .field-full{grid-column:1/-1}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field-label{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);font-weight:500}
+
+  /* INPUTS */
+  .field input[type="text"],.field input[type="date"],.field input[type="tel"],
+  .field input[type="email"],.field input[type="number"],.field select,.field textarea{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 11px;
+    outline:none;transition:border-color 0.15s,background 0.15s;width:100%}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);background:var(--surface2)}
+  .field textarea{resize:vertical;min-height:76px;line-height:1.6}
+  .field select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6b7e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;cursor:pointer}
+  .field input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.4);cursor:pointer}
+
+  /* STATUS PILLS */
+  .status-group{display:flex;flex-wrap:wrap;gap:5px}
+  .status-pill{padding:6px 12px;border-radius:4px;font-size:11px;font-family:var(--font-mono);font-weight:500;letter-spacing:0.06em;cursor:pointer;border:2px solid transparent;transition:all 0.12s;user-select:none;opacity:0.42}
+  .status-pill:hover{opacity:0.75}
+  .status-pill.selected{opacity:1;border-color:#facc15;box-shadow:0 0 0 1px rgba(250,204,21,0.3),0 2px 8px rgba(0,0,0,0.4)}
+
+  /* CUSTOM DROPDOWN */
+  .custom-select-wrap{position:relative}
+  .custom-select-display{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px 30px 8px 11px;cursor:pointer;min-height:36px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;transition:border-color 0.15s}
+  .custom-select-display:hover,.custom-select-display.open{border-color:var(--accent)}
+  .custom-select-single{color:var(--text);font-size:13px}
+  .custom-placeholder{color:var(--text-muted);font-size:13px}
+  .multi-tag{background:rgba(200,180,255,0.12);color:var(--accent);border-radius:2px;padding:2px 6px;font-size:11px;display:flex;align-items:center;gap:3px}
+  .multi-tag-remove{cursor:pointer;opacity:0.6}
+  .multi-tag-remove:hover{opacity:1}
+  .custom-dropdown{position:absolute;top:calc(100% + 3px);left:0;right:0;background:var(--surface2);border:1px solid var(--border-active);border-radius:var(--radius);z-index:500;max-height:220px;overflow-y:auto;display:none;box-shadow:0 8px 24px rgba(0,0,0,0.5)}
+  .custom-dropdown.open{display:block}
+  .custom-option{padding:8px 11px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:7px;transition:background 0.1s;color:var(--text)}
+  .custom-option:hover{background:rgba(200,180,255,0.08)}
+  .custom-option.selected{color:var(--accent)}
+  .custom-check{width:13px;height:13px;border:1px solid var(--border);border-radius:2px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
+  .custom-option.selected .custom-check{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+  .select-chevron{position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text-muted);font-size:11px}
+
+  /* PHONE */
+  .phone-row{display:flex;gap:7px}
+  .phone-country{width:84px;flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 5px;outline:none;cursor:pointer;appearance:none;transition:border-color 0.15s;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b6b7e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center}
+  .phone-country:focus{border-color:var(--accent)}
+  .phone-input-field{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 11px;outline:none;transition:border-color 0.15s}
+  .phone-input-field:focus{border-color:var(--accent);background:var(--surface2)}
+
+  /* SECTION NAV */
+  .section-nav{display:flex;justify-content:space-between;align-items:center;margin-top:32px;padding-top:20px;border-top:1px solid var(--border)}
+  .nav-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:var(--radius);padding:7px 16px;font-family:var(--font-mono);font-size:12px;cursor:pointer;transition:all 0.15s}
+  .nav-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .nav-btn:disabled{opacity:0.2;cursor:not-allowed}
+  .section-progress{font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted)}
+
+  /* INTERVIEW VIEW SPECIFIC */
+  #interview-view { max-width: 600px; }
+
+  /* BIGGER HEADSHOT IN STRIP */
+  .candidate-avatar { width:64px!important; height:64px!important; border-radius:6px!important; }
+
+  /* PHOTO GRID IN STRIP */
+  .strip-photo-grid { display:flex; gap:6px; flex-wrap:wrap; max-width:320px; }
+  .strip-photo-thumb { width:52px; height:52px; border-radius:4px; overflow:hidden; border:1px solid var(--border); flex-shrink:0; cursor:pointer; }
+  .strip-photo-thumb img { width:100%; height:100%; object-fit:cover; }
+  .strip-photo-thumb.loading { background:var(--surface2); display:flex; align-items:center; justify-content:center; font-size:9px; color:var(--text-dim); }
+  .strip-photo-more { width:52px; height:52px; border-radius:4px; background:var(--surface2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--text-muted); flex-shrink:0; }
+
+  /* STICKY GENERAL NOTES IN INTERVIEW VIEW */
+  .iv-notes-sticky { position:sticky; top:0; z-index:50; background:var(--surface); border-bottom:1px solid var(--border); padding:10px 0 14px; margin-bottom:20px; }
+  .iv-notes-sticky .field-label { font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--accent); font-weight:500; margin-bottom:6px; }
+  .iv-notes-sticky textarea { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-family:var(--font-mono); font-size:13px; padding:9px 12px; outline:none; resize:none; height:80px; line-height:1.6; transition:border-color 0.15s; }
+  .iv-notes-sticky textarea:focus { border-color:var(--accent); background:var(--surface2); }
+
+  /* INTERVIEW UPLOAD SECTION */
+  .iv-upload-section { margin-top:24px; padding-top:20px; border-top:1px solid var(--border); }
+  .iv-upload-label { font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-muted); font-weight:500; margin-bottom:10px; }
+  .interview-field{display:flex;flex-direction:column;gap:5px;margin-bottom:16px}
+  .interview-field .field-label{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);font-weight:500}
+  .other-info-tab{display:flex;align-items:center;gap:8px;padding:12px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;margin:24px 0 16px;transition:border-color 0.15s;user-select:none}
+  .other-info-tab:hover{border-color:var(--accent)}
+  .other-info-tab-label{font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);flex:1}
+  .other-info-tab-chevron{color:var(--text-muted);font-size:11px;transition:transform 0.2s}
+  .other-info-tab-chevron.open{transform:rotate(180deg)}
+  .other-info-panel{display:none}
+  .other-info-panel.open{display:block}
+
+  /* NEW MODEL */
+  .new-model-banner{background:rgba(200,180,255,0.06);border:1px solid rgba(200,180,255,0.2);border-radius:var(--radius);padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--text-muted)}
+  .new-model-banner strong{color:var(--accent);display:block;margin-bottom:3px;font-family:var(--font-display);font-size:13px}
+
+  /* LOADING */
+  #loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:14px}
+  .spinner{width:30px;height:30px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-text{font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted)}
+
+  /* EMPTY STATE */
+  #empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:55vh;gap:10px;color:var(--text-muted);text-align:center}
+  .empty-icon{font-size:36px;opacity:0.25;margin-bottom:6px}
+  .empty-title{font-family:var(--font-display);font-size:16px;color:var(--text-dim)}
+  .empty-sub{font-size:12px;color:var(--text-dim)}
+
+  /* TOAST */
+  #toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;font-size:12px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all 0.25s cubic-bezier(0.34,1.56,0.64,1);z-index:9999;max-width:300px}
+  #toast.show{transform:translateY(0);opacity:1}
+  #toast.success{border-color:var(--success);color:var(--success)}
+  #toast.error{border-color:var(--danger);color:var(--danger)}
+  #toast.saving{border-color:var(--accent);color:var(--accent)}
+
+
+  /* PHOTO UPLOAD */
+  .photo-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:24px 20px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:8px;position:relative}
+  .photo-zone:hover,.photo-zone.drag-over{border-color:var(--accent);background:rgba(200,180,255,0.04)}
+  .photo-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  .photo-zone-icon{font-size:28px;margin-bottom:8px;opacity:0.4}
+  .photo-zone-label{font-size:12px;color:var(--text-muted)}
+  .photo-zone-sub{font-size:11px;color:var(--text-dim);margin-top:3px}
+  .photo-previews{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .photo-thumb{position:relative;width:72px;height:72px;border-radius:4px;overflow:hidden;border:1px solid var(--border);flex-shrink:0}
+  .photo-thumb img{width:100%;height:100%;object-fit:cover}
+  .photo-thumb-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#fff;padding:3px 4px;text-align:center}
+  .photo-thumb-remove{position:absolute;top:2px;right:2px;width:16px;height:16px;background:rgba(0,0,0,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:10px;color:#fff;line-height:1}
+  .photo-thumb-remove:hover{background:var(--danger)}
+  /* UPLOAD PROGRESS */
+  .upload-progress{display:none;margin-top:16px}
+  .upload-progress.visible{display:block}
+  .upload-progress-label{font-size:11px;color:var(--text-muted);margin-bottom:6px;display:flex;justify-content:space-between}
+  .upload-bar-track{background:var(--border);border-radius:99px;height:6px;overflow:hidden}
+  .upload-bar-fill{background:var(--accent);height:100%;border-radius:99px;transition:width 0.3s ease;width:0%}
+  .upload-step-list{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+  .upload-step{font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px}
+  .upload-step.done{color:var(--success)}
+  .upload-step.active{color:var(--accent)}
+  .upload-step.error{color:var(--danger)}
+  .upload-step-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+  @media(max-width:768px){.main{grid-template-columns:1fr}.sidebar{display:none}.form-area{padding:18px 14px}.field-grid{grid-template-columns:1fr}.field-grid.triple{grid-template-columns:1fr 1fr}header{padding:0 14px}.selector-bar{padding:10px 14px}}
+</style>
+</head>
+<body>
+
+<div id="loading-screen"><div class="spinner"></div><div class="loading-text">Connecting to monday.com</div></div>
+<div id="toast"></div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">Carnal <span>Media</span></div>
+
+  <!-- MODE SELECTOR -->
+  <div class="mode-selector" id="mode-selector">
+    <button class="mode-btn" data-mode="new" onclick="setMode('new')">+ NEW MODEL</button>
+    <button class="mode-btn active" data-mode="0" onclick="setMode('0')">0-APPLICANT</button>
+    <button class="mode-btn" data-mode="1" onclick="setMode('1')">1-SCREEN</button>
+    <button class="mode-btn" data-mode="2" onclick="setMode('2')">2-POTENTIAL</button>
+    <button class="mode-btn" data-mode="3" onclick="setMode('3')">3-INTERVIEW</button>
+    <button class="mode-btn" data-mode="4" onclick="setMode('4')">4-REVIEW</button>
+    <button class="mode-btn" data-mode="5a" onclick="setMode('5a')">5-APPROVED</button>
+    <button class="mode-btn" data-mode="5r" onclick="setMode('5r')">5-REJECTED</button>
+  </div>
+
+  <div class="save-area">
+    <div class="unsaved-dot" id="unsaved-dot"></div>
+    <div class="save-status" id="save-status"></div>
+    <button class="save-btn" id="save-btn" onclick="saveRecord()" disabled>Save</button>
+  </div>
+</header>
+
+<!-- SELECTOR BAR (hidden in new model mode) -->
+<div class="selector-bar" id="selector-bar">
+  <div class="selector-row">
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="search-input" placeholder="Search..." oninput="filterCandidates(this.value)">
+    </div>
+    <select class="candidate-select" id="candidate-select" onchange="loadCandidate(this.value)">
+      <option value="">— choose a candidate —</option>
+    </select>
+    <div id="candidate-status-badge"></div>
+  </div>
+</div>
+
+<!-- CANDIDATE STRIP -->
+<div class="candidate-strip" id="candidate-strip">
+  <div class="candidate-avatar" id="candidate-avatar-wrap">
+    <div class="candidate-avatar-placeholder" id="avatar-initial">?</div>
+  </div>
+  <div style="flex:1">
+    <div class="candidate-name" id="strip-name">—</div>
+    <div class="candidate-meta">
+      <div class="candidate-meta-item" id="strip-age"></div>
+      <div class="candidate-meta-item" id="strip-location"></div>
+      <div class="candidate-meta-item" id="strip-role"></div>
+    </div>
+  </div>
+  <div class="strip-photo-grid" id="strip-photo-grid"></div>
+</div>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-nav" id="sidebar-nav">
+      <!-- filled by JS based on mode -->
+    </div>
+    <div class="sidebar-notes-pin" id="sidebar-notes-pin">
+      <div class="sidebar-notes-label">General Notes</div>
+      <textarea class="sidebar-notes-textarea" id="sidebar-general-notes" placeholder="General observations..." oninput="const iv=document.getElementById('iv-general-notes');if(iv)iv.value=this.value;markDirty()"></textarea>
+    </div>
+  </nav>
+
+  <!-- FORM AREA -->
+  <div class="form-area" id="form-area">
+    <div id="empty-state">
+      <div class="empty-icon">◈</div>
+      <div class="empty-title" id="empty-title">Choose a mode and candidate</div>
+      <div class="empty-sub" id="empty-sub">Select a status above to see candidates in that stage</div>
+    </div>
+
+    <!-- ════════════════════════════════════════════
+         FULL VIEW (all modes except 3-INTERVIEW)
+    ═════════════════════════════════════════════ -->
+    <div id="full-view" style="display:none">
+
+      <!-- S0: Identity -->
+      <div class="section active" id="fs-0">
+        <div class="section-header"><div class="section-title">Identity</div><div class="section-count" id="fs-0-count">1/7</div></div>
+        <div class="field-grid">
+          <div class="field"><div class="field-label">Legal Name</div><input type="text" id="f-text_mknceqty" placeholder="Full legal name" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Date of Birth</div><input type="date" id="f-date_of_birth_mkncwsrj" onchange="onDobChange(this.value);markDirty()"></div>
+          <div class="field"><div class="field-label">Age</div><input type="number" id="f-age" placeholder="yrs" min="18" max="99" oninput="markDirty()"></div>
+          <div class="field">
+            <div class="field-label">Language(s)</div>
+            <div class="custom-select-wrap">
+              <div class="custom-select-display" id="display-dropdown_mknb18b7" onclick="event.stopPropagation();toggleCustom('dropdown_mknb18b7',true)"><span class="custom-placeholder">Select...</span></div>
+              <span class="select-chevron">▾</span><div class="custom-dropdown" id="dropdown-dropdown_mknb18b7"></div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label">Citizenship</div>
+            <div class="custom-select-wrap">
+              <div class="custom-select-display" id="display-dropdown_mm26n6qx" onclick="event.stopPropagation();toggleCustom('dropdown_mm26n6qx',true)"><span class="custom-placeholder">Select...</span></div>
+              <span class="select-chevron">▾</span><div class="custom-dropdown" id="dropdown-dropdown_mm26n6qx"></div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label">Passport</div>
+            <div class="status-group" id="f-color_mm26w6hs">
+              <div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatus(this,'color_mm26w6hs')">NO</div>
+              <div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatus(this,'color_mm26w6hs')">YES</div>
+              <div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatus(this,'color_mm26w6hs')">N/A</div>
+            </div>
+          </div>
+          <div class="field"><div class="field-label">State ID (state)</div><input type="text" id="f-text_mm1z66yj" placeholder="e.g. California" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Address</div><input type="text" id="f-text_mknct7cn" placeholder="Full address" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Location (specific)</div><input type="text" id="f-text_mkncbdr1" placeholder="City, State" oninput="markDirty()"></div>
+          <div class="field">
+            <div class="field-label">Location (general)</div>
+            <div class="custom-select-wrap">
+              <div class="custom-select-display" id="display-dropdown_mm254xed" onclick="event.stopPropagation();toggleCustom('dropdown_mm254xed',false)"><span class="custom-placeholder">Select...</span></div>
+              <span class="select-chevron">▾</span><div class="custom-dropdown" id="dropdown-dropdown_mm254xed"></div>
+            </div>
+          </div>
+        </div>
+        <div class="section-nav"><button class="nav-btn" disabled>← Prev</button><div class="section-progress">1/7</div><button class="nav-btn" onclick="goFSection(1)">Next →</button></div>
+      </div>
+
+      <!-- S1: Contact & Links -->
+      <div class="section" id="fs-1">
+        <div class="section-header"><div class="section-title">Contact &amp; Links</div><div class="section-count">2/7</div></div>
+        <div class="field-grid">
+          <div class="field"><div class="field-label">Email</div><input type="email" id="f-text_mknk1txg" placeholder="email@domain.com" oninput="markDirty()"></div>
+          <div class="field">
+            <div class="field-label">Phone</div>
+            <div class="phone-row">
+              <select class="phone-country" id="phone-country" onchange="updatePhonePlaceholder()">
+                <option value="US">🇺🇸 US</option><option value="CA">🇨🇦 CA</option><option value="GB">🇬🇧 UK</option>
+                <option value="FR">🇫🇷 FR</option><option value="DE">🇩🇪 DE</option><option value="ES">🇪🇸 ES</option>
+                <option value="IT">🇮🇹 IT</option><option value="NL">🇳🇱 NL</option><option value="BR">🇧🇷 BR</option>
+                <option value="MX">🇲🇽 MX</option><option value="AU">🇦🇺 AU</option><option value="OTHER">🌐</option>
+              </select>
+              <input type="tel" class="phone-input-field" id="f-phone9ouk2t6x" placeholder="+1 123 456-7890" oninput="markDirty()">
+            </div>
+          </div>
+          <div class="field"><div class="field-label">Twitter / X</div><input type="text" id="f-lien_internet" placeholder="https://twitter.com/..." oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Instagram</div><input type="text" id="f-lien_internet9" placeholder="https://instagram.com/..." oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Bluesky</div><input type="text" id="f-dup__of_facebook" placeholder="https://bsky.app/..." oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">OnlyFans</div><input type="text" id="f-text_mkncy7gf" placeholder="https://onlyfans.com/..." oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">JustForFans</div><input type="text" id="f-text_mknc3aty" placeholder="https://justfor.fans/..." oninput="markDirty()"></div>
+        </div>
+        <div class="section-nav"><button class="nav-btn" onclick="goFSection(0)">← Prev</button><div class="section-progress">2/7</div><button class="nav-btn" onclick="goFSection(2)">Next →</button></div>
+      </div>
+
+      <!-- S2: Casting Details -->
+      <div class="section" id="fs-2">
+        <div class="section-header"><div class="section-title">Casting Details</div><div class="section-count">3/7</div></div>
+        <div class="field-grid">
+          <div class="field"><div class="field-label">Type</div><div class="custom-select-wrap"><div class="custom-select-display" id="display-dropdown_mm1zzwcg" onclick="event.stopPropagation();toggleCustom('dropdown_mm1zzwcg',true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="dropdown-dropdown_mm1zzwcg"></div></div></div>
+          <div class="field"><div class="field-label">Role</div><div class="custom-select-wrap"><div class="custom-select-display" id="display-dropdown_mknbe0p0" onclick="event.stopPropagation();toggleCustom('dropdown_mknbe0p0',true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="dropdown-dropdown_mknbe0p0"></div></div></div>
+          <div class="field"><div class="field-label">Sexuality (on camera)</div><div class="custom-select-wrap"><div class="custom-select-display" id="display-dropdown_mm1by5q0" onclick="event.stopPropagation();toggleCustom('dropdown_mm1by5q0',true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="dropdown-dropdown_mm1by5q0"></div></div></div>
+          <div class="field"><div class="field-label">Ethnicity</div><div class="custom-select-wrap"><div class="custom-select-display" id="display-dropdown_mm1zcar6" onclick="event.stopPropagation();toggleCustom('dropdown_mm1zcar6',true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="dropdown-dropdown_mm1zcar6"></div></div></div>
+          <div class="field"><div class="field-label">FTM?</div><div class="status-group" id="f-color_mm1zk5e2"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatus(this,'color_mm1zk5e2')">YES</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatus(this,'color_mm1zk5e2')">Will Film</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatus(this,'color_mm1zk5e2')">NO</div></div></div>
+          <div class="field"><div class="field-label">FTM Notes</div><textarea id="f-long_text_mm1zbe1t" placeholder="Notes..." oninput="markDirty()"></textarea></div>
+          <div class="field"><div class="field-label">Tattoos</div><div class="status-group" id="f-color_mm1zghx9"><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatus(this,'color_mm1zghx9')">NONE</div><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatus(this,'color_mm1zghx9')">TINY</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatus(this,'color_mm1zghx9')">YES</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatus(this,'color_mm1zghx9')">A LOT</div></div></div>
+          <div class="field"><div class="field-label">Tattoo Notes</div><textarea id="f-long_text_mm1zsdyv" placeholder="Placement, size..." oninput="markDirty()"></textarea></div>
+          <div class="field"><div class="field-label">Collab House?</div><div class="status-group" id="f-color_mm1z2f56"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatus(this,'color_mm1z2f56')">YES</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatus(this,'color_mm1z2f56')">MAYBE</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatus(this,'color_mm1z2f56')">NO</div></div></div>
+          <div class="field"><div class="field-label">Haircut?</div><div class="status-group" id="f-color_mm1zzwv8"><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatus(this,'color_mm1zzwv8')">NONE</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatus(this,'color_mm1zzwv8')">A LITTLE</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatus(this,'color_mm1zzwv8')">YES</div></div></div>
+          <div class="field field-full"><div class="field-label">Haircut Notes</div><textarea id="f-long_text_mm1zshaw" placeholder="Details..." oninput="markDirty()"></textarea></div>
+          <div class="field field-full"><div class="field-label">Availability Notes</div><textarea id="f-long_text_mm1z9aeg" placeholder="When available to shoot?" oninput="markDirty()"></textarea></div>
+        </div>
+        <div class="section-nav"><button class="nav-btn" onclick="goFSection(1)">← Prev</button><div class="section-progress">3/7</div><button class="nav-btn" onclick="goFSection(3)">Next →</button></div>
+      </div>
+
+      <!-- S3: Physical -->
+      <div class="section" id="fs-3">
+        <div class="section-header"><div class="section-title">Physical</div><div class="section-count">4/7</div></div>
+        <div class="field-grid triple">
+          <div class="field"><div class="field-label">Height</div><input type="text" id="f-text_mknc1sps" placeholder='5&apos;11"' oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Weight</div><input type="text" id="f-text_mm1yx2wg" placeholder="175 lbs" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Cock Size</div><input type="text" id="f-text_mm1y2znz" placeholder='7"' oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Hair Color</div><input type="text" id="f-text_mkncjzx8" placeholder="Brown" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Eye Color</div><input type="text" id="f-text_mkncsqaq" placeholder="Blue" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Cut vs Uncut</div><div class="custom-select-wrap"><div class="custom-select-display" id="display-dropdown_mkx04tbr" onclick="event.stopPropagation();toggleCustom('dropdown_mkx04tbr',false)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="dropdown-dropdown_mkx04tbr"></div></div></div>
+          <div class="field"><div class="field-label">Shirt Size</div><input type="text" id="f-text_mknc62rg" placeholder="XS/S/M/L/XL" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Shoe Size</div><input type="text" id="f-text_mknc2t7g" placeholder="10.5" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Pant Size</div><input type="text" id="f-text_mknc808t" placeholder="32x30" oninput="markDirty()"></div>
+        </div>
+        <div class="section-nav"><button class="nav-btn" onclick="goFSection(2)">← Prev</button><div class="section-progress">4/7</div><button class="nav-btn" onclick="goFSection(4)">Next →</button></div>
+      </div>
+
+      <!-- S4: Health & Medical -->
+      <div class="section" id="fs-4">
+        <div class="section-header"><div class="section-title">Health &amp; Medical</div><div class="section-count">5/7</div></div>
+        <div class="field-grid">
+          <div class="field"><div class="field-label">HIV</div><div class="status-group" id="f-color_mm1zzkz6"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatus(this,'color_mm1zzkz6')">Non-detectable</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatus(this,'color_mm1zzkz6')">YES</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatus(this,'color_mm1zzkz6')">NONE</div></div></div>
+          <div class="field"><div class="field-label">Syphilis</div><div class="status-group" id="f-color_mm1zbze8"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatus(this,'color_mm1zbze8')">Past Infection</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatus(this,'color_mm1zbze8')">NONE</div></div></div>
+          <div class="field"><div class="field-label">Medical Allergies</div><input type="text" id="f-text_mkncgkwk" placeholder="medications, bees, etc." oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Food Restrictions</div><input type="text" id="f-text_mkncht8f" placeholder="vegan, gluten-free, etc." oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Dick Enhancement</div><div class="custom-select-wrap"><div class="custom-select-display" id="display-dropdown_mm1ztytq" onclick="event.stopPropagation();toggleCustom('dropdown_mm1ztytq',false)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="dropdown-dropdown_mm1ztytq"></div></div></div>
+        </div>
+        <div class="section-nav"><button class="nav-btn" onclick="goFSection(3)">← Prev</button><div class="section-progress">5/7</div><button class="nav-btn" onclick="goFSection(5)">Next →</button></div>
+      </div>
+
+      <!-- S5: Experience & Notes -->
+      <div class="section" id="fs-5">
+        <div class="section-header"><div class="section-title">Experience &amp; Notes</div><div class="section-count">6/7</div></div>
+        <div class="field-grid single">
+          <div class="field"><div class="field-label">Referred By</div><textarea id="f-long_text_mm1zhkyq" placeholder="Who referred this applicant?" oninput="markDirty()"></textarea></div>
+          <div class="field"><div class="field-label">Experience in Porn</div><textarea id="f-long_text_mm2mxr92" placeholder="Prior studios, experience..." oninput="markDirty()"></textarea></div>
+          <div class="field"><div class="field-label">Experience Bottoming</div><textarea id="f-long_text_mm1zaqzq" placeholder="Experience and comfort level..." oninput="markDirty()"></textarea></div>
+          <div class="field"><div class="field-label">Other Studios?</div><div class="status-group" id="f-color_mm25jb44"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatus(this,'color_mm25jb44')">No Prev Exp</div><div class="status-pill" style="background:#df2f4a;color:#fff" data-value="2" onclick="selectStatus(this,'color_mm25jb44')">OF Only</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatus(this,'color_mm25jb44')">Occasional</div><div class="status-pill" style="background:#037f4c;color:#fff" data-value="6" onclick="selectStatus(this,'color_mm25jb44')">Mix of Everything</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatus(this,'color_mm25jb44')">Regularly</div></div></div>
+          <div class="field"><div class="field-label">Other Studios Notes</div><textarea id="f-long_text_mm252r65" placeholder="Which studios, how frequent..." oninput="markDirty()"></textarea></div>
+          <div class="field"><div class="field-label">2nd Form Notes</div><textarea id="f-long_text_mm252tt7" placeholder="Notes from 2nd form..." oninput="markDirty()"></textarea></div>
+        </div>
+        <div class="section-nav"><button class="nav-btn" onclick="goFSection(4)">← Prev</button><div class="section-progress">6/7</div><button class="nav-btn" onclick="goFSection(6)">Next →</button></div>
+      </div>
+
+      <!-- S6: Status & Rating -->
+      <div class="section" id="fs-6">
+        <div class="section-header"><div class="section-title">Status &amp; Rating</div><div class="section-count">7/7</div></div>
+        <div class="field-grid">
+          <div class="field field-full">
+            <div class="field-label">Model Status</div>
+            <div class="status-group" id="f-label">
+              <div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatus(this,'label')">0-APPLICANT</div>
+              <div class="status-pill" style="background:#cab641;color:#111" data-value="8" onclick="selectStatus(this,'label')">1-SCREEN</div>
+              <div class="status-pill" style="background:#ff6d3b;color:#fff" data-value="10" onclick="selectStatus(this,'label')">2-POTENTIAL</div>
+              <div class="status-pill" style="background:#ffcb00;color:#111" data-value="7" onclick="selectStatus(this,'label')">3-INTERVIEW</div>
+              <div class="status-pill" style="background:#579bfc;color:#fff" data-value="9" onclick="selectStatus(this,'label')">4-REVIEW</div>
+              <div class="status-pill" style="background:#037f4c;color:#fff" data-value="2" onclick="selectStatus(this,'label')">5-APPROVED</div>
+              <div class="status-pill" style="background:#df2f4a;color:#fff" data-value="3" onclick="selectStatus(this,'label')">5-REJECTED</div>
+            </div>
+          </div>
+          <div class="field"><div class="field-label">Rating — Intake</div><input type="number" id="f-numeric_mm1z34ca" min="1" max="10" placeholder="1–10" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Rating — Final</div><input type="number" id="f-numeric_mm1zjjrp" min="1" max="10" placeholder="1–10" oninput="markDirty()"></div>
+          <div class="field field-full"><div class="field-label">Rating Notes</div><textarea id="f-text_mm1znrfv" placeholder="Notes on rating..." oninput="markDirty()"></textarea></div>
+          <div class="field"><div class="field-label">Rate Offered</div><input type="text" id="f-text_mm1zb8xf" placeholder="e.g. $800" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Date First Shot</div><input type="date" id="f-date_mknb5z70" oninput="markDirty()"></div>
+        </div>
+        <div class="section-nav"><button class="nav-btn" onclick="goFSection(5)">← Prev</button><div class="section-progress">7/7</div><button class="save-btn" onclick="saveRecord()">✓ Save All</button></div>
+      </div>
+
+    </div><!-- /full-view -->
+
+    <!-- ════════════════════════════════════════════
+         INTERVIEW VIEW (3-INTERVIEW mode only)
+    ═════════════════════════════════════════════ -->
+    <div id="interview-view" style="display:none">
+
+      <!-- Primary fields per MODEL INTERVIEW view order -->
+      <div class="section active" id="iv-0">
+        <div class="section-header"><div class="section-title">Interview</div></div>
+        <div id="iv-quick-section">
+
+        <!-- STICKY GENERAL NOTES -->
+        <div class="iv-notes-sticky">
+          <div class="field-label">General Notes</div>
+          <textarea id="iv-general-notes" placeholder="General observations..." oninput="document.getElementById('sidebar-general-notes').value=this.value;markDirty()"></textarea>
+        </div>
+
+        <div class="field-grid single">
+          <!-- Age at top -->
+          <div class="field">
+            <div class="field-label">Age</div>
+            <input type="number" id="iv-age-quick" min="18" max="99" placeholder="e.g. 28" oninput="syncAgeFromQuick(this.value)">
+          </div>
+          <!-- Role, Type, Sexuality -->
+          <div class="field"><div class="field-label">Role</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mknbe0p0" onclick="event.stopPropagation();toggleCustom('dropdown_mknbe0p0',true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mknbe0p0"></div></div></div>
+          <div class="field"><div class="field-label">Type</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1zzwcg" onclick="event.stopPropagation();toggleCustom('dropdown_mm1zzwcg',true,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1zzwcg"></div></div></div>
+          <div class="field"><div class="field-label">Sexuality (on camera)</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1by5q0" onclick="event.stopPropagation();toggleCustom('dropdown_mm1by5q0',true,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1by5q0"></div></div></div>
+          <!-- Tattoos, FTM, Collab -->
+          <div class="field"><div class="field-label">Tattoos</div><div class="status-group" id="iv-color_mm1zghx9"><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zghx9')">NONE</div><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1zghx9')">TINY</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1zghx9')">YES</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm1zghx9')">A LOT</div></div></div>
+          <div class="field"><div class="field-label">Tattoo Notes</div><textarea id="iv-long_text_mm1zsdyv" placeholder="" oninput="syncIvField('long_text_mm1zsdyv',this.value)"></textarea></div>
+          <div class="field"><div class="field-label">FTM?</div><div class="status-group" id="iv-color_mm1zk5e2"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1zk5e2')">YES</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1zk5e2')">Will Film</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zk5e2')">NO</div></div></div>
+          <div class="field"><div class="field-label">FTM Notes</div><textarea id="iv-long_text_mm1zbe1t" placeholder="" oninput="syncIvField('long_text_mm1zbe1t',this.value)"></textarea></div>
+          <!-- Rate, Dick Enhancement -->
+          <div class="field"><div class="field-label">Rate Offered</div><input type="text" id="iv-text_mm1zb8xf" placeholder="e.g. $800" oninput="syncIvField('text_mm1zb8xf',this.value)"></div>
+          <div class="field"><div class="field-label">Dick Enhancement</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1ztytq" onclick="event.stopPropagation();toggleCustom('dropdown_mm1ztytq',false,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1ztytq"></div></div></div>
+          <!-- HIV, Syphilis -->
+          <div class="field"><div class="field-label">HIV</div><div class="status-group" id="iv-color_mm1zzkz6"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1zzkz6')">Non-detectable</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1zzkz6')">YES</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zzkz6')">NONE</div></div></div>
+          <div class="field"><div class="field-label">Syphilis</div><div class="status-group" id="iv-color_mm1zbze8"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1zbze8')">Past Infection</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zbze8')">NONE</div></div></div>
+          <!-- Haircut -->
+          <div class="field"><div class="field-label">Haircut?</div><div class="status-group" id="iv-color_mm1zzwv8"><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zzwv8')">NONE</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm1zzwv8')">A LITTLE</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1zzwv8')">YES</div></div></div>
+          <div class="field"><div class="field-label">Haircut Notes</div><textarea id="iv-long_text_mm1zshaw" placeholder="" oninput="syncIvField('long_text_mm1zshaw',this.value)"></textarea></div>
+          <!-- Availability -->
+          <div class="field field-full"><div class="field-label">Availability Notes</div><textarea id="iv-long_text_mm1z9aeg" placeholder="" oninput="syncIvField('long_text_mm1z9aeg',this.value)"></textarea></div>
+          <!-- Rating -->
+          <div class="field"><div class="field-label">Rating — Intake</div><input type="number" id="iv-numeric_mm1z34ca" min="1" max="10" placeholder="1–10" oninput="syncIvField('numeric_mm1z34ca',this.value)"></div>
+          <div class="field"><div class="field-label">Rating Notes</div><textarea id="iv-text_mm1znrfv" placeholder="" oninput="syncIvField('text_mm1znrfv',this.value)"></textarea></div>
+          <!-- Status -->
+          <div class="field field-full">
+            <div class="field-label">Model Status</div>
+            <div class="status-group" id="iv-label">
+              <div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'label')">0-APPLICANT</div>
+              <div class="status-pill" style="background:#cab641;color:#111" data-value="8" onclick="selectStatusIv(this,'label')">1-SCREEN</div>
+              <div class="status-pill" style="background:#ff6d3b;color:#fff" data-value="10" onclick="selectStatusIv(this,'label')">2-POTENTIAL</div>
+              <div class="status-pill" style="background:#ffcb00;color:#111" data-value="7" onclick="selectStatusIv(this,'label')">3-INTERVIEW</div>
+              <div class="status-pill" style="background:#579bfc;color:#fff" data-value="9" onclick="selectStatusIv(this,'label')">4-REVIEW</div>
+              <div class="status-pill" style="background:#037f4c;color:#fff" data-value="2" onclick="selectStatusIv(this,'label')">5-APPROVED</div>
+              <div class="status-pill" style="background:#df2f4a;color:#fff" data-value="3" onclick="selectStatusIv(this,'label')">5-REJECTED</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- OTHER INFO COLLAPSIBLE -->
+        <div class="other-info-tab" onclick="toggleOtherInfo()">
+          <div class="other-info-tab-label">Other Info</div>
+          <div class="other-info-tab-chevron" id="other-info-chevron">▾</div>
+        </div>
+        <div class="other-info-panel" id="other-info-panel">
+          <div class="field-grid single">
+            <div class="field"><div class="field-label">Legal Name</div><input type="text" id="iv-text_mknceqty" placeholder="Full legal name" oninput="syncIvField('text_mknceqty',this.value)"></div>
+            <div class="field"><div class="field-label">Date of Birth</div><input type="date" id="iv-dob" onchange="syncIvField('date_of_birth_mkncwsrj',this.value);onDobChange(this.value)"></div>
+            <div class="field"><div class="field-label">Age</div><input type="number" id="iv-age" placeholder="yrs" min="18" max="99" oninput="syncIvField('age',this.value)"></div>
+            <div class="field"><div class="field-label">Location</div><input type="text" id="iv-text_mkncbdr1" placeholder="City, State" oninput="syncIvField('text_mkncbdr1',this.value)"></div>
+            <div class="field"><div class="field-label">Email</div><input type="email" id="iv-text_mknk1txg" placeholder="email@domain.com" oninput="syncIvField('text_mknk1txg',this.value)"></div>
+            <div class="field"><div class="field-label">Phone</div><input type="tel" id="iv-phone" placeholder="+1 ..." oninput="syncIvField('phone9ouk2t6x',this.value)"></div>
+            <div class="field"><div class="field-label">Height</div><input type="text" id="iv-text_mknc1sps" placeholder='5&apos;11"' oninput="syncIvField('text_mknc1sps',this.value)"></div>
+            <div class="field"><div class="field-label">Weight</div><input type="text" id="iv-text_mm1yx2wg" placeholder="175 lbs" oninput="syncIvField('text_mm1yx2wg',this.value)"></div>
+            <div class="field"><div class="field-label">Cock Size</div><input type="text" id="iv-text_mm1y2znz" placeholder='7"' oninput="syncIvField('text_mm1y2znz',this.value)"></div>
+            <div class="field"><div class="field-label">Collab House?</div><div class="status-group" id="iv2-color_mm1z2f56"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1z2f56')">YES</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1z2f56')">MAYBE</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1z2f56')">NO</div></div></div>
+            <div class="field"><div class="field-label">Referred By</div><textarea id="iv-long_text_mm1zhkyq" placeholder="" oninput="syncIvField('long_text_mm1zhkyq',this.value)"></textarea></div>
+            <div class="field"><div class="field-label">Experience in Porn</div><textarea id="iv-long_text_mm2mxr92" placeholder="" oninput="syncIvField('long_text_mm2mxr92',this.value)"></textarea></div>
+            <div class="field"><div class="field-label">Experience Bottoming</div><textarea id="iv-long_text_mm1zaqzq" placeholder="" oninput="syncIvField('long_text_mm1zaqzq',this.value)"></textarea></div>
+            <div class="field"><div class="field-label">Other Studios?</div><div class="status-group" id="iv-color_mm25jb44"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm25jb44')">No Prev Exp</div><div class="status-pill" style="background:#df2f4a;color:#fff" data-value="2" onclick="selectStatusIv(this,'color_mm25jb44')">OF Only</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm25jb44')">Occasional</div><div class="status-pill" style="background:#037f4c;color:#fff" data-value="6" onclick="selectStatusIv(this,'color_mm25jb44')">Mix</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm25jb44')">Regularly</div></div></div>
+          </div>
+        </div>
+
+        <!-- PHOTO UPLOAD IN INTERVIEW -->
+        <div class="iv-upload-section">
+          <div class="iv-upload-label">Upload Extra Photos → Monday</div>
+          <div class="photo-zone" id="iv-extras-zone" ondragover="onDragOver(event,'iv-extras-zone')" ondragleave="onDragLeave('iv-extras-zone')" ondrop="onDrop(event,'iv-extra')">
+            <input type="file" accept="image/*" multiple onchange="onFileSelect(event,'iv-extra')">
+            <div class="photo-zone-icon">📷</div>
+            <div class="photo-zone-label">Drag photos here or click to select</div>
+            <div class="photo-zone-sub">Appended to Extra Pictures in Monday on save</div>
+          </div>
+          <div class="photo-previews" id="iv-extras-previews"></div>
+          <div class="upload-progress" id="iv-upload-progress">
+            <div class="upload-progress-label">
+              <span id="iv-upload-label">Uploading...</span>
+              <span id="iv-upload-pct">0%</span>
+            </div>
+            <div class="upload-bar-track"><div class="upload-bar-fill" id="iv-upload-bar"></div></div>
+            <div class="upload-step-list" id="iv-upload-steps"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:24px;display:flex;justify-content:flex-end">
+          <button class="save-btn" onclick="saveAndUploadIv()">✓ Save All Changes</button>
+        </div>
+        </div><!-- /iv-quick-section -->
+
+        <!-- EXTRA FIELDS SECTION (hidden by default) -->
+        <div id="iv-extra-section" style="display:none">
+          <div class="field-grid single" style="margin-bottom:24px">
+            <div class="field"><div class="field-label">Legal Name</div><input type="text" id="ive-text_mknceqty" placeholder="Full legal name" oninput="syncIvField('text_mknceqty',this.value)"></div>
+            <div class="field"><div class="field-label">Date of Birth</div><input type="date" id="ive-dob" onchange="syncIvField('date_of_birth_mkncwsrj',this.value);onDobChange(this.value)"></div>
+            <div class="field"><div class="field-label">Location</div><input type="text" id="ive-text_mkncbdr1" placeholder="City, State" oninput="syncIvField('text_mkncbdr1',this.value)"></div>
+            <div class="field"><div class="field-label">Email</div><input type="email" id="ive-text_mknk1txg" placeholder="email@domain.com" oninput="syncIvField('text_mknk1txg',this.value)"></div>
+            <div class="field"><div class="field-label">Phone</div><input type="tel" id="ive-phone" placeholder="+1 ..." oninput="syncIvField('phone9ouk2t6x',this.value)"></div>
+            <div class="field"><div class="field-label">Height</div><input type="text" id="ive-text_mknc1sps" placeholder='5&apos;11"' oninput="syncIvField('text_mknc1sps',this.value)"></div>
+            <div class="field"><div class="field-label">Weight</div><input type="text" id="ive-text_mm1yx2wg" placeholder="175 lbs" oninput="syncIvField('text_mm1yx2wg',this.value)"></div>
+            <div class="field"><div class="field-label">Cock Size</div><input type="text" id="ive-text_mm1y2znz" placeholder='7"' oninput="syncIvField('text_mm1y2znz',this.value)"></div>
+            <div class="field"><div class="field-label">Collab House?</div><div class="status-group" id="ive-color_mm1z2f56"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1z2f56')">YES</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1z2f56')">MAYBE</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1z2f56')">NO</div></div></div>
+            <div class="field"><div class="field-label">Ethnicity</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mm1zcar6" onclick="event.stopPropagation();toggleCustom('dropdown_mm1zcar6',true,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mm1zcar6"></div></div></div>
+            <div class="field"><div class="field-label">Language(s)</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mknb18b7" onclick="event.stopPropagation();toggleCustom('dropdown_mknb18b7',true,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mknb18b7"></div></div></div>
+            <div class="field"><div class="field-label">Citizenship</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mm26n6qx" onclick="event.stopPropagation();toggleCustom('dropdown_mm26n6qx',true,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mm26n6qx"></div></div></div>
+            <div class="field"><div class="field-label">Passport</div><div class="status-group" id="ive-color_mm26w6hs"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm26w6hs')">NO</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm26w6hs')">YES</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm26w6hs')">N/A</div></div></div>
+            <div class="field"><div class="field-label">State ID (state)</div><input type="text" id="ive-text_mm1z66yj" placeholder="e.g. California" oninput="syncIvField('text_mm1z66yj',this.value)"></div>
+            <div class="field"><div class="field-label">Address</div><input type="text" id="ive-text_mknct7cn" placeholder="Full address" oninput="syncIvField('text_mknct7cn',this.value)"></div>
+            <div class="field"><div class="field-label">Location (general)</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mm254xed" onclick="event.stopPropagation();toggleCustom('dropdown_mm254xed',false,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mm254xed"></div></div></div>
+            <div class="field"><div class="field-label">Cut vs Uncut</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mkx04tbr" onclick="event.stopPropagation();toggleCustom('dropdown_mkx04tbr',false,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mkx04tbr"></div></div></div>
+            <div class="field"><div class="field-label">Hair Color</div><input type="text" id="ive-text_mkncjzx8" placeholder="Brown" oninput="syncIvField('text_mkncjzx8',this.value)"></div>
+            <div class="field"><div class="field-label">Eye Color</div><input type="text" id="ive-text_mkncsqaq" placeholder="Blue" oninput="syncIvField('text_mkncsqaq',this.value)"></div>
+            <div class="field"><div class="field-label">Shirt Size</div><input type="text" id="ive-text_mknc62rg" placeholder="XS/S/M/L/XL" oninput="syncIvField('text_mknc62rg',this.value)"></div>
+            <div class="field"><div class="field-label">Shoe Size</div><input type="text" id="ive-text_mknc2t7g" placeholder="10.5" oninput="syncIvField('text_mknc2t7g',this.value)"></div>
+            <div class="field"><div class="field-label">Pant Size</div><input type="text" id="ive-text_mknc808t" placeholder="32x30" oninput="syncIvField('text_mknc808t',this.value)"></div>
+            <div class="field"><div class="field-label">Medical Allergies</div><input type="text" id="ive-text_mkncgkwk" placeholder="medications, bees, etc." oninput="syncIvField('text_mkncgkwk',this.value)"></div>
+            <div class="field"><div class="field-label">Food Restrictions</div><input type="text" id="ive-text_mkncht8f" placeholder="vegan, gluten-free, etc." oninput="syncIvField('text_mkncht8f',this.value)"></div>
+            <div class="field"><div class="field-label">Dick Enhancement</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mm1ztytq" onclick="event.stopPropagation();toggleCustom('dropdown_mm1ztytq',false,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mm1ztytq"></div></div></div>
+            <div class="field"><div class="field-label">Referred By</div><textarea id="ive-long_text_mm1zhkyq" placeholder="" oninput="syncIvField('long_text_mm1zhkyq',this.value)"></textarea></div>
+            <div class="field"><div class="field-label">Experience in Porn</div><textarea id="ive-long_text_mm2mxr92" placeholder="" oninput="syncIvField('long_text_mm2mxr92',this.value)"></textarea></div>
+            <div class="field"><div class="field-label">Experience Bottoming</div><textarea id="ive-long_text_mm1zaqzq" placeholder="" oninput="syncIvField('long_text_mm1zaqzq',this.value)"></textarea></div>
+            <div class="field"><div class="field-label">Other Studios?</div><div class="status-group" id="ive-color_mm25jb44"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm25jb44')">No Prev Exp</div><div class="status-pill" style="background:#df2f4a;color:#fff" data-value="2" onclick="selectStatusIv(this,'color_mm25jb44')">OF Only</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm25jb44')">Occasional</div><div class="status-pill" style="background:#037f4c;color:#fff" data-value="6" onclick="selectStatusIv(this,'color_mm25jb44')">Mix</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm25jb44')">Regularly</div></div></div>
+            <div class="field"><div class="field-label">Other Studios Notes</div><textarea id="ive-long_text_mm252r65" placeholder="" oninput="syncIvField('long_text_mm252r65',this.value)"></textarea></div>
+            <div class="field"><div class="field-label">2nd Form Notes</div><textarea id="ive-long_text_mm252tt7" placeholder="" oninput="syncIvField('long_text_mm252tt7',this.value)"></textarea></div>
+            <div class="field"><div class="field-label">Rating — Final</div><input type="number" id="ive-numeric_mm1zjjrp" min="1" max="10" placeholder="1–10" oninput="syncIvField('numeric_mm1zjjrp',this.value)"></div>
+            <div class="field"><div class="field-label">Rate Offered</div><input type="text" id="ive-text_mm1zb8xf" placeholder="e.g. $800" oninput="syncIvField('text_mm1zb8xf',this.value)"></div>
+            <div class="field"><div class="field-label">Date First Shot</div><input type="date" id="ive-date_mknb5z70" oninput="syncIvField('date_mknb5z70',this.value)"></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end">
+            <button class="save-btn" onclick="saveAndUploadIv()">✓ Save All Changes</button>
+          </div>
+        </div><!-- /iv-extra-section -->
+
+      </div>
+
+    </div><!-- /interview-view -->
+
+    <!-- NEW MODEL VIEW -->
+    <div id="new-model-view" style="display:none">
+      <div class="new-model-banner"><strong>New Model</strong>Fill in what you have. On save, this will be created in monday.com with status 2-POTENTIAL.</div>
+      <div class="section active">
+        <div class="section-header"><div class="section-title">New Model</div></div>
+        <div class="field-grid">
+          <div class="field field-full"><div class="field-label">Stage Name <span style="color:var(--accent2)">*</span></div><input type="text" id="new-name" placeholder="Stage name / alias" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Email</div><input type="email" id="new-email" placeholder="email@domain.com" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Phone</div><input type="tel" id="new-phone" placeholder="+1 ..." oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Twitter / X</div><input type="text" id="new-twitter" placeholder="https://twitter.com/..." oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Instagram</div><input type="text" id="new-instagram" placeholder="https://instagram.com/..." oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Role</div><div class="custom-select-wrap"><div class="custom-select-display" id="new-display-dropdown_mknbe0p0" onclick="event.stopPropagation();toggleCustom('dropdown_mknbe0p0',true,'new')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="new-dropdown-dropdown_mknbe0p0"></div></div></div>
+          <div class="field"><div class="field-label">Sexuality (on camera)</div><div class="custom-select-wrap"><div class="custom-select-display" id="new-display-dropdown_mm1by5q0" onclick="event.stopPropagation();toggleCustom('dropdown_mm1by5q0',true,'new')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="new-dropdown-dropdown_mm1by5q0"></div></div></div>
+          <div class="field"><div class="field-label">Location</div><input type="text" id="new-location" placeholder="City, State" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Date of Birth</div><input type="date" id="new-dob" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Height</div><input type="text" id="new-height" placeholder='5&apos;11"' oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Weight</div><input type="text" id="new-weight" placeholder="175 lbs" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Cock Size</div><input type="text" id="new-cock" placeholder='7"' oninput="markDirty()"></div>
+          <div class="field field-full"><div class="field-label">General Notes</div><textarea id="new-notes" placeholder="Any additional notes..." oninput="markDirty()"></textarea></div>
+
+          <!-- HEADSHOT -->
+          <div class="field field-full">
+            <div class="field-label">Headshot <span style="color:var(--text-dim);font-size:9px;letter-spacing:0">— 1 photo, goes to Headshot field in Monday</span></div>
+            <div class="photo-zone" id="headshot-zone" ondragover="onDragOver(event,'headshot-zone')" ondragleave="onDragLeave('headshot-zone')" ondrop="onDrop(event,'headshot')">
+              <input type="file" accept="image/*" onchange="onFileSelect(event,'headshot')">
+              <div class="photo-zone-icon">🖼</div>
+              <div class="photo-zone-label">Drag headshot here or click to select</div>
+              <div class="photo-zone-sub">1 photo max · JPG, PNG, WEBP</div>
+            </div>
+            <div class="photo-previews" id="headshot-previews"></div>
+          </div>
+
+          <!-- EXTRA PHOTOS -->
+          <div class="field field-full">
+            <div class="field-label">Extra Photos <span style="color:var(--text-dim);font-size:9px;letter-spacing:0">— all others go to Extra Pictures field in Monday</span></div>
+            <div class="photo-zone" id="extras-zone" ondragover="onDragOver(event,'extras-zone')" ondragleave="onDragLeave('extras-zone')" ondrop="onDrop(event,'extra')">
+              <input type="file" accept="image/*" multiple onchange="onFileSelect(event,'extra')">
+              <div class="photo-zone-icon">📷</div>
+              <div class="photo-zone-label">Drag extra photos here or click to select</div>
+              <div class="photo-zone-sub">Multiple files OK · JPG, PNG, WEBP</div>
+            </div>
+            <div class="photo-previews" id="extras-previews"></div>
+          </div>
+
+        </div>
+
+        <!-- UPLOAD PROGRESS -->
+        <div class="upload-progress" id="upload-progress">
+          <div class="upload-progress-label">
+            <span id="upload-progress-label">Uploading...</span>
+            <span id="upload-progress-pct">0%</span>
+          </div>
+          <div class="upload-bar-track"><div class="upload-bar-fill" id="upload-bar-fill"></div></div>
+          <div class="upload-step-list" id="upload-step-list"></div>
+        </div>
+
+        <div style="margin-top:20px;display:flex;justify-content:flex-end">
+          <button class="save-btn" id="new-model-save-btn" onclick="saveNewModel()">✓ Create in Monday</button>
+        </div>
+      </div>
+    </div><!-- /new-model-view -->
+
+  </div><!-- /form-area -->
+</div><!-- /main -->
+
+<script>
+const API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0MjE2NDAwMywiYWFpIjoxMSwidWlkIjoyMzMyNTE1NywiaWFkIjoiMjAyNi0wNC0wNlQyMDo0NTowMC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6ODgyNjM1NywicmduIjoidXNlMSJ9.eI5q0d8WflnpvZh1Tno_xBcI7DGJpkL9-p-iTMiH7YA';
+const BOARD_ID = '3636652411';
+const API_URL  = 'https://api.monday.com/v2';
+
+// Status label index → mode key
+const MODE_STATUS_IDS = { '0':[5], '1':[8], '2':[10], '3':[7], '4':[9], '5a':[2], '5r':[3] };
+// Status index → hex colors
+const STATUS_COLORS = {5:{bg:'#c4c4c4',fg:'#111'},8:{bg:'#cab641',fg:'#111'},10:{bg:'#ff6d3b',fg:'#fff'},7:{bg:'#ffcb00',fg:'#111'},9:{bg:'#579bfc',fg:'#fff'},2:{bg:'#037f4c',fg:'#fff'},3:{bg:'#df2f4a',fg:'#fff'}};
+const STATUS_LABELS = {5:'0-APPLICANT',8:'1-SCREEN',10:'2-POTENTIAL',7:'3-INTERVIEW',9:'4-REVIEW',2:'5-APPROVED',3:'5-REJECTED'};
+
+let currentMode = '0';
+let allCandidates = [];
+let currentItem   = null;
+let isDirty       = false;
+let statusValues  = {};
+let selectValues  = {};
+let multiValues   = {};
+let boardDropdownOptions = {};
+
+const MULTI_DROPDOWNS = new Set(['dropdown_mm1zzwcg','dropdown_mknbe0p0','dropdown_mm1by5q0','dropdown_mm1zcar6','dropdown_mknb18b7','dropdown_mm26n6qx']);
+
+// ── API ──
+async function gql(q,v={}){
+  const r=await fetch(API_URL,{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':API_TOKEN,
+      'API-Version':'2024-01',
+    },
+    body:JSON.stringify({query:q,variables:v})
+  });
+  if(!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+  const j=await r.json();
+  if(j.errors) throw new Error(j.errors.map(e=>e.message).join(', '));
+  return j.data;
+}
+
+// ── INIT ──
+async function init(){
+  try{
+    await fetchBoardDropdownOptions();
+    buildAllDropdowns();
+    await loadCandidatesForMode('0');
+    hide('loading-screen');
+  }catch(e){
+    document.querySelector('#loading-screen .loading-text').textContent='Connection failed: '+e.message;
+    console.error(e);
+  }
+}
+
+async function fetchBoardDropdownOptions(){
+  const data=await gql(`{boards(ids:[${BOARD_ID}]){columns(ids:["dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm1by5q0","dropdown_mm1zcar6","dropdown_mknb18b7","dropdown_mm26n6qx","dropdown_mm254xed","dropdown_mkx04tbr","dropdown_mm1ztytq"]){id settings_str}}}`);
+  data.boards[0].columns.forEach(col=>{
+    try{const s=JSON.parse(col.settings_str);if(s.labels)boardDropdownOptions[col.id]=s.labels.filter(l=>!l.is_deactivated).map(l=>({id:l.id,label:l.name||l.label}));}catch{}
+  });
+}
+
+const FALLBACK_OPTIONS={
+  dropdown_mm1zzwcg:[{id:1,label:'Twink'},{id:2,label:'Jock'},{id:3,label:'Daddy'},{id:4,label:'Bear'},{id:5,label:'SilverFox'}],
+  dropdown_mknbe0p0:[{id:1,label:'TOP'},{id:2,label:'BOTTOM'},{id:3,label:'NON-SEX'},{id:4,label:'VERSE'},{id:5,label:'FTM'},{id:6,label:'Bi-Cis-Female'}],
+  dropdown_mm1by5q0:[{id:1,label:'straight'},{id:2,label:'gay (cis only)'},{id:3,label:'gay (trans inclusive)'},{id:4,label:'bisexual (cis only)'},{id:5,label:'bisexual (trans inclusive)'}],
+  dropdown_mm1zcar6:[{id:1,label:'Black'},{id:2,label:'Latino'},{id:3,label:'White'},{id:4,label:'Asian'},{id:5,label:'Mixed'}],
+  dropdown_mknb18b7:[{id:1,label:'English'},{id:2,label:'Spanish'},{id:3,label:'French'},{id:4,label:'Portuguese'},{id:5,label:'Czech'},{id:6,label:'German'},{id:7,label:'Russian'},{id:8,label:'OTHER'},{id:9,label:'Italian'},{id:10,label:'Dutch'},{id:11,label:'Arabic'},{id:12,label:'Turkish'},{id:13,label:'Polish'},{id:14,label:'Romanian'},{id:15,label:'Hungarian'},{id:16,label:'Swedish'},{id:17,label:'Norwegian'},{id:18,label:'Danish'},{id:19,label:'Finnish'},{id:20,label:'Greek'},{id:21,label:'Korean'},{id:22,label:'Japanese'},{id:23,label:'Chinese'},{id:24,label:'Hindi'},{id:25,label:'Ukrainian'}],
+  dropdown_mm26n6qx:[{id:1,label:'USA'},{id:2,label:'France'},{id:3,label:'Spain'},{id:4,label:'Germany'},{id:5,label:'Belgium'},{id:6,label:'Netherlands'},{id:7,label:'Italy'},{id:8,label:'Greece'},{id:9,label:'Brazil'},{id:10,label:'UK'},{id:11,label:'Japan'},{id:12,label:'Mexico'},{id:13,label:'Canada'},{id:14,label:'Argentina'}],
+  dropdown_mm254xed:[{id:1,label:'USA'},{id:2,label:'EU'},{id:3,label:'Canada'},{id:4,label:'Europe-nonEU'},{id:5,label:'South America'},{id:6,label:'Central America'},{id:7,label:'Asia'},{id:8,label:'Africa'},{id:9,label:'Middle East'},{id:10,label:'India'},{id:11,label:'Australia'}],
+  dropdown_mkx04tbr:[{id:1,label:"Cut (circumcised)"},{id:2,label:"Uncut (uncircumcised)"},{id:3,label:"Doesn't apply"}],
+  dropdown_mm1ztytq:[{id:6,label:'Not Started'},{id:1,label:'Working on it'},{id:5,label:'Cialis'},{id:7,label:'Viagra'},{id:2,label:'Trimix'},{id:3,label:'Trimix — Own Supply'},{id:17,label:'Nothing'}],
+};
+
+function getOptions(id){return boardDropdownOptions[id]||FALLBACK_OPTIONS[id]||[]}
+
+// Build ALL dropdown instances (main, interview, new)
+function buildAllDropdowns(){
+  const prefixes=['','iv-','iv2-','ive-','new-'];
+  const allIds=Object.keys(FALLBACK_OPTIONS);
+  allIds.forEach(fieldId=>{
+    prefixes.forEach(pre=>{
+      const dd=document.getElementById(pre+'dropdown-'+fieldId);
+      if(!dd||dd.dataset.built)return;
+      dd.dataset.built='1';
+      const isMulti=MULTI_DROPDOWNS.has(fieldId);
+      const opts=getOptions(fieldId);
+      opts.forEach(opt=>{
+        const div=document.createElement('div');
+        div.className='custom-option';div.dataset.id=opt.id;div.dataset.label=opt.label;
+        if(isMulti){
+          div.innerHTML=`<div class="custom-check"></div><span>${opt.label}</span>`;
+          div.onclick=e=>{e.stopPropagation();const ctx=dd.id.startsWith('iv')?'iv':dd.id.startsWith('new')?'new':'main';toggleMultiOption(fieldId,opt.id,ctx);};
+        }else{
+          div.innerHTML=`<span>${opt.label}</span>`;
+          div.onclick=e=>{e.stopPropagation();const ctx=dd.id.startsWith('iv')?'iv':dd.id.startsWith('new')?'new':'main';selectSingleOption(fieldId,opt.id,opt.label,ctx);};
+        }
+        dd.appendChild(div);
+      });
+    });
+  });
+}
+
+// ── MODE ──
+async function setMode(mode){
+  currentMode=mode;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  resetForm();
+  if(mode==='new'){
+    hide('selector-bar');
+    hide('candidate-strip');
+    hide('empty-state');
+    hide('full-view');
+    hide('interview-view');
+    show('new-model-view');
+    document.getElementById('sidebar-notes-pin').classList.remove('visible');
+    buildSidebarNav('new');
+    document.getElementById('save-btn').disabled=false;
+    return;
+  }
+  show('selector-bar');
+  hide('new-model-view');
+  hide('full-view');
+  hide('interview-view');
+  show('empty-state');
+  document.getElementById('empty-title').textContent='Select a candidate';
+  document.getElementById('empty-sub').textContent='Choose from the list below';
+  if(mode==='3') document.getElementById('sidebar-notes-pin').classList.remove('visible');
+  buildSidebarNav(mode==='3'?'interview':'full');
+  await loadCandidatesForMode(mode);
+}
+
+function showIvSection(section){
+  document.getElementById('iv-quick-section').style.display = section==='quick' ? 'block' : 'none';
+  document.getElementById('iv-extra-section').style.display = section==='extra' ? 'block' : 'none';
+  document.querySelectorAll('#sidebar-nav .nav-item[data-iv-section]').forEach(item=>{
+    item.classList.toggle('active', item.dataset.ivSection === section);
+  });
+  document.getElementById('form-area').scrollTop = 0;
+}
+
+function buildSidebarNav(type){
+  const nav=document.getElementById('sidebar-nav');
+  nav.innerHTML='';
+  if(type==='full'){
+    const sections=[['0','Identity'],['1','Contact & Links'],['2','Casting Details'],['3','Physical'],['4','Health & Medical'],['5','Experience & Notes'],['6','Status & Rating']];
+    const label=document.createElement('div');label.className='nav-section-label';label.textContent='Sections';nav.appendChild(label);
+    sections.forEach(([i,name])=>{
+      const d=document.createElement('div');
+      d.className='nav-item'+(i==='0'?' active':'');
+      d.dataset.section=i;d.onclick=()=>goFSection(parseInt(i));
+      d.innerHTML=`<div class="nav-item-dot"></div>${name}`;
+      nav.appendChild(d);
+    });
+  }else if(type==='interview'){
+    const label=document.createElement('div');label.className='nav-section-label';label.textContent='Interview';nav.appendChild(label);
+    const d=document.createElement('div');d.className='nav-item active';d.dataset.ivSection='quick';d.onclick=()=>showIvSection('quick');d.innerHTML='<div class="nav-item-dot"></div>Quick Fields';nav.appendChild(d);
+    const d2=document.createElement('div');d2.className='nav-item';d2.dataset.ivSection='extra';d2.onclick=()=>showIvSection('extra');d2.innerHTML='<div class="nav-item-dot"></div>Extra Fields';nav.appendChild(d2);
+  }else if(type==='new'){
+    const label=document.createElement('div');label.className='nav-section-label';label.textContent='New Model';nav.appendChild(label);
+    const d=document.createElement('div');d.className='nav-item active';d.innerHTML='<div class="nav-item-dot"></div>Entry Form';nav.appendChild(d);
+  }
+}
+
+// ── LOAD CANDIDATES ──
+// Cache so switching back to a mode doesn't re-fetch
+// Full board cache — fetched once on first use, filtered client-side per mode
+let fullBoardCache = null;
+let boardCacheLoading = false;
+let boardCacheCallbacks = [];
+
+async function ensureBoardCache(){
+  if(fullBoardCache) return;
+  if(boardCacheLoading){
+    await new Promise(resolve => boardCacheCallbacks.push(resolve));
+    return;
+  }
+  boardCacheLoading = true;
+  let cursor = null;
+  const all = [];
+  do {
+    const cp = cursor ? `cursor:"${cursor}"` : `limit:200`;
+    const data = await gql(`{boards(ids:[${BOARD_ID}]){items_page(${cp}){cursor items{id name column_values(ids:["label","text_mkncbdr1","dropdown_mknbe0p0","date_of_birth_mkncwsrj"]){id text value}}}}}`);
+    const page = data.boards[0].items_page;
+    all.push(...page.items);
+    cursor = page.cursor;
+  } while(cursor);
+  fullBoardCache = all;
+  boardCacheLoading = false;
+  boardCacheCallbacks.forEach(cb => cb());
+  boardCacheCallbacks = [];
+}
+
+async function loadCandidatesForMode(mode){
+  if(mode === 'new') return;
+  const statusIds = MODE_STATUS_IDS[mode] || [5];
+
+  // Show loading state immediately
+  const sel = document.getElementById('candidate-select');
+  sel.innerHTML = '<option value="">Loading...</option>';
+
+  await ensureBoardCache();
+
+  const filtered = fullBoardCache.filter(item => {
+    const lc = item.column_values.find(c => c.id === 'label');
+    if(!lc?.value) return false;
+    try { return statusIds.includes(JSON.parse(lc.value).index); } catch { return false; }
+  });
+  filtered.sort((a,b) => a.name.localeCompare(b.name));
+  allCandidates = filtered;
+  renderCandidateList(filtered);
+}
+
+function renderCandidateList(list){
+  const sel=document.getElementById('candidate-select');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— choose a candidate —</option>';
+  if(list.length===0){
+    const o=document.createElement('option');o.disabled=true;o.textContent='No candidates in this status';sel.appendChild(o);
+  } else {
+    list.forEach(item=>{const o=document.createElement('option');o.value=item.id;o.textContent=item.name;sel.appendChild(o);});
+  }
+  if(cur)sel.value=cur;
+}
+
+function filterCandidates(q){
+  q=q.toLowerCase().trim();
+  renderCandidateList(q?allCandidates.filter(c=>c.name.toLowerCase().includes(q)):allCandidates);
+}
+
+// ── LOAD CANDIDATE ──
+async function loadCandidate(itemId){
+  if(!itemId){
+    resetForm();show('empty-state');
+    document.getElementById('candidate-strip').classList.remove('visible');
+    document.getElementById('save-btn').disabled=true;currentItem=null;return;
+  }
+  showToast('Loading...','saving');
+  const data=await gql(`{items(ids:[${itemId}]){id name column_values{id text value}}}`);
+  currentItem=data.items[0];
+  populateForm(currentItem);
+  hide('empty-state');
+  document.getElementById('candidate-strip').classList.add('visible');
+  // Only show sidebar notes pin in full view modes, not interview (has sticky notes)
+  if(currentMode !== '3'){
+    document.getElementById('sidebar-notes-pin').classList.add('visible');
+  }
+  loadCandidatePhotos(currentItem.id);
+  document.getElementById('save-btn').disabled=false;
+  isDirty=false;
+  document.getElementById('unsaved-dot').classList.remove('visible');
+  document.getElementById('save-status').textContent='';
+  // Show correct view
+  if(currentMode==='3'){
+    hide('full-view');show('interview-view');
+    const s=document.getElementById('iv-0');s.classList.add('active');
+  }else{
+    hide('interview-view');show('full-view');
+    goFSection(0);
+  }
+  showToast('Loaded','success');
+}
+
+function populateForm(item){
+  const cols={};item.column_values.forEach(c=>cols[c.id]=c);
+  document.getElementById('strip-name').textContent=item.name;
+  document.getElementById('avatar-initial').textContent=item.name.charAt(0).toUpperCase();
+  const txt=id=>cols[id]?.text||'';
+  const val=id=>{try{return cols[id]?.value?JSON.parse(cols[id].value):null;}catch{return null;}};
+
+  // Helper: set input by ID (both f- and iv- prefixes)
+  const setTxt=(col,value)=>{
+    ['f-','iv-','ive-'].forEach(pre=>{const el=document.getElementById(pre+col);if(el)el.value=value;});
+  };
+
+  // Text fields
+  ['text_mknceqty','text_mm1zb8xf','text_mknk1txg','text_mkncy7gf','text_mknc3aty',
+   'text_mknc1sps','text_mm1yx2wg','text_mm1y2znz','text_mknc2t7g','text_mknc62rg',
+   'text_mknc808t','text_mkncjzx8','text_mkncsqaq','text_mkncbdr1','text_mknct7cn',
+   'text_mkncgkwk','text_mkncht8f','text_mm1z66yj','text_mm1znrfv'
+  ].forEach(id=>setTxt(id,txt(id)));
+
+  // Long text
+  ['long_text_mm1zsdyv','long_text_mm1zbe1t','long_text_mm1zshaw','long_text_mm1z9aeg',
+   'long_text_mm1zhkyq','long_text_mm2mxr92','long_text_mm1zaqzq','long_text_mm252r65','long_text_mm252tt7'
+  ].forEach(id=>setTxt(id,txt(id)));
+
+  // General notes in sidebar + interview sticky
+  const gn=document.getElementById('sidebar-general-notes');if(gn)gn.value=txt('long_text_mktg36ee');
+  const ivgn=document.getElementById('iv-general-notes');if(ivgn)ivgn.value=txt('long_text_mktg36ee');
+
+  // Numbers
+  ['numeric_mm1z34ca','numeric_mm1zjjrp'].forEach(id=>setTxt(id,txt(id)||''));
+
+  // Dates
+  const dobV=val('date_of_birth_mkncwsrj');
+  const dobStr=dobV?.date||'';
+  ['f-date_of_birth_mkncwsrj','iv-dob','ive-dob'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=dobStr;});
+  const ageVal=dobStr?String(calcAge(dobStr)):'';
+  ['f-age','iv-age','iv-age-quick'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=ageVal;});
+  const ivAgeQuick=document.getElementById('iv-age-quick');if(ivAgeQuick)ivAgeQuick.value=ageVal;
+  const fsEl=document.getElementById('f-date_mknb5z70');if(fsEl){const v=val('date_mknb5z70');fsEl.value=v?.date||'';}
+
+  // Links
+  ['lien_internet','lien_internet9','dup__of_facebook'].forEach(id=>{
+    const v=val(id);const url=v?.url||'';
+    const el=document.getElementById('f-'+id);if(el)el.value=url;
+  });
+
+  // Phone
+  const rawPhone=txt('phone9ouk2t6x')||(val('phone9ouk2t6x')?.phone)||'';
+  const fmtPhone=rawPhone?formatPhoneDisplay(rawPhone):'';
+  ['f-phone9ouk2t6x','iv-phone'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=fmtPhone;});
+
+  // Status / color fields — sync to both f- and iv- groups
+  statusValues={};
+  ['label','color_mm1zghx9','color_mm1zk5e2','color_mm1z2f56','color_mm1zzkz6','color_mm1zbze8','color_mm1zzwv8','color_mm26w6hs','color_mm25jb44','color_mm26br5p'].forEach(id=>{
+    const v=val(id);statusValues[id]=v?.index??null;
+    ['f-','iv-','iv2-','ive-'].forEach(pre=>{
+      const g=document.getElementById(pre+id);
+      if(!g)return;
+      g.querySelectorAll('.status-pill').forEach(p=>p.classList.toggle('selected',parseInt(p.dataset.value)===statusValues[id]));
+    });
+  });
+
+  // Single-select dropdowns (main + interview)
+  selectValues={};
+  ['dropdown_mm254xed','dropdown_mkx04tbr','dropdown_mm1ztytq'].forEach(id=>{
+    const v=val(id);selectValues[id]=v?.ids?.[0]||null;
+    ['','iv-','ive-'].forEach(ctx=>{renderSingleDisplay(id,ctx);updateSingleDropdownState(id,ctx);});
+  });
+
+  // Multi-select dropdowns (main + interview)
+  multiValues={};
+  ['dropdown_mm1zzwcg','dropdown_mknbe0p0','dropdown_mm1by5q0','dropdown_mm1zcar6','dropdown_mknb18b7','dropdown_mm26n6qx'].forEach(id=>{
+    const v=val(id);multiValues[id]=v?.ids||[];
+    ['','iv-','ive-'].forEach(ctx=>{renderMultiDisplay(id,ctx);updateMultiDropdownState(id,ctx);});
+  });
+
+  // Strip meta
+  const dob=dobV?.date;
+  document.getElementById('strip-age').textContent=dob?'◈ '+calcAge(dob)+' yrs':'';
+  document.getElementById('strip-location').textContent=txt('text_mkncbdr1')?'◎ '+txt('text_mkncbdr1'):'';
+  document.getElementById('strip-role').textContent=txt('dropdown_mknbe0p0')?'▸ '+txt('dropdown_mknbe0p0'):'';
+  updateStatusBadge(statusValues['label']);
+}
+
+function syncIvField(field,value){
+  // Keep main form inputs in sync with interview form inputs
+  const el=document.getElementById('f-'+field);if(el&&el.tagName!=='DIV')el.value=value;
+  markDirty();
+}
+
+function formatPhoneDisplay(raw){
+  const d=String(raw).replace(/\D/g,'');if(!d)return raw;
+  if(d.length===10)return `+1 ${d.slice(0,3)} ${d.slice(3,6)}-${d.slice(6)}`;
+  if(d.length===11&&d[0]==='1')return `+1 ${d.slice(1,4)} ${d.slice(4,7)}-${d.slice(7)}`;
+  return '+'+d;
+}
+function updatePhonePlaceholder(){const examples={US:'+1 123 456-7890',CA:'+1 123 456-7890',GB:'+44 7700 900000',FR:'+33 6 12 34 56 78',DE:'+49 151 12345678',ES:'+34 612 345 678',IT:'+39 312 345 6789',NL:'+31 6 12345678',BR:'+55 11 91234-5678',MX:'+52 55 1234 5678',AU:'+61 412 345 678',OTHER:'Full number with country code'};document.getElementById('f-phone9ouk2t6x').placeholder=examples[document.getElementById('phone-country').value]||'+';}
+function calcAge(d){const dob=new Date(d),t=new Date();let a=t.getFullYear()-dob.getFullYear();const m=t.getMonth()-dob.getMonth();if(m<0||(m===0&&t.getDate()<dob.getDate()))a--;return a;}
+function syncAgeFromQuick(ageStr){
+  const age = parseInt(ageStr);
+  if(isNaN(age) || age < 1 || age > 99){ markDirty(); return; }
+  // Estimate DOB as Jan 1 of birth year
+  const birthYear = new Date().getFullYear() - age;
+  const estimatedDob = birthYear + '-01-01';
+  // Set DOB fields if not already filled
+  ['f-date_of_birth_mkncwsrj','iv-dob'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el && !el.value) el.value = estimatedDob;
+  });
+  // Also sync to age display fields
+  ['f-age','iv-age'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = ageStr;
+  });
+  markDirty();
+}
+
+function onDobChange(v){const a=v?calcAge(v)+' yrs':'—';['f-','iv-'].forEach(pre=>{const el=document.getElementById(pre+'age');if(el&&el.type==='number'){el.value=v?String(calcAge(v)):'';}});}
+
+function updateStatusBadge(index){
+  const badge=document.getElementById('candidate-status-badge');
+  const s=STATUS_COLORS[index];const l=STATUS_LABELS[index];
+  badge.innerHTML=s?`<div class="status-badge" style="background:${s.bg};color:${s.fg}"><div class="status-dot" style="background:${s.fg}"></div>${l}</div>`:'';
+}
+
+// ── CUSTOM DROPDOWNS ──
+// ctx: '' = main, 'iv' = interview, 'new' = new model
+function toggleCustom(fieldId,isMulti,ctx){
+  ctx=ctx||'';
+  const pre=ctx==='iv'?'iv-':ctx==='ive'?'ive-':ctx==='new'?'new-':'';
+  const dd=document.getElementById(pre+'dropdown-'+fieldId);
+  const disp=document.getElementById(pre+'display-'+fieldId);
+  if(!dd||!disp)return;
+  const isOpen=dd.classList.contains('open');
+  closeAllDropdowns();
+  if(!isOpen){dd.classList.add('open');disp.classList.add('open');}
+}
+
+function closeAllDropdowns(){
+  document.querySelectorAll('.custom-dropdown.open').forEach(d=>d.classList.remove('open'));
+  document.querySelectorAll('.custom-select-display.open').forEach(d=>d.classList.remove('open'));
+}
+
+document.addEventListener('click',e=>{if(!e.target.closest('.custom-select-wrap'))closeAllDropdowns();});
+
+function selectSingleOption(fieldId,optId,optLabel,ctx){
+  ctx=ctx||'main';
+  selectValues[fieldId]=selectValues[fieldId]===optId?null:optId;
+  ['','iv-'].forEach(pre=>{renderSingleDisplay(fieldId,pre);updateSingleDropdownState(fieldId,pre);});
+  if(ctx==='new'){renderSingleDisplay(fieldId,'new-');updateSingleDropdownState(fieldId,'new-');}
+  closeAllDropdowns();markDirty();
+}
+
+function renderSingleDisplay(fieldId,pre){
+  pre=pre===''?'':pre===undefined?'':pre;
+  const disp=document.getElementById(pre+'display-'+fieldId);if(!disp)return;
+  const id=selectValues[fieldId];
+  if(!id){disp.innerHTML='<span class="custom-placeholder">Select...</span>';return;}
+  const opt=getOptions(fieldId).find(o=>o.id===id);
+  disp.innerHTML=`<span class="custom-select-single">${opt?.label||id}</span>`;
+}
+
+function updateSingleDropdownState(fieldId,pre){
+  pre=pre||'';
+  const dd=document.getElementById(pre+'dropdown-'+fieldId);if(!dd)return;
+  const selected=selectValues[fieldId];
+  dd.querySelectorAll('.custom-option').forEach(opt=>opt.classList.toggle('selected',parseInt(opt.dataset.id)===selected));
+}
+
+function toggleMultiOption(fieldId,optId,ctx){
+  ctx=ctx||'main';
+  if(!multiValues[fieldId])multiValues[fieldId]=[];
+  const idx=multiValues[fieldId].indexOf(optId);
+  if(idx===-1)multiValues[fieldId].push(optId);else multiValues[fieldId].splice(idx,1);
+  ['','iv-','new-'].forEach(pre=>{renderMultiDisplay(fieldId,pre);updateMultiDropdownState(fieldId,pre);});
+  markDirty();
+}
+
+function renderMultiDisplay(fieldId,pre){
+  pre=pre||'';
+  const disp=document.getElementById(pre+'display-'+fieldId);if(!disp)return;
+  const selected=multiValues[fieldId]||[];
+  const options=getOptions(fieldId);
+  if(!selected.length){disp.innerHTML='<span class="custom-placeholder">Select...</span>';return;}
+  disp.innerHTML=selected.map(id=>{const opt=options.find(o=>o.id===id);return`<div class="multi-tag">${opt?.label||id}<span class="multi-tag-remove" onclick="event.stopPropagation();removeMultiOption('${fieldId}',${id})">×</span></div>`;}).join('');
+}
+
+function removeMultiOption(fieldId,optId){
+  if(!multiValues[fieldId])return;
+  multiValues[fieldId]=multiValues[fieldId].filter(id=>id!==optId);
+  ['','iv-','new-'].forEach(pre=>{renderMultiDisplay(fieldId,pre);updateMultiDropdownState(fieldId,pre);});
+  markDirty();
+}
+
+function updateMultiDropdownState(fieldId,pre){
+  pre=pre||'';
+  const dd=document.getElementById(pre+'dropdown-'+fieldId);if(!dd)return;
+  const selected=multiValues[fieldId]||[];
+  dd.querySelectorAll('.custom-option').forEach(opt=>{
+    const id=parseInt(opt.dataset.id);
+    opt.classList.toggle('selected',selected.includes(id));
+    const ch=opt.querySelector('.custom-check');if(ch)ch.textContent=selected.includes(id)?'✓':'';
+  });
+}
+
+// ── STATUS PILLS ──
+function selectStatus(pill,fieldKey){
+  document.getElementById('f-'+fieldKey)?.querySelectorAll('.status-pill').forEach(p=>p.classList.remove('selected'));
+  pill.classList.add('selected');statusValues[fieldKey]=parseInt(pill.dataset.value);
+  if(fieldKey==='label')updateStatusBadge(statusValues['label']);
+  markDirty();
+}
+
+function selectStatusIv(pill,fieldKey){
+  // Sync to both main and interview pill groups
+  ['f-','iv-','iv2-','ive-'].forEach(pre=>{document.getElementById(pre+fieldKey)?.querySelectorAll('.status-pill').forEach(p=>p.classList.remove('selected'));});
+  pill.classList.add('selected');
+  statusValues[fieldKey]=parseInt(pill.dataset.value);
+  // Mirror to main group
+  ['f-','iv2-','ive-'].forEach(pre=>{
+    const g=document.getElementById(pre+fieldKey);
+    if(g)g.querySelectorAll(`.status-pill[data-value="${pill.dataset.value}"]`).forEach(p=>p.classList.add('selected'));
+  });
+  if(fieldKey==='label')updateStatusBadge(statusValues['label']);
+  markDirty();
+}
+
+// ── OTHER INFO TOGGLE ──
+function toggleOtherInfo(){
+  const panel=document.getElementById('other-info-panel');
+  const chevron=document.getElementById('other-info-chevron');
+  panel.classList.toggle('open');chevron.classList.toggle('open');
+}
+
+// ── DIRTY ──
+function markDirty(){
+  isDirty=true;
+  document.getElementById('unsaved-dot').classList.add('visible');
+  document.getElementById('save-status').textContent='Unsaved changes';
+  document.getElementById('save-btn').disabled=false;
+}
+
+// ── SAVE (existing model) ──
+async function saveRecord(){
+  if(!currentItem&&currentMode!=='new')return;
+  document.getElementById('save-btn').disabled=true;
+  showToast('Saving...','saving');
+  try{
+    const cv=buildColumnValues();
+    await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+      {i:currentItem.id,b:BOARD_ID,c:JSON.stringify(cv)});
+    isDirty=false;
+    document.getElementById('unsaved-dot').classList.remove('visible');
+    document.getElementById('save-status').textContent='Saved '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('save-btn').disabled=false;
+    showToast('Saved','success');
+    await loadCandidatesForMode(currentMode);
+  }catch(e){showToast('Save failed: '+e.message,'error');document.getElementById('save-btn').disabled=false;console.error(e);}
+}
+
+// ── LOAD PHOTOS FROM MONDAY ──
+async function loadCandidatePhotos(itemId){
+  // Reset photo grid
+  const grid = document.getElementById('strip-photo-grid');
+  const avatarWrap = document.getElementById('candidate-avatar-wrap');
+  grid.innerHTML = '';
+  avatarWrap.innerHTML = '<div class="candidate-avatar-placeholder" id="avatar-initial">'+document.getElementById('strip-name').textContent.charAt(0).toUpperCase()+'</div>';
+
+  try {
+    // assets = all files on the item; column_values tell us which assetIds belong to which file column
+    const data = await gql(`{items(ids:[${itemId}]){
+      assets{id public_url file_extension name}
+      column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}
+    }}`);
+    const item = data?.items?.[0];
+    if(!item) return;
+
+    const assetById = {};
+    (item.assets || []).forEach(a => assetById[String(a.id)] = a);
+
+    // File column value JSON looks like: {"files":[{"assetId":123,"name":"x.jpg",...},...]}
+    const colAssetIds = colId => {
+      const cv = (item.column_values || []).find(c => c.id === colId);
+      if(!cv?.value) return [];
+      try { return (JSON.parse(cv.value).files || []).map(f => String(f.assetId)); }
+      catch { return []; }
+    };
+
+    const isImg = a => a && ['jpg','jpeg','png','webp','gif'].includes((a.file_extension||'').toLowerCase().replace('.',''));
+
+    const headshots = colAssetIds('files_mkncw5nm').map(id => assetById[id]).filter(isImg);
+    const extras    = colAssetIds('file_mkp1n4bt').map(id => assetById[id]).filter(isImg);
+
+    // Show headshot as avatar
+    if(headshots.length > 0){
+      avatarWrap.innerHTML = `<img src="${headshots[0].public_url}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">`;
+    }
+
+    // Show all photos in grid (headshots first then extras, max 6 shown)
+    const allImgs = [...headshots, ...extras];
+    allImgs.slice(0, 6).forEach(img => {
+      const thumb = document.createElement('div');
+      thumb.className = 'strip-photo-thumb';
+      thumb.innerHTML = `<img src="${img.public_url}" title="${img.name}" loading="lazy">`;
+      thumb.onclick = () => window.open(img.public_url, '_blank');
+      grid.appendChild(thumb);
+    });
+    if(allImgs.length > 6){
+      const more = document.createElement('div');
+      more.className = 'strip-photo-more';
+      more.textContent = '+' + (allImgs.length - 6);
+      grid.appendChild(more);
+    }
+  } catch(e) {
+    console.log('Photo load error:', e.message);
+  }
+}
+
+// ── PHOTO STATE ──
+let headshotFiles = [];   // max 1
+let extraFiles    = [];   // unlimited
+let ivExtraFiles  = [];   // interview mode extra uploads
+
+function onDragOver(e, zoneId){
+  e.preventDefault();
+  document.getElementById(zoneId).classList.add('drag-over');
+}
+function onDragLeave(zoneId){
+  document.getElementById(zoneId).classList.remove('drag-over');
+}
+function onDrop(e, type){
+  e.preventDefault();
+  const zoneId = type === 'headshot' ? 'headshot-zone' : 'extras-zone';
+  document.getElementById(zoneId).classList.remove('drag-over');
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+  addPhotos(files, type);
+}
+function onFileSelect(e, type){
+  const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+  addPhotos(files, type);
+  e.target.value = ''; // reset so same file can be re-added
+}
+function addPhotos(files, type){
+  if(type === 'headshot'){
+    headshotFiles = [files[0]]; // only keep 1
+    renderPreviews('headshot-previews', headshotFiles, 'headshot');
+  } else if(type === 'iv-extra'){
+    ivExtraFiles.push(...files);
+    renderPreviews('iv-extras-previews', ivExtraFiles, 'iv-extra');
+  } else {
+    extraFiles.push(...files);
+    renderPreviews('extras-previews', extraFiles, 'extra');
+  }
+  markDirty();
+}
+function removePhoto(type, idx){
+  if(type === 'headshot'){ headshotFiles.splice(idx,1); renderPreviews('headshot-previews', headshotFiles, 'headshot'); }
+  else if(type === 'iv-extra'){ ivExtraFiles.splice(idx,1); renderPreviews('iv-extras-previews', ivExtraFiles, 'iv-extra'); }
+  else { extraFiles.splice(idx,1); renderPreviews('extras-previews', extraFiles, 'extra'); }
+}
+function renderPreviews(containerId, files, type){
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  files.forEach((file, i) => {
+    const url = URL.createObjectURL(file);
+    const thumb = document.createElement('div');
+    thumb.className = 'photo-thumb';
+    thumb.innerHTML = `<img src="${url}"><div class="photo-thumb-label">${file.name.length > 10 ? file.name.slice(0,8)+'…' : file.name}</div><div class="photo-thumb-remove" onclick="removePhoto('${type}',${i})">×</div>`;
+    container.appendChild(thumb);
+  });
+}
+
+// Upload a single file to a monday file column.
+// monday's /v2/file endpoint blocks browser CORS, so this goes through
+// our own server's /upload relay (same origin — no CORS at all).
+async function uploadFileToMonday(itemId, columnId, file, onProgress){
+  const fd = new FormData();
+  fd.append('itemId', itemId);
+  fd.append('columnId', columnId);
+  fd.append('file', file, file.name);
+
+  await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = e => { if(e.lengthComputable && onProgress) onProgress(e.loaded/e.total); };
+    xhr.onload = () => {
+      try {
+        const j = JSON.parse(xhr.responseText);
+        if (xhr.status >= 400 || j.error) reject(new Error(j.error || ('HTTP ' + xhr.status)));
+        else resolve(j);
+      } catch(e) { reject(new Error('Upload failed: HTTP ' + xhr.status)); }
+    };
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.open('POST', '/upload');
+    xhr.send(fd);
+  });
+}
+
+function setUploadStep(list, idx, state, text){
+  const steps = list.querySelectorAll('.upload-step');
+  if(steps[idx]){
+    steps[idx].className = `upload-step ${state}`;
+    steps[idx].querySelector('.upload-step-dot').style.background = '';
+    steps[idx].querySelector('span').textContent = text;
+  }
+}
+
+function addUploadStep(list, text, state=''){
+  const div = document.createElement('div');
+  div.className = `upload-step ${state}`;
+  div.innerHTML = `<div class="upload-step-dot"></div><span>${text}</span>`;
+  list.appendChild(div);
+  return list.children.length - 1;
+}
+
+function setProgress(pct, label){
+  document.getElementById('upload-bar-fill').style.width = pct + '%';
+  document.getElementById('upload-progress-pct').textContent = Math.round(pct) + '%';
+  if(label) document.getElementById('upload-progress-label').textContent = label;
+}
+
+// ── SAVE (new model) ──
+async function saveNewModel(){
+  const name = document.getElementById('new-name').value.trim();
+  if(!name){ showToast('Stage name is required','error'); return; }
+
+  const saveBtn = document.getElementById('new-model-save-btn');
+  saveBtn.disabled = true;
+  document.getElementById('save-btn').disabled = true;
+
+  // Show progress
+  const progress = document.getElementById('upload-progress');
+  const stepList = document.getElementById('upload-step-list');
+  stepList.innerHTML = '';
+  progress.classList.add('visible');
+  setProgress(0, 'Creating model...');
+
+  const totalPhotos = headshotFiles.length + extraFiles.length;
+  const totalSteps = 2 + totalPhotos; // create + column values + each photo
+  let stepsDone = 0;
+  const tick = () => { stepsDone++; setProgress((stepsDone/totalSteps)*100); };
+
+  try{
+    // STEP 1: Create item
+    const s0 = addUploadStep(stepList, 'Creating model record...', 'active');
+    const createData = await gql(
+      `mutation($b:ID!,$g:String!,$n:String!){create_item(board_id:$b,group_id:$g,item_name:$n){id}}`,
+      {b:BOARD_ID, g:'group_mm202zgr', n:name}
+    );
+    const newId = createData.create_item.id;
+    setUploadStep(stepList, s0, 'done', `✓ Created: ${name} (ID ${newId})`);
+    tick();
+
+    // STEP 2: Set column values
+    setProgress((stepsDone/totalSteps)*100, 'Saving details...');
+    const s1 = addUploadStep(stepList, 'Saving details...', 'active');
+    const cv = {};
+    const em=document.getElementById('new-email').value; if(em) cv['text_mknk1txg']=em;
+    const ph=document.getElementById('new-phone').value; if(ph) cv['phone9ouk2t6x']={phone:ph.replace(/\D/g,''),countryShortName:'US'};
+    const tw=document.getElementById('new-twitter').value; if(tw) cv['lien_internet']={url:tw,text:tw};
+    const ig=document.getElementById('new-instagram').value; if(ig) cv['lien_internet9']={url:ig,text:ig};
+    const loc=document.getElementById('new-location').value; if(loc) cv['text_mkncbdr1']=loc;
+    const dob=document.getElementById('new-dob').value; if(dob) cv['date_of_birth_mkncwsrj']={date:dob};
+    const ht=document.getElementById('new-height').value; if(ht) cv['text_mknc1sps']=ht;
+    const wt=document.getElementById('new-weight').value; if(wt) cv['text_mm1yx2wg']=wt;
+    const ck=document.getElementById('new-cock').value; if(ck) cv['text_mm1y2znz']=ck;
+    const nt=document.getElementById('new-notes').value; if(nt) cv['long_text_mktg36ee']={text:nt};
+    cv['label'] = {index:10};
+    if(multiValues['dropdown_mknbe0p0']?.length) cv['dropdown_mknbe0p0']={ids:multiValues['dropdown_mknbe0p0']};
+    if(multiValues['dropdown_mm1by5q0']?.length) cv['dropdown_mm1by5q0']={ids:multiValues['dropdown_mm1by5q0']};
+    if(Object.keys(cv).length){
+      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+        {i:newId, b:BOARD_ID, c:JSON.stringify(cv)});
+    }
+    setUploadStep(stepList, s1, 'done', '✓ Details saved');
+    tick();
+
+    // STEP 3+: Upload photos
+    if(totalPhotos > 0){
+      setProgress((stepsDone/totalSteps)*100, 'Uploading photos...');
+
+      // Headshot
+      if(headshotFiles.length > 0){
+        const file = headshotFiles[0];
+        const si = addUploadStep(stepList, `Uploading headshot: ${file.name}...`, 'active');
+        try{
+          await uploadFileToMonday(newId, 'files_mkncw5nm', file, pct => {
+            setProgress(((stepsDone + pct)/totalSteps)*100);
+          });
+          setUploadStep(stepList, si, 'done', `✓ Headshot: ${file.name}`);
+        }catch(e){
+          setUploadStep(stepList, si, 'error', `✗ Headshot failed: ${e.message}`);
+        }
+        tick();
+      }
+
+      // Extra photos
+      for(let i=0; i<extraFiles.length; i++){
+        const file = extraFiles[i];
+        const si = addUploadStep(stepList, `Uploading extra ${i+1}/${extraFiles.length}: ${file.name}...`, 'active');
+        try{
+          await uploadFileToMonday(newId, 'file_mkp1n4bt', file, pct => {
+            setProgress(((stepsDone + pct)/totalSteps)*100);
+          });
+          setUploadStep(stepList, si, 'done', `✓ ${file.name}`);
+        }catch(e){
+          setUploadStep(stepList, si, 'error', `✗ ${file.name} failed: ${e.message}`);
+        }
+        tick();
+      }
+    }
+
+    setProgress(100, 'Done!');
+    showToast('Model created in Monday!', 'success');
+
+    // Reset after short delay so user can see completion
+    setTimeout(() => {
+      document.querySelectorAll('#new-model-view input[type=text],#new-model-view input[type=email],#new-model-view input[type=tel],#new-model-view input[type=date],#new-model-view input[type=number],#new-model-view textarea').forEach(el=>el.value='');
+      headshotFiles=[];extraFiles=[];
+      renderPreviews('headshot-previews',[],`headshot`);
+      renderPreviews('extras-previews',[],`extra`);
+      multiValues={};
+      ['dropdown_mknbe0p0','dropdown_mm1by5q0'].forEach(id=>{renderMultiDisplay(id,'new-');updateMultiDropdownState(id,'new-');});
+      isDirty=false;
+      document.getElementById('unsaved-dot').classList.remove('visible');
+      document.getElementById('save-status').textContent='';
+      progress.classList.remove('visible');
+      stepList.innerHTML='';
+      setProgress(0,'');
+      saveBtn.disabled=false;
+      document.getElementById('save-btn').disabled=true;
+    }, 2000);
+
+  }catch(e){
+    showToast('Failed: '+e.message,'error');
+    addUploadStep(stepList, `✗ Error: ${e.message}`, 'error');
+    saveBtn.disabled=false;
+    document.getElementById('save-btn').disabled=false;
+    console.error(e);
+  }
+}
+
+// ── SAVE + UPLOAD for interview mode ──
+async function saveAndUploadIv(){
+  if(!currentItem) return;
+  // First save all field data
+  await saveRecord();
+  // Then upload any queued iv-extra photos
+  if(ivExtraFiles.length === 0) return;
+  const prog = document.getElementById('iv-upload-progress');
+  const steps = document.getElementById('iv-upload-steps');
+  const bar = document.getElementById('iv-upload-bar');
+  steps.innerHTML=''; prog.classList.add('visible');
+  document.getElementById('iv-upload-label').textContent='Uploading photos...';
+  document.getElementById('iv-upload-pct').textContent='0%';
+  for(let i=0; i<ivExtraFiles.length; i++){
+    const file = ivExtraFiles[i];
+    const si = addUploadStep(steps, `Uploading ${file.name}...`, 'active');
+    try{
+      await uploadFileToMonday(currentItem.id, 'file_mkp1n4bt', file, pct=>{
+        bar.style.width = Math.round(((i+pct)/ivExtraFiles.length)*100)+'%';
+        document.getElementById('iv-upload-pct').textContent = Math.round(((i+pct)/ivExtraFiles.length)*100)+'%';
+      });
+      setUploadStep(steps, si, 'done', '✓ '+file.name);
+    }catch(e){
+      setUploadStep(steps, si, 'error', '✗ '+file.name+': '+e.message);
+    }
+  }
+  bar.style.width='100%';
+  document.getElementById('iv-upload-pct').textContent='100%';
+  document.getElementById('iv-upload-label').textContent='Done!';
+  ivExtraFiles=[];
+  // Refresh photo grid so new uploads appear next to the name
+  if(currentItem) loadCandidatePhotos(currentItem.id);
+  renderPreviews('iv-extras-previews',[],`iv-extra`);
+  setTimeout(()=>{ prog.classList.remove('visible'); steps.innerHTML=''; bar.style.width='0%'; },2500);
+}
+
+function buildColumnValues(){
+  const cv={};
+  const gv=id=>{const el=document.getElementById('f-'+id);return el?el.value:null;};
+  // Also check iv- fields for interview mode
+  const getv=id=>{
+    let v=gv(id);
+    if((v===null||v==='')&&currentMode==='3'){const iv=document.getElementById('iv-'+id);if(iv)v=iv.value;}
+    return v;
+  };
+
+  const texts=['text_mknceqty','text_mm1zb8xf','text_mknk1txg','text_mkncy7gf','text_mknc3aty','text_mknc1sps','text_mm1yx2wg','text_mm1y2znz','text_mknc2t7g','text_mknc62rg','text_mknc808t','text_mkncjzx8','text_mkncsqaq','text_mkncbdr1','text_mknct7cn','text_mkncgkwk','text_mkncht8f','text_mm1z66yj','text_mm1znrfv'];
+  texts.forEach(id=>{const v=getv(id);if(v!==null)cv[id]=v;});
+
+  const longs=['long_text_mm1zsdyv','long_text_mm1zbe1t','long_text_mm1zshaw','long_text_mm1z9aeg','long_text_mm1zhkyq','long_text_mm2mxr92','long_text_mm1zaqzq','long_text_mm252r65','long_text_mm252tt7'];
+  longs.forEach(id=>{
+    let v=getv(id);
+    if(currentMode==='3'){const ivel=document.getElementById('iv-'+id);if(ivel)v=ivel.value;}
+    if(v!==null)cv[id]={text:v};
+  });
+  const gn=document.getElementById('sidebar-general-notes')?.value;if(gn!=null)cv['long_text_mktg36ee']={text:gn};
+
+  const ri=getv('numeric_mm1z34ca');const rf=gv('f-numeric_mm1zjjrp');
+  if(ri!=='')cv['numeric_mm1z34ca']=parseFloat(ri)||'';
+  if(rf!=='')cv['numeric_mm1zjjrp']=parseFloat(rf)||'';
+
+  // Age → DOB: if DOB not set but age was entered, estimate DOB from age
+  const ageQuick = document.getElementById('iv-age-quick')?.value || document.getElementById('f-age')?.value;
+  let dob = getv('date_of_birth_mkncwsrj');
+  if(!dob && ageQuick && parseInt(ageQuick) > 0){
+    const birthYear = new Date().getFullYear() - parseInt(ageQuick);
+    dob = birthYear + '-01-01';
+  }
+  if(dob) cv['date_of_birth_mkncwsrj'] = {date: dob};
+  const fs=gv('f-date_mknb5z70');if(fs)cv['date_mknb5z70']={date:fs};
+
+  ['lien_internet','lien_internet9','dup__of_facebook'].forEach(id=>{const v=gv('f-'+id);if(v!==null)cv[id]={url:v,text:v};});
+
+  const phone=document.getElementById('f-phone9ouk2t6x')?.value||document.getElementById('iv-phone')?.value||'';
+  if(phone)cv['phone9ouk2t6x']={phone:phone.replace(/\D/g,''),countryShortName:'US'};
+
+  ['label','color_mm1zghx9','color_mm1zk5e2','color_mm1z2f56','color_mm1zzkz6','color_mm1zbze8','color_mm1zzwv8','color_mm26w6hs','color_mm25jb44','color_mm26br5p'].forEach(id=>{if(statusValues[id]!=null)cv[id]={index:statusValues[id]};});
+
+  ['dropdown_mm254xed','dropdown_mkx04tbr','dropdown_mm1ztytq'].forEach(id=>{if(selectValues[id])cv[id]={ids:[selectValues[id]]};});
+  ['dropdown_mm1zzwcg','dropdown_mknbe0p0','dropdown_mm1by5q0','dropdown_mm1zcar6','dropdown_mknb18b7','dropdown_mm26n6qx'].forEach(id=>{if(multiValues[id]?.length)cv[id]={ids:multiValues[id]};});
+
+  return cv;
+}
+
+// ── SECTION NAV (full view) ──
+let currentFSection=0;
+function goFSection(i){
+  document.querySelectorAll('#full-view .section').forEach((s,idx)=>s.classList.toggle('active',idx===i));
+  document.querySelectorAll('#sidebar-nav .nav-item').forEach(item=>item.classList.toggle('active',parseInt(item.dataset.section)===i));
+  currentFSection=i;document.getElementById('form-area').scrollTop=0;
+}
+
+// ── RESET ──
+function resetForm(){
+  currentItem=null;isDirty=false;statusValues={};selectValues={};multiValues={};
+  document.getElementById('unsaved-dot').classList.remove('visible');
+  document.getElementById('save-status').textContent='';
+  document.getElementById('save-btn').disabled=true;
+  hide('full-view');hide('interview-view');hide('new-model-view');
+  document.getElementById('sidebar-notes-pin').classList.remove('visible');
+  document.getElementById('candidate-strip').classList.remove('visible');
+  document.getElementById('candidate-select').value='';
+  document.getElementById('search-input').value='';
+  document.getElementById('candidate-status-badge').innerHTML='';
+}
+
+// ── HELPERS ──
+function show(id){const el=document.getElementById(id);if(el)el.style.display='';}
+function hide(id){const el=document.getElementById(id);if(el)el.style.display='none';}
+let toastTimer;
+function showToast(msg,type='success'){
+  const t=document.getElementById('toast');t.textContent=msg;t.className=`show ${type}`;
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.className='';},3000);
+}
+
+init();
+</script>
+</body>
+</html>
