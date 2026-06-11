@@ -1615,7 +1615,11 @@ function buildColumnValues(){
 // ── SECTION NAV (full view) ──
 let currentFSection=0;
 function goFSection(i){
-  document.querySelectorAll('#full-view .section').forEach((s,idx)=>s.classList.toggle('active',idx===i));
+  // Target fs- prefixed sections directly so we never accidentally touch iv- sections
+  [0,1,2,3,4,5,6].forEach(idx=>{
+    const el=document.getElementById('fs-'+idx);
+    if(el) el.classList.toggle('active',idx===i);
+  });
   document.querySelectorAll('#sidebar-nav .nav-item').forEach(item=>item.classList.toggle('active',parseInt(item.dataset.section)===i));
   currentFSection=i;document.getElementById('form-area').scrollTop=0;
 }
