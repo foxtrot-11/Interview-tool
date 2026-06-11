@@ -1644,7 +1644,7 @@ function showToast(msg,type='success'){
 }
 
 // ── PASSWORD GATE ──
-const PW_HASH = '8a1d6aa28a2c2be0e083bc66a782c9a51a14efe57ae10a0b3da2a24c76f02e7a'; // sha256 of "carnalmedia"
+const PW_HASH = '46ae38c27cf30a9a2c8d643b22dd09875a8c8df54bb6b6136cef21c70ae6a452'; // sha256 of "carnalmedia"
 
 async function sha256(str){
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
