@@ -964,33 +964,37 @@ async function loadCandidate(itemId){
   showToast('Loading...','saving');
   const data=await gql(`{items(ids:[${itemId}]){id name column_values{id text value}}}`);
   currentItem=data.items[0];
-  populateForm(currentItem);
+  // Show the correct view FIRST so the form is visible no matter what
   hide('empty-state');
+  hide('new-model-view');
+  if(currentMode==='3'){
+    hide('full-view');show('interview-view');
+    const s=document.getElementById('iv-0');if(s)s.classList.add('active');
+  }else{
+    hide('interview-view');show('full-view');
+    goFSection(0);
+  }
   document.getElementById('candidate-strip').classList.add('visible');
-  // Only show sidebar notes pin in full view modes, not interview (has sticky notes)
   if(currentMode !== '3'){
     document.getElementById('sidebar-notes-pin').classList.add('visible');
   }
+  // Populate fields — wrapped so one bad field never blanks the form
+  try { populateForm(currentItem); }
+  catch(e){ console.error('populateForm error:', e); showToast('Some fields failed to load: '+e.message,'error'); }
   loadCandidatePhotos(currentItem.id);
   document.getElementById('save-btn').disabled=false;
   isDirty=false;
   document.getElementById('unsaved-dot').classList.remove('visible');
   document.getElementById('save-status').textContent='';
-  // Show correct view
-  if(currentMode==='3'){
-    hide('full-view');show('interview-view');
-    const s=document.getElementById('iv-0');s.classList.add('active');
-  }else{
-    hide('interview-view');show('full-view');
-    goFSection(0);
-  }
   showToast('Loaded','success');
 }
 
 function populateForm(item){
   const cols={};item.column_values.forEach(c=>cols[c.id]=c);
   document.getElementById('strip-name').textContent=item.name;
-  document.getElementById('avatar-initial').textContent=item.name.charAt(0).toUpperCase();
+  // Rebuild the avatar placeholder — the previous candidate's headshot <img> may have replaced it
+  const aw=document.getElementById('candidate-avatar-wrap');
+  if(aw) aw.innerHTML='<div class="candidate-avatar-placeholder" id="avatar-initial">'+item.name.charAt(0).toUpperCase()+'</div>';
   const txt=id=>cols[id]?.text||'';
   const val=id=>{try{return cols[id]?.value?JSON.parse(cols[id].value):null;}catch{return null;}};
 
