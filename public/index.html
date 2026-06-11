@@ -61,7 +61,7 @@
   .status-dot{width:5px;height:5px;border-radius:50%}
 
   /* CANDIDATE STRIP */
-  .candidate-strip{flex-shrink:0;background:var(--surface2);border-bottom:1px solid var(--border);padding:10px 28px;display:none;align-items:center;gap:16px}
+  .candidate-strip{flex-shrink:0;background:var(--surface2);border-bottom:1px solid var(--border);padding:12px 28px;display:none;align-items:flex-start;gap:16px;max-height:40vh;overflow-y:auto}
   .candidate-strip.visible{display:flex}
   .candidate-avatar{width:40px;height:40px;border-radius:4px;background:var(--border);overflow:hidden;flex-shrink:0;border:1px solid var(--border)}
   .candidate-avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--text-muted);background:linear-gradient(135deg,var(--surface),var(--border))}
@@ -164,11 +164,33 @@
   .candidate-avatar { width:64px!important; height:64px!important; border-radius:6px!important; }
 
   /* PHOTO GRID IN STRIP */
-  .strip-photo-grid { display:flex; gap:6px; flex-wrap:wrap; max-width:320px; }
-  .strip-photo-thumb { width:52px; height:52px; border-radius:4px; overflow:hidden; border:1px solid var(--border); flex-shrink:0; cursor:pointer; }
-  .strip-photo-thumb img { width:100%; height:100%; object-fit:cover; }
-  .strip-photo-thumb.loading { background:var(--surface2); display:flex; align-items:center; justify-content:center; font-size:9px; color:var(--text-dim); }
-  .strip-photo-more { width:52px; height:52px; border-radius:4px; background:var(--surface2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--text-muted); flex-shrink:0; }
+  .strip-photo-grid { display:flex; gap:8px; flex-wrap:wrap; flex:1; }
+  .strip-photo-thumb { position:relative; width:96px; height:96px; border-radius:5px; overflow:hidden; border:2px solid var(--border); flex-shrink:0; cursor:pointer; transition:border-color 0.12s, transform 0.12s; }
+  .strip-photo-thumb:hover { transform:scale(1.03); }
+  .strip-photo-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .strip-photo-thumb.is-headshot { border:3px solid #facc15; }
+  .strip-photo-thumb.is-headshot::after { content:'HEADSHOT'; position:absolute; bottom:0; left:0; right:0; background:rgba(250,204,21,0.92); color:#111; font-size:8px; letter-spacing:0.12em; font-weight:600; text-align:center; padding:2px 0; }
+  .strip-photo-thumb.is-pending { border:3px solid #f87171; }
+  .strip-photo-thumb.is-pending::after { content:'NEW HEADSHOT'; position:absolute; bottom:0; left:0; right:0; background:rgba(248,113,113,0.92); color:#fff; font-size:8px; letter-spacing:0.12em; font-weight:600; text-align:center; padding:2px 0; }
+  .rechoose-active .strip-photo-thumb:not(.is-headshot):hover { border-color:#f87171; }
+  .photo-controls { display:flex; flex-direction:column; gap:6px; align-items:flex-end; flex-shrink:0; }
+  .photo-action-btn { background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); border-radius:var(--radius); padding:6px 12px; font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+  .photo-action-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .photo-action-btn.danger { border-color:#f87171; color:#f87171; }
+  .photo-hint { font-size:10px; color:var(--warning); text-align:right; max-width:180px; }
+  /* LIGHTBOX */
+  #lightbox { position:fixed; inset:0; background:rgba(8,8,10,0.95); z-index:99999; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
+  #lightbox.open { display:flex; }
+  #lightbox-img { max-width:88vw; max-height:78vh; object-fit:contain; border-radius:6px; box-shadow:0 20px 80px rgba(0,0,0,0.7); }
+  .lightbox-caption { display:flex; align-items:center; gap:12px; color:var(--text-muted); font-size:12px; }
+  .lightbox-hs-badge { background:#facc15; color:#111; font-size:9px; letter-spacing:0.12em; font-weight:700; padding:3px 8px; border-radius:3px; }
+  .lightbox-btn { background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:var(--radius); padding:8px 16px; font-family:var(--font-mono); font-size:11px; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; transition:all 0.15s; }
+  .lightbox-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .lightbox-nav { position:fixed; top:50%; transform:translateY(-50%); background:rgba(28,28,31,0.85); border:1px solid var(--border); color:var(--text); width:46px; height:46px; border-radius:50%; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; user-select:none; }
+  .lightbox-nav:hover { border-color:var(--accent); color:var(--accent); }
+  #lightbox-prev { left:24px; } #lightbox-next { right:24px; }
+  #lightbox-close { position:fixed; top:20px; right:24px; background:rgba(28,28,31,0.85); border:1px solid var(--border); color:var(--text); width:40px; height:40px; border-radius:50%; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  #lightbox-close:hover { border-color:var(--danger); color:var(--danger); }
 
   /* STICKY GENERAL NOTES IN INTERVIEW VIEW */
   .iv-notes-sticky { position:sticky; top:0; z-index:50; background:var(--surface); border-bottom:1px solid var(--border); padding:10px 0 14px; margin-bottom:20px; }
@@ -268,6 +290,20 @@
 <div id="loading-screen" style="display:none"><div class="spinner"></div><div class="loading-text">Connecting to monday.com</div></div>
 <div id="toast"></div>
 
+<!-- LIGHTBOX GALLERY -->
+<div id="lightbox" onclick="if(event.target===this)closeLightbox()">
+  <div id="lightbox-close" onclick="closeLightbox()">✕</div>
+  <div class="lightbox-nav" id="lightbox-prev" onclick="lightboxNav(-1)">‹</div>
+  <div class="lightbox-nav" id="lightbox-next" onclick="lightboxNav(1)">›</div>
+  <img id="lightbox-img" src="" alt="">
+  <div class="lightbox-caption">
+    <span id="lightbox-name"></span>
+    <span class="lightbox-hs-badge" id="lightbox-hs-badge" style="display:none">HEADSHOT</span>
+    <span id="lightbox-counter"></span>
+  </div>
+  <button class="lightbox-btn" id="lightbox-use-btn" onclick="useAsHeadshotFromLightbox()">Use as Headshot</button>
+</div>
+
 <!-- HEADER -->
 <header>
   <div class="logo">Carnal <span>Media</span></div>
@@ -319,6 +355,10 @@
     </div>
   </div>
   <div class="strip-photo-grid" id="strip-photo-grid"></div>
+  <div class="photo-controls" id="photo-controls" style="display:none">
+    <button class="photo-action-btn" id="rechoose-btn" onclick="toggleRechoose()">Re-choose Headshot</button>
+    <div class="photo-hint" id="photo-hint"></div>
+  </div>
 </div>
 
 <div class="main">
@@ -733,10 +773,10 @@ const BOARD_ID = '3636652411';
 const API_URL  = 'https://api.monday.com/v2';
 
 // Status label index → mode key
-const MODE_STATUS_IDS = { '0':[5], '1':[8], '2':[10], '3':[7], '4':[9], '5a':[2], '5r':[3] };
+const MODE_STATUS_IDS = { '0':[5], '1':[8], '2':[10], '3':[7], '4':[9], '5a':[2,4,105], '5r':[3] };
 // Status index → hex colors
-const STATUS_COLORS = {5:{bg:'#c4c4c4',fg:'#111'},8:{bg:'#cab641',fg:'#111'},10:{bg:'#ff6d3b',fg:'#fff'},7:{bg:'#ffcb00',fg:'#111'},9:{bg:'#579bfc',fg:'#fff'},2:{bg:'#037f4c',fg:'#fff'},3:{bg:'#df2f4a',fg:'#fff'}};
-const STATUS_LABELS = {5:'0-APPLICANT',8:'1-SCREEN',10:'2-POTENTIAL',7:'3-INTERVIEW',9:'4-REVIEW',2:'5-APPROVED',3:'5-REJECTED'};
+const STATUS_COLORS = {5:{bg:'#c4c4c4',fg:'#111'},8:{bg:'#cab641',fg:'#111'},10:{bg:'#ff6d3b',fg:'#fff'},7:{bg:'#ffcb00',fg:'#111'},9:{bg:'#579bfc',fg:'#fff'},2:{bg:'#037f4c',fg:'#fff'},3:{bg:'#df2f4a',fg:'#fff'},4:{bg:'#9d50dd',fg:'#fff'},105:{bg:'#00c875',fg:'#fff'}};
+const STATUS_LABELS = {5:'0-APPLICANT',8:'1-SCREEN',10:'2-POTENTIAL',7:'3-INTERVIEW',9:'4-REVIEW',2:'5-APPROVED',3:'5-REJECTED',4:'00 - ALL-STAR',105:'00 - EXCLUSIVE'};
 
 let currentMode = '0';
 let allCandidates = [];
@@ -1242,6 +1282,11 @@ async function saveRecord(){
     const cv=buildColumnValues();
     await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
       {i:currentItem.id,b:BOARD_ID,c:JSON.stringify(cv)});
+    // Apply pending headshot swap (old headshot → extras, chosen → headshot)
+    if(pendingHeadshotAssetId){
+      try { await applyHeadshotSwap(); loadCandidatePhotos(currentItem.id); }
+      catch(e){ showToast('Headshot swap failed: '+e.message,'error'); console.error(e); }
+    }
     isDirty=false;
     document.getElementById('unsaved-dot').classList.remove('visible');
     document.getElementById('save-status').textContent='Saved '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
@@ -1252,15 +1297,25 @@ async function saveRecord(){
 }
 
 // ── LOAD PHOTOS FROM MONDAY ──
+// ── GALLERY STATE ──
+// photoState holds the RAW file entries from monday (incl. non-images) so the
+// headshot swap can rewrite the columns without losing any attachments.
+let photoState = { headshotEntries: [], extraEntries: [] };
+let candidatePhotos = [];          // display list: {assetId, url, name, isHeadshot}
+let pendingHeadshotAssetId = null; // chosen replacement, applied on Save
+let rechooseMode = false;
+let lightboxIndex = 0;
+
 async function loadCandidatePhotos(itemId){
-  // Reset photo grid
   const grid = document.getElementById('strip-photo-grid');
   const avatarWrap = document.getElementById('candidate-avatar-wrap');
   grid.innerHTML = '';
   avatarWrap.innerHTML = '<div class="candidate-avatar-placeholder" id="avatar-initial">'+document.getElementById('strip-name').textContent.charAt(0).toUpperCase()+'</div>';
+  photoState = { headshotEntries: [], extraEntries: [] };
+  candidatePhotos = [];
+  document.getElementById('photo-controls').style.display = 'none';
 
   try {
-    // assets = all files on the item; column_values tell us which assetIds belong to which file column
     const data = await gql(`{items(ids:[${itemId}]){
       assets{id public_url file_extension name}
       column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}
@@ -1271,43 +1326,138 @@ async function loadCandidatePhotos(itemId){
     const assetById = {};
     (item.assets || []).forEach(a => assetById[String(a.id)] = a);
 
-    // File column value JSON looks like: {"files":[{"assetId":123,"name":"x.jpg",...},...]}
-    const colAssetIds = colId => {
+    const colEntries = colId => {
       const cv = (item.column_values || []).find(c => c.id === colId);
       if(!cv?.value) return [];
-      try { return (JSON.parse(cv.value).files || []).map(f => String(f.assetId)); }
-      catch { return []; }
+      try { return JSON.parse(cv.value).files || []; } catch { return []; }
     };
+    photoState.headshotEntries = colEntries('files_mkncw5nm');
+    photoState.extraEntries    = colEntries('file_mkp1n4bt');
 
     const isImg = a => a && ['jpg','jpeg','png','webp','gif'].includes((a.file_extension||'').toLowerCase().replace('.',''));
 
-    const headshots = colAssetIds('files_mkncw5nm').map(id => assetById[id]).filter(isImg);
-    const extras    = colAssetIds('file_mkp1n4bt').map(id => assetById[id]).filter(isImg);
-
-    // Show headshot as avatar
-    if(headshots.length > 0){
-      avatarWrap.innerHTML = `<img src="${headshots[0].public_url}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">`;
-    }
-
-    // Show all photos in grid (headshots first then extras, max 6 shown)
-    const allImgs = [...headshots, ...extras];
-    allImgs.slice(0, 6).forEach(img => {
-      const thumb = document.createElement('div');
-      thumb.className = 'strip-photo-thumb';
-      thumb.innerHTML = `<img src="${img.public_url}" title="${img.name}" loading="lazy">`;
-      thumb.onclick = () => window.open(img.public_url, '_blank');
-      grid.appendChild(thumb);
+    const build = (entries, isHeadshot) => entries.forEach(en => {
+      const a = assetById[String(en.assetId)];
+      if(isImg(a)) candidatePhotos.push({ assetId: en.assetId, url: a.public_url, name: a.name, isHeadshot });
     });
-    if(allImgs.length > 6){
-      const more = document.createElement('div');
-      more.className = 'strip-photo-more';
-      more.textContent = '+' + (allImgs.length - 6);
-      grid.appendChild(more);
+    build(photoState.headshotEntries, true);
+    build(photoState.extraEntries, false);
+
+    const headshot = candidatePhotos.find(p => p.isHeadshot);
+    if(headshot){
+      avatarWrap.innerHTML = `<img src="${headshot.url}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">`;
     }
+
+    renderPhotoGrid();
+    if(candidatePhotos.length > 0) document.getElementById('photo-controls').style.display = '';
   } catch(e) {
     console.log('Photo load error:', e.message);
   }
 }
+
+function renderPhotoGrid(){
+  const grid = document.getElementById('strip-photo-grid');
+  grid.innerHTML = '';
+  grid.classList.toggle('rechoose-active', rechooseMode);
+  candidatePhotos.forEach((p, i) => {
+    const thumb = document.createElement('div');
+    let cls = 'strip-photo-thumb';
+    if(p.assetId === pendingHeadshotAssetId) cls += ' is-pending';
+    else if(p.isHeadshot) cls += ' is-headshot';
+    thumb.className = cls;
+    thumb.innerHTML = `<img src="${p.url}" title="${p.name}" loading="lazy">`;
+    thumb.onclick = () => rechooseMode ? selectPendingHeadshot(p.assetId) : openLightbox(i);
+    grid.appendChild(thumb);
+  });
+  updatePhotoHint();
+}
+
+function updatePhotoHint(){
+  const hint = document.getElementById('photo-hint');
+  const btn = document.getElementById('rechoose-btn');
+  if(rechooseMode){
+    hint.textContent = 'Click a photo to make it the new headshot';
+    btn.textContent = 'Cancel';
+    btn.classList.add('danger');
+  } else if(pendingHeadshotAssetId){
+    hint.textContent = 'New headshot chosen — applies on Save';
+    btn.textContent = 'Cancel New Headshot';
+    btn.classList.add('danger');
+  } else {
+    hint.textContent = '';
+    btn.textContent = 'Re-choose Headshot';
+    btn.classList.remove('danger');
+  }
+}
+
+function toggleRechoose(){
+  if(pendingHeadshotAssetId){ pendingHeadshotAssetId = null; rechooseMode = false; }
+  else rechooseMode = !rechooseMode;
+  renderPhotoGrid();
+}
+
+function selectPendingHeadshot(assetId){
+  const p = candidatePhotos.find(x => x.assetId === assetId);
+  if(!p) return;
+  if(p.isHeadshot){ rechooseMode = false; renderPhotoGrid(); return; } // already the headshot
+  pendingHeadshotAssetId = assetId;
+  rechooseMode = false;
+  renderPhotoGrid();
+  markDirty();
+  showToast('New headshot selected — hit Save to apply','saving');
+}
+
+// Builds the swap and writes both file columns referencing existing assetIds
+async function applyHeadshotSwap(){
+  if(!pendingHeadshotAssetId || !currentItem) return;
+  const all = [...photoState.headshotEntries, ...photoState.extraEntries];
+  const chosen = all.find(e => e.assetId === pendingHeadshotAssetId);
+  if(!chosen) throw new Error('Chosen photo not found on item');
+  const rest = all.filter(e => e.assetId !== pendingHeadshotAssetId);
+  const cv = {
+    'files_mkncw5nm': { files: [chosen] },
+    'file_mkp1n4bt':  { files: rest }
+  };
+  await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+    {i: currentItem.id, b: BOARD_ID, c: JSON.stringify(cv)});
+  pendingHeadshotAssetId = null;
+  rechooseMode = false;
+}
+
+// ── LIGHTBOX ──
+function openLightbox(i){
+  lightboxIndex = i;
+  renderLightbox();
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox(){
+  document.getElementById('lightbox').classList.remove('open');
+}
+function lightboxNav(dir){
+  if(candidatePhotos.length === 0) return;
+  lightboxIndex = (lightboxIndex + dir + candidatePhotos.length) % candidatePhotos.length;
+  renderLightbox();
+}
+function renderLightbox(){
+  const p = candidatePhotos[lightboxIndex];
+  if(!p) return;
+  document.getElementById('lightbox-img').src = p.url;
+  document.getElementById('lightbox-name').textContent = p.name;
+  document.getElementById('lightbox-counter').textContent = (lightboxIndex+1) + ' / ' + candidatePhotos.length;
+  document.getElementById('lightbox-hs-badge').style.display = p.isHeadshot ? '' : 'none';
+  document.getElementById('lightbox-use-btn').style.display = p.isHeadshot ? 'none' : '';
+}
+function useAsHeadshotFromLightbox(){
+  const p = candidatePhotos[lightboxIndex];
+  if(p){ selectPendingHeadshot(p.assetId); closeLightbox(); }
+}
+document.addEventListener('keydown', e => {
+  const lb = document.getElementById('lightbox');
+  if(!lb || !lb.classList.contains('open')) return;
+  if(e.key === 'Escape') closeLightbox();
+  if(e.key === 'ArrowLeft') lightboxNav(-1);
+  if(e.key === 'ArrowRight') lightboxNav(1);
+});
 
 // ── PHOTO STATE ──
 let headshotFiles = [];   // max 1
@@ -1631,6 +1781,8 @@ function goFSection(i){
 // ── RESET ──
 function resetForm(){
   currentItem=null;isDirty=false;statusValues={};selectValues={};multiValues={};
+  pendingHeadshotAssetId=null;rechooseMode=false;candidatePhotos=[];closeLightbox();
+  const pc=document.getElementById('photo-controls');if(pc)pc.style.display='none';
   document.getElementById('unsaved-dot').classList.remove('visible');
   document.getElementById('save-status').textContent='';
   document.getElementById('save-btn').disabled=true;
