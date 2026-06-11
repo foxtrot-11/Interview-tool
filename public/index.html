@@ -161,7 +161,9 @@
   #interview-view { max-width: 600px; }
   /* In interview mode the strip is moved inside the scrolling form so it scrolls away;
      only the General Notes box stays sticky */
-  #interview-view .candidate-strip { border:1px solid var(--border); border-radius:6px; margin-bottom:16px; padding:12px 14px; max-height:none; overflow:visible; }
+  #interview-view .candidate-strip { border:1px solid var(--border); border-radius:6px; margin-bottom:16px; padding:12px 14px; max-height:none; overflow:visible; flex-wrap:wrap; }
+  #interview-view .candidate-strip .photo-controls { order:1; }
+  #interview-view .candidate-strip .strip-photo-grid { order:2; flex-basis:100%; }
 
   /* BIGGER HEADSHOT IN STRIP */
   .candidate-avatar { width:64px!important; height:64px!important; border-radius:6px!important; }
