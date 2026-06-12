@@ -39,6 +39,46 @@
   .mode-btn.active[data-mode="5a"]{background:#037f4c;color:#fff}
   .mode-btn.active[data-mode="5r"]{background:#df2f4a;color:#fff}
   .mode-btn.active[data-mode="new"]{background:var(--accent);color:var(--bg)}
+  .mode-btn.batch-btn{border-left:1px solid var(--border)}
+  .mode-btn.dup-btn{border-left:1px solid var(--border)}
+  .mode-btn.active[data-mode="dup"]{background:#f87171;color:#fff}
+
+  /* DUPLICATES VIEW */
+  .dup-group{background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:20px;overflow:hidden}
+  .dup-group-header{padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .dup-group-name{font-family:var(--font-display);font-weight:700;font-size:15px;color:var(--text)}
+  .dup-group-count{font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase}
+  .dup-case-badge{font-size:10px;padding:3px 8px;border-radius:3px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase}
+  .dup-case-1{background:#facc1520;color:#facc15;border:1px solid #facc1540}
+  .dup-case-2{background:#60a5fa20;color:#60a5fa;border:1px solid #60a5fa40}
+  .dup-case-3{background:#f8717120;color:#f87171;border:1px solid #f8717140}
+  .dup-case-4{background:#4ade8020;color:#4ade80;border:1px solid #4ade8040}
+  .dup-items{display:flex;gap:12px;padding:14px;flex-wrap:wrap;overflow-x:auto}
+  .dup-item-card{background:var(--bg);border:2px solid var(--border);border-radius:6px;padding:12px;min-width:220px;flex:1;max-width:320px;cursor:pointer;transition:border-color 0.15s;position:relative}
+  .dup-item-card:hover{border-color:var(--accent)}
+  .dup-item-card.oldest{border-color:#4ade80}
+  .dup-item-card.oldest::before{content:"OLDEST (KEEP)";position:absolute;top:-1px;left:8px;background:#4ade80;color:#000;font-size:9px;font-weight:700;letter-spacing:0.1em;padding:2px 6px;border-radius:0 0 4px 4px}
+  .dup-item-card.will-delete{border-color:#f87171;opacity:0.8}
+  .dup-item-field{font-size:11px;margin-bottom:4px;display:flex;gap:6px}
+  .dup-item-field-label{color:var(--text-muted);flex-shrink:0;min-width:80px}
+  .dup-item-field-val{color:var(--text);word-break:break-word}
+  .dup-item-photos{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+  .dup-item-photo{width:40px;height:40px;object-fit:cover;border-radius:3px;border:1px solid var(--border)}
+  .dup-actions{padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .merge-btn{background:#facc15;color:#111;border:none;border-radius:var(--radius);padding:8px 18px;font-family:var(--font-display);font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:all 0.15s}
+  .merge-btn:hover{background:#fde047}
+  .merge-btn:disabled{opacity:0.4;cursor:not-allowed}
+  .keep-btn{background:var(--surface2);border:1px solid #4ade80;color:#4ade80;border-radius:var(--radius);padding:8px 14px;font-family:var(--font-mono);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer}
+  .skip-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:var(--radius);padding:8px 14px;font-family:var(--font-mono);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer}
+  .dup-merge-log{font-family:var(--font-mono);font-size:11px;line-height:1.7;color:var(--text-muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:10px 12px;margin-top:8px;white-space:pre-wrap;max-height:160px;overflow-y:auto;display:none}
+  .dup-merge-log.visible{display:block}
+  .log-ok{color:var(--success)}
+  .log-warn{color:var(--warning)}
+  .log-err{color:var(--danger)}
+  .dup-empty{text-align:center;padding:60px 20px;color:var(--text-muted);font-size:13px}
+  .dup-loading{text-align:center;padding:40px;color:var(--text-muted);font-size:12px;letter-spacing:0.15em;text-transform:uppercase}
+  .dup-refresh-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:var(--radius);padding:6px 14px;font-family:var(--font-mono);font-size:11px;cursor:pointer;margin-left:auto}
+  .dup-refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
 
   .save-area{display:flex;align-items:center;gap:10px;flex-shrink:0}
   .unsaved-dot{width:6px;height:6px;border-radius:50%;background:var(--warning);display:none}
@@ -341,6 +381,7 @@
     <button class="mode-btn" data-mode="5a" onclick="setMode('5a')">5-APPROVED</button>
     <button class="mode-btn" data-mode="5r" onclick="setMode('5r')">5-REJECTED</button>
     <button class="mode-btn batch-btn" data-mode="batch" onclick="setMode('batch')">EVERNOTE BATCH IMPORT</button>
+    <button class="mode-btn dup-btn" data-mode="dup" onclick="setMode('dup')">DUPLICATES</button>
   </div>
 
   <div class="save-area">
@@ -760,6 +801,18 @@
       </div>
     </div><!-- /new-model-view -->
 
+    <!-- DUPLICATES VIEW -->
+    <div id="dup-view" style="display:none">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <div style="font-family:var(--font-display);font-size:20px;font-weight:700">Duplicates</div>
+        <div style="font-size:11px;color:var(--text-muted)" id="dup-summary"></div>
+        <button class="dup-refresh-btn" onclick="loadDuplicates()">↺ Refresh</button>
+      </div>
+      <div id="dup-groups-container">
+        <div class="dup-loading">Scanning boards for duplicates...</div>
+      </div>
+    </div>
+
   </div><!-- /form-area -->
 </div><!-- /main -->
 
@@ -877,6 +930,17 @@ async function setMode(mode){
   currentMode=mode;
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
   resetForm();
+  if(mode==='dup'){
+    hide('selector-bar');
+    hide('candidate-strip');
+    hide('empty-state');
+    hide('full-view');
+    hide('interview-view');
+    hide('new-model-view');
+    show('dup-view');
+    loadDuplicates();
+    return;
+  }
   if(mode==='new'){
     hide('selector-bar');
     hide('candidate-strip');
@@ -889,6 +953,7 @@ async function setMode(mode){
     document.getElementById('save-btn').disabled=false;
     return;
   }
+  hide('dup-view');
   show('selector-bar');
   hide('new-model-view');
   hide('full-view');
@@ -1975,6 +2040,438 @@ async function bootCheck(){
     init();
   }
   // else: pw-gate stays visible, waiting for input
+}
+
+
+// ════════════════════════════════════════════════════
+// DUPLICATES ENGINE
+// ════════════════════════════════════════════════════
+
+// Columns skipped during merge comparison (system/read-only/formula)
+const SKIP_COLS = new Set(['name','sous__l_ments','formula_mkncvm1n','multiple_person_mm1znj7j',
+  'people','people7','people8','status0','dup__of_biopic_selector','dup__of_bio_pic_status',
+  'dup__of_biopic_status','color_mm26br5p','date_mm2cq4tj','date_mm2n67q2']);
+
+// Columns that are "high stakes" — never overwrite with import value in Case 1/4
+const PRESERVE_COLS = new Set(['label','numeric_mm1z34ca','numeric_mm1zjjrp','text_mm1znrfv',
+  'text_mm1zb8xf','date_mknb5z70','long_text_mktg36ee']);
+
+// DUPLICATE status index = 12; EVERNOTE IMPORT = 11
+const STATUS_DUPLICATE = 12;
+const STATUS_EVERNOTE  = 11;
+
+// Production statuses — extra caution (Case 4)
+const PRODUCTION_STATUSES = new Set([7,9,2,4,105]); // INTERVIEW,REVIEW,APPROVED,ALL-STAR,EXCLUSIVE
+
+let dupGroups = []; // [{name, items:[{id,name,created_at,statusIdx,cols,assets,board}]}]
+
+// ── Load all duplicates from both boards ──
+async function loadDuplicates(){
+  const container = document.getElementById('dup-groups-container');
+  const summary   = document.getElementById('dup-summary');
+  container.innerHTML = '<div class="dup-loading">Scanning both boards...</div>';
+  summary.textContent = '';
+
+  try {
+    // Fetch all items from both boards (name + status + created_at only for grouping)
+    const allItems = [];
+    for(const boardId of [MAIN_BOARD_ID, BATCH_BOARD_ID]){
+      let cursor = null;
+      do {
+        const cp = cursor ? `cursor:"${cursor}"` : 'limit:200';
+        const data = await gql(`{boards(ids:[${boardId}]){items_page(${cp}){cursor items{id name created_at column_values(ids:["label"]){value}}}}}`);
+        const page = data.boards[0].items_page;
+        page.items.forEach(it => {
+          let statusIdx = null;
+          try { statusIdx = JSON.parse(it.column_values[0].value)?.index ?? null; } catch {}
+          allItems.push({ id: it.id, name: it.name.trim(), created_at: it.created_at, statusIdx, board: boardId });
+        });
+        cursor = page.cursor;
+      } while(cursor);
+    }
+
+    // Group by normalised name (lowercase, trimmed)
+    const byName = {};
+    allItems.forEach(it => {
+      const key = it.name.toLowerCase();
+      (byName[key] = byName[key] || []).push(it);
+    });
+
+    // Keep only groups that have at least one DUPLICATE-status item
+    dupGroups = Object.values(byName)
+      .filter(g => g.some(it => it.statusIdx === STATUS_DUPLICATE))
+      .map(g => ({ name: g[0].name, items: g.sort((a,b) => new Date(a.created_at)-new Date(b.created_at)) }));
+
+    summary.textContent = dupGroups.length
+      ? `${dupGroups.length} group${dupGroups.length>1?'s':''} found`
+      : '';
+
+    if(!dupGroups.length){
+      container.innerHTML = '<div class="dup-empty">✓ No duplicates found on either board</div>';
+      return;
+    }
+    renderDupGroups();
+  } catch(e){
+    container.innerHTML = `<div class="dup-empty log-err">Failed to load: ${e.message}</div>`;
+    console.error(e);
+  }
+}
+
+function classifyCase(group){
+  const items = group.items;
+  const hasDup  = items.some(it => it.statusIdx === STATUS_DUPLICATE);
+  const hasEv   = items.some(it => it.statusIdx === STATUS_EVERNOTE);
+  const hasProd = items.some(it => PRODUCTION_STATUSES.has(it.statusIdx));
+  if(items.length === 2 && !hasProd && items.every(it => it.statusIdx === STATUS_DUPLICATE || it.statusIdx === STATUS_EVERNOTE))
+    return {case:2, label:'Identical imports'};
+  if(hasProd && items.length === 2)
+    return {case:1, label:'Existing + new import'};
+  if(hasProd && items.length > 2)
+    return {case:3, label:'Multi-version cascade'};
+  if(hasProd)
+    return {case:4, label:'Production + import'};
+  return {case:2, label:'Duplicate imports'};
+}
+
+function renderDupGroups(){
+  const container = document.getElementById('dup-groups-container');
+  container.innerHTML = '';
+  dupGroups.forEach((group, gi) => {
+    const {case:c, label} = classifyCase(group);
+    const oldest = group.items[0];
+    const div = document.createElement('div');
+    div.className = 'dup-group';
+    div.id = `dup-group-${gi}`;
+
+    const caseColors = {1:'dup-case-1',2:'dup-case-2',3:'dup-case-3',4:'dup-case-4'};
+    div.innerHTML = `
+      <div class="dup-group-header">
+        <div class="dup-group-name">${group.items[0].name}</div>
+        <div class="dup-group-count">${group.items.length} versions</div>
+        <div class="dup-case-badge ${caseColors[c]}">Case ${c}: ${label}</div>
+        <div style="margin-left:auto;font-size:10px;color:var(--text-dim)">oldest: ${oldest.created_at.slice(0,10)}</div>
+      </div>
+      <div class="dup-items" id="dup-items-${gi}">
+        <div style="padding:12px;color:var(--text-muted);font-size:12px">Loading details...</div>
+      </div>
+      <div class="dup-actions">
+        <button class="merge-btn" onclick="runMerge(${gi})" id="merge-btn-${gi}">
+          ${c===2?'Keep Oldest & Delete Others':'Merge All → Oldest'}
+        </button>
+        <button class="skip-btn" onclick="skipGroup(${gi})">Skip</button>
+        <div id="dup-log-${gi}" class="dup-merge-log"></div>
+      </div>`;
+    container.appendChild(div);
+    // Load full details async
+    loadGroupDetails(gi);
+  });
+}
+
+async function loadGroupDetails(gi){
+  const group = dupGroups[gi];
+  const container = document.getElementById(`dup-items-${gi}`);
+  try {
+    // Fetch full column values + assets for each item in the group
+    const ids = group.items.map(it=>it.id).join(',');
+    const data = await gql(`{items(ids:[${ids}]){id name created_at assets{id name file_size file_extension public_url} column_values(ids:["label","text_mknceqty","text_mkncbdr1","dropdown_mknbe0p0","date_of_birth_mkncwsrj","long_text_mktg36ee","files_mkncw5nm","file_mkp1n4bt"]){id text value}}}`);
+
+    // Merge fetched details back into dupGroups
+    const byId = {};
+    data.items.forEach(it => byId[it.id] = it);
+    group.items.forEach(it => {
+      if(byId[it.id]){
+        it.fullCols = byId[it.id].column_values;
+        it.assets   = byId[it.id].assets;
+      }
+    });
+
+    container.innerHTML = '';
+    group.items.forEach((it, idx) => {
+      const isOldest = idx === 0;
+      const card = document.createElement('div');
+      card.className = 'dup-item-card' + (isOldest?' oldest':' will-delete');
+
+      const getCol = id => (it.fullCols||[]).find(c=>c.id===id);
+      const statusText = getCol('label')?.text || '—';
+      const legal   = getCol('text_mknceqty')?.text || '';
+      const loc     = getCol('text_mkncbdr1')?.text || '';
+      const role    = getCol('dropdown_mknbe0p0')?.text || '';
+      const dob     = getCol('date_of_birth_mkncwsrj')?.text || '';
+      const notes   = getCol('long_text_mktg36ee')?.text || '';
+      const imgs    = (it.assets||[]).filter(a=>['.jpg','.jpeg','.png','.webp'].includes((a.file_extension||'').toLowerCase()));
+
+      card.innerHTML = `
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--text)">${it.name}</div>
+        <div class="dup-item-field"><span class="dup-item-field-label">Board</span><span class="dup-item-field-val" style="color:var(--text-muted);font-size:10px">${it.board===MAIN_BOARD_ID?'Main':'Batch'}</span></div>
+        <div class="dup-item-field"><span class="dup-item-field-label">Created</span><span class="dup-item-field-val">${it.created_at.slice(0,10)}</span></div>
+        <div class="dup-item-field"><span class="dup-item-field-label">Status</span><span class="dup-item-field-val">${statusText}</span></div>
+        ${legal?`<div class="dup-item-field"><span class="dup-item-field-label">Legal</span><span class="dup-item-field-val">${legal}</span></div>`:''}
+        ${loc?`<div class="dup-item-field"><span class="dup-item-field-label">Location</span><span class="dup-item-field-val">${loc}</span></div>`:''}
+        ${role?`<div class="dup-item-field"><span class="dup-item-field-label">Role</span><span class="dup-item-field-val">${role}</span></div>`:''}
+        ${dob?`<div class="dup-item-field"><span class="dup-item-field-label">DOB</span><span class="dup-item-field-val">${dob}</span></div>`:''}
+        ${notes?`<div class="dup-item-field"><span class="dup-item-field-label">Notes</span><span class="dup-item-field-val" style="font-size:10px;opacity:0.7">${notes.slice(0,80)}${notes.length>80?'…':''}</span></div>`:''}
+        <div class="dup-item-photos">
+          ${imgs.slice(0,6).map(img=>`<img class="dup-item-photo" src="${img.public_url}" title="${img.name}" loading="lazy">`).join('')}
+          ${imgs.length>6?`<div style="width:40px;height:40px;border-radius:3px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-muted)">+${imgs.length-6}</div>`:''}
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:var(--text-dim)">${imgs.length} photo${imgs.length!==1?'s':''} · ${it.id}</div>`;
+      container.appendChild(card);
+    });
+  } catch(e){
+    container.innerHTML = `<div style="padding:12px;color:var(--danger);font-size:12px">Failed to load details: ${e.message}</div>`;
+  }
+}
+
+// ── MERGE ENGINE ──
+async function runMerge(gi){
+  const group = dupGroups[gi];
+  const btn   = document.getElementById(`merge-btn-${gi}`);
+  const log   = document.getElementById(`dup-log-${gi}`);
+  btn.disabled = true;
+  log.className = 'dup-merge-log visible';
+  log.innerHTML = '';
+
+  const addLog = (msg, cls='') => {
+    log.innerHTML += `<span class="${cls}">${msg}</span>\n`;
+    log.scrollTop = log.scrollHeight;
+  };
+
+  try {
+    // Make sure all items have full data loaded
+    const missing = group.items.filter(it => !it.fullCols);
+    if(missing.length){
+      addLog('Loading full data...');
+      const ids = missing.map(it=>it.id).join(',');
+      const d = await gql(`{items(ids:[${ids}]){id assets{id name file_size file_extension public_url} column_values{id text value}}}`);
+      d.items.forEach(it => {
+        const target = group.items.find(x=>x.id===it.id);
+        if(target){ target.fullCols=it.column_values; target.assets=it.assets; }
+      });
+    }
+
+    const {case:c} = classifyCase(group);
+    const oldest = group.items[0];
+    const rest   = group.items.slice(1);
+    addLog(`Merge strategy: Case ${c} — ${rest.length} item(s) → oldest (${oldest.id})`);
+
+    // ── CASE 2: identical imports — just delete all but oldest ──
+    if(c === 2){
+      addLog('Case 2: verifying similarity then deleting newer copies...');
+      for(const dup of rest){
+        addLog(`  Deleting ${dup.name} (${dup.id}) from ${dup.board===MAIN_BOARD_ID?'main':'batch'} board...`);
+        await gql(`mutation{delete_item(item_id:${dup.id}){id}}`);
+        addLog(`  ✓ Deleted ${dup.id}`, 'log-ok');
+      }
+      addLog('✓ Done — oldest record kept', 'log-ok');
+      btn.textContent = '✓ Merged';
+      return;
+    }
+
+    // ── CASES 1, 3, 4: cascade merge newest→...→oldest ──
+    // Build merge order: process items newest→second-newest, then result→oldest
+    // We merge in pairs: always merge NEWER into OLDER
+    addLog('Building merged column values...');
+
+    // Load ALL column values for oldest (we need every field)
+    const fullOldestData = await gql(`{items(ids:[${oldest.id}]){column_values{id text value}}}`);
+    const oldestColMap = {};
+    fullOldestData.items[0].column_values.forEach(c => oldestColMap[c.id] = c);
+
+    const mergeNotes = []; // conflicts logged here
+    const newColValues = {}; // fields to write to oldest
+
+    // Process each newer item, oldest-first among the "rest" (so last one wins for missing fields)
+    for(const newer of rest){
+      addLog(`Processing ${newer.name} (${newer.id})...`);
+
+      // Load full cols for this item if not already loaded
+      let newerCols = newer.fullCols;
+      if(!newerCols || newerCols.length < 50){
+        const nd = await gql(`{items(ids:[${newer.id}]){column_values{id text value}}}`);
+        newerCols = nd.items[0].column_values;
+      }
+
+      newerCols.forEach(nc => {
+        if(SKIP_COLS.has(nc.id)) return;
+        if(!nc.value && !nc.text) return; // newer has nothing — skip
+        const oc = oldestColMap[nc.id];
+        const oldHasValue = oc && (oc.value || oc.text);
+
+        if(PRESERVE_COLS.has(nc.id)){
+          // Never overwrite preserve cols — but log conflict if both have values and they differ
+          if(oldHasValue && oc.text !== nc.text && nc.id !== 'long_text_mktg36ee'){
+            mergeNotes.push(`${nc.id}: new="${nc.text}" (kept original: "${oc.text}")`);
+          }
+          return; // don't write
+        }
+
+        if(!oldHasValue){
+          // Oldest is empty — port from newer
+          newColValues[nc.id] = nc.value;
+          addLog(`  + Porting ${nc.id}: "${(nc.text||'').slice(0,40)}"`, 'log-ok');
+        } else if(oc.text !== nc.text){
+          // Both have values but they differ — keep oldest, note the conflict
+          mergeNotes.push(`${nc.id}: new="${(nc.text||'').slice(0,60)}" (kept original: "${(oc.text||'').slice(0,60)}")`);
+          addLog(`  ~ Conflict ${nc.id}: keeping original, logging new value`, 'log-warn');
+        }
+        // If identical — nothing to do
+      });
+    }
+
+    // ── Port general notes ──
+    const oldNotes = (oldestColMap['long_text_mktg36ee']?.text || '').trim();
+    let newNotes = oldNotes;
+    if(mergeNotes.length){
+      const stamp = `\n\n[MERGE ${new Date().toISOString().slice(0,10)} — conflicting values from duplicate(s)]`;
+      newNotes = oldNotes + stamp + '\n' + mergeNotes.map(n=>`• ${n}`).join('\n');
+      addLog(`  ~ Appended ${mergeNotes.length} conflict(s) to General Notes`, 'log-warn');
+    }
+    if(newNotes !== oldNotes) newColValues['long_text_mktg36ee'] = {text: newNotes};
+
+    // ── Write merged cols to oldest ──
+    if(Object.keys(newColValues).length){
+      addLog(`Writing ${Object.keys(newColValues).length} ported fields to oldest item...`);
+      // Filter out values that are JSON strings we can pass directly
+      const writeVals = {};
+      Object.entries(newColValues).forEach(([k,v]) => {
+        if(v === null || v === undefined) return;
+        writeVals[k] = typeof v === 'string' ? JSON.parse(v) : v;
+      });
+      if(Object.keys(writeVals).length){
+        await gql(
+          `mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:true){id}}`,
+          {i: oldest.id, b: oldest.board, c: JSON.stringify(writeVals)}
+        );
+        addLog('  ✓ Fields written', 'log-ok');
+      }
+    } else {
+      addLog('  No new fields to port (oldest already has all values)');
+    }
+
+    // ── Merge photos ──
+    addLog('Merging photos...');
+    await mergePhotos(oldest, rest, addLog);
+
+    // ── Post merge comment then delete each newer item ──
+    for(const newer of rest){
+      const comment = `MERGED INTO ${oldest.id} (${oldest.name}) on ${new Date().toISOString().slice(0,10)}. ${mergeNotes.length} conflicting fields logged in General Notes of the kept record.`;
+      try {
+        await gql(`mutation($i:ID!,$b:String!){create_update(item_id:$i,body:$b){id}}`,
+          {i: newer.id, b: comment});
+        addLog(`  Comment posted on ${newer.id} before deletion`);
+      } catch(e){ addLog(`  (Comment post failed: ${e.message})`, 'log-warn'); }
+
+      addLog(`Deleting ${newer.name} (${newer.id})...`);
+      await gql(`mutation{delete_item(item_id:${newer.id}){id}}`);
+      addLog(`  ✓ Deleted`, 'log-ok');
+    }
+
+    addLog('✓ Merge complete', 'log-ok');
+    btn.textContent = '✓ Merged';
+
+    // Remove from dupGroups so refresh shows accurately
+    dupGroups.splice(gi, 1);
+
+  } catch(e){
+    addLog(`✗ Error: ${e.message}`, 'log-err');
+    btn.disabled = false;
+    console.error(e);
+  }
+}
+
+async function mergePhotos(oldest, rest, addLog){
+  // Build the current file entries for oldest (headshot + extras)
+  const fullData = await gql(`{items(ids:[${oldest.id}]){
+    assets{id name file_size file_extension}
+    column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}
+  }}`);
+  const item = fullData.items[0];
+  const assetById = {};
+  item.assets.forEach(a => assetById[String(a.id)] = a);
+
+  const colEntries = colId => {
+    const cv = item.column_values.find(c=>c.id===colId);
+    if(!cv?.value) return [];
+    try { return JSON.parse(cv.value).files || []; } catch { return []; }
+  };
+  const existingHeadshot = colEntries('files_mkncw5nm');
+  const existingExtras   = colEntries('file_mkp1n4bt');
+
+  // Dedup key: name+size
+  const dedupKey = entry => {
+    const a = assetById[String(entry.assetId)];
+    return a ? `${a.name}|${a.file_size}` : String(entry.assetId);
+  };
+  const seenKeys = new Set([...existingHeadshot, ...existingExtras].map(e => dedupKey(e)));
+
+  let newExtras = [...existingExtras];
+  let newHeadshot = [...existingHeadshot];
+  let added = 0;
+
+  for(const newer of rest){
+    const nd = await gql(`{items(ids:[${newer.id}]){
+      assets{id name file_size file_extension}
+      column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}
+    }}`);
+    const ni = nd.items[0];
+    const naById = {};
+    ni.assets.forEach(a => naById[String(a.id)] = a);
+
+    const nColEntries = colId => {
+      const cv = ni.column_values.find(c=>c.id===colId);
+      if(!cv?.value) return [];
+      try { return JSON.parse(cv.value).files||[]; } catch { return []; }
+    };
+
+    // Try to port headshot if oldest has none
+    if(!newHeadshot.length){
+      const nh = nColEntries('files_mkncw5nm');
+      if(nh.length){
+        const key = `${naById[String(nh[0].assetId)]?.name}|${naById[String(nh[0].assetId)]?.file_size}`;
+        if(!seenKeys.has(key)){
+          newHeadshot = [nh[0]];
+          seenKeys.add(key);
+          addLog(`  + Porting headshot from ${newer.id}`, 'log-ok');
+          added++;
+        }
+      }
+    }
+
+    // Port all extra photos (dedup by name+size)
+    const ne = [...nColEntries('files_mkncw5nm').slice(newHeadshot.length?1:0), ...nColEntries('file_mkp1n4bt')];
+    for(const entry of ne){
+      const a = naById[String(entry.assetId)];
+      const key = a ? `${a.name}|${a.file_size}` : String(entry.assetId);
+      if(seenKeys.has(key)){
+        addLog(`  ~ Skipping duplicate photo: ${a?.name||entry.assetId}`);
+        continue;
+      }
+      seenKeys.add(key);
+      newExtras.push(entry);
+      added++;
+      addLog(`  + Adding photo: ${a?.name||entry.assetId}`, 'log-ok');
+    }
+  }
+
+  if(added === 0){
+    addLog('  No new photos to add (all duplicates by name+size)');
+    return;
+  }
+
+  // Write merged photo columns back to oldest
+  const cv = {};
+  if(newHeadshot.length) cv['files_mkncw5nm'] = {files: newHeadshot};
+  cv['file_mkp1n4bt'] = {files: newExtras};
+  await gql(
+    `mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+    {i: oldest.id, b: oldest.board, c: JSON.stringify(cv)}
+  );
+  addLog(`  ✓ Merged ${added} new photo(s)`, 'log-ok');
+}
+
+function skipGroup(gi){
+  const el = document.getElementById(`dup-group-${gi}`);
+  if(el){ el.style.opacity='0.4'; el.style.pointerEvents='none'; }
 }
 
 bootCheck();
