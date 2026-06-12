@@ -856,16 +856,6 @@ async function setMode(mode){
   currentMode=mode;
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
   resetForm();
-  // INTERVIEW mode: strip lives inside the scrollable form (scrolls away, notes stay sticky).
-  // All other modes: strip pinned above the form as usual.
-  const strip = document.getElementById('candidate-strip');
-  if(mode === '3'){
-    const iv = document.getElementById('interview-view');
-    if(strip && iv && strip.parentElement !== iv) iv.insertBefore(strip, iv.firstChild);
-  } else {
-    const mainEl = document.querySelector('.main');
-    if(strip && mainEl && strip.parentElement !== document.body) document.body.insertBefore(strip, mainEl);
-  }
   if(mode==='new'){
     hide('selector-bar');
     hide('candidate-strip');
