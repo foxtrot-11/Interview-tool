@@ -61,14 +61,14 @@
   .status-dot{width:5px;height:5px;border-radius:50%}
 
   /* CANDIDATE STRIP */
-  .candidate-strip{flex-shrink:0;background:var(--surface2);border-bottom:1px solid var(--border);padding:12px 28px;display:none;align-items:flex-start;gap:16px}
+  .candidate-strip{flex-shrink:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:20px;display:none;align-items:flex-start;gap:16px}
   .candidate-strip.visible{display:flex}
   .candidate-avatar{width:40px;height:40px;border-radius:4px;background:var(--border);overflow:hidden;flex-shrink:0;border:1px solid var(--border)}
   .candidate-avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--text-muted);background:linear-gradient(135deg,var(--surface),var(--border))}
   .candidate-name{font-family:var(--font-display);font-weight:700;font-size:16px;color:var(--text)}
   .strip-status-bar{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
   /* STICKY STATUS BAR — pinned at top of the scroll area in every view */
-  .sticky-status-bar{position:sticky;top:0;z-index:60;background:var(--bg);display:flex;align-items:center;gap:12px;padding:10px 0 12px;margin-bottom:8px;border-bottom:1px solid var(--border)}
+  .sticky-status-bar{position:sticky;top:0;z-index:60;background:var(--bg);display:flex;align-items:center;gap:12px;padding:4px 0 12px;margin-bottom:16px;border-bottom:1px solid var(--border)}
   .sticky-status-label{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);font-weight:500}
   .status-dd-wrap{position:relative}
   .status-dd-display{display:flex;align-items:center;gap:10px;cursor:pointer;border-radius:5px;padding:6px 12px;font-size:12px;font-weight:600;letter-spacing:0.05em;min-width:160px;border:2px solid transparent;transition:filter 0.12s}
@@ -296,6 +296,7 @@
 
   @media(max-width:768px){.main{grid-template-columns:1fr}.sidebar{display:none}.form-area{padding:18px 14px}.field-grid{grid-template-columns:1fr}.field-grid.triple{grid-template-columns:1fr 1fr}header{padding:0 14px}.selector-bar{padding:10px 14px}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js" defer></script>
 </head>
 <body>
 
@@ -364,25 +365,6 @@
 </div>
 
 <!-- CANDIDATE STRIP -->
-<div class="candidate-strip" id="candidate-strip">
-  <div class="candidate-avatar" id="candidate-avatar-wrap">
-    <div class="candidate-avatar-placeholder" id="avatar-initial">?</div>
-  </div>
-  <div style="flex:1">
-    <div class="candidate-name" id="strip-name">—</div>
-    <div class="candidate-meta">
-      <div class="candidate-meta-item" id="strip-age"></div>
-      <div class="candidate-meta-item" id="strip-location"></div>
-      <div class="candidate-meta-item" id="strip-role"></div>
-    </div>
-  </div>
-  <div class="strip-photo-grid" id="strip-photo-grid"></div>
-  <div class="photo-controls" id="photo-controls" style="display:none">
-    <button class="photo-action-btn" id="rechoose-btn" onclick="toggleRechoose()">Re-choose Headshot</button>
-    <div class="photo-hint" id="photo-hint"></div>
-  </div>
-</div>
-
 <div class="main">
   <!-- SIDEBAR -->
   <nav class="sidebar" id="sidebar">
@@ -405,6 +387,24 @@
           <span id="status-dd-current">—</span><span class="status-dd-chevron">▾</span>
         </div>
         <div class="status-dd-menu" id="status-dd-menu"></div>
+      </div>
+    </div>
+    <div class="candidate-strip" id="candidate-strip">
+      <div class="candidate-avatar" id="candidate-avatar-wrap">
+        <div class="candidate-avatar-placeholder" id="avatar-initial">?</div>
+      </div>
+      <div style="flex:1">
+        <div class="candidate-name" id="strip-name">—</div>
+        <div class="candidate-meta">
+          <div class="candidate-meta-item" id="strip-age"></div>
+          <div class="candidate-meta-item" id="strip-location"></div>
+          <div class="candidate-meta-item" id="strip-role"></div>
+        </div>
+      </div>
+      <div class="strip-photo-grid" id="strip-photo-grid"></div>
+      <div class="photo-controls" id="photo-controls" style="display:none">
+        <button class="photo-action-btn" id="rechoose-btn" onclick="toggleRechoose()">Re-choose Headshot</button>
+        <div class="photo-hint" id="photo-hint"></div>
       </div>
     </div>
     <div id="empty-state">
@@ -646,7 +646,7 @@
         <div class="iv-upload-section">
           <div class="iv-upload-label">Upload Extra Photos → Monday</div>
           <div class="photo-zone" id="iv-extras-zone" ondragover="onDragOver(event,'iv-extras-zone')" ondragleave="onDragLeave('iv-extras-zone')" ondrop="onDrop(event,'iv-extra')">
-            <input type="file" accept="image/*" multiple onchange="onFileSelect(event,'iv-extra')">
+            <input type="file" accept="image/*,.heic,.heif" multiple onchange="onFileSelect(event,'iv-extra')">
             <div class="photo-zone-icon">📷</div>
             <div class="photo-zone-label">Drag photos here or click to select</div>
             <div class="photo-zone-sub">Appended to Extra Pictures in Monday on save</div>
@@ -722,7 +722,7 @@
           <div class="field field-full">
             <div class="field-label">Headshot <span style="color:var(--text-dim);font-size:9px;letter-spacing:0">— 1 photo, goes to Headshot field in Monday</span></div>
             <div class="photo-zone" id="headshot-zone" ondragover="onDragOver(event,'headshot-zone')" ondragleave="onDragLeave('headshot-zone')" ondrop="onDrop(event,'headshot')">
-              <input type="file" accept="image/*" onchange="onFileSelect(event,'headshot')">
+              <input type="file" accept="image/*,.heic,.heif" onchange="onFileSelect(event,'headshot')">
               <div class="photo-zone-icon">🖼</div>
               <div class="photo-zone-label">Drag headshot here or click to select</div>
               <div class="photo-zone-sub">1 photo max · JPG, PNG, WEBP</div>
@@ -734,7 +734,7 @@
           <div class="field field-full">
             <div class="field-label">Extra Photos <span style="color:var(--text-dim);font-size:9px;letter-spacing:0">— all others go to Extra Pictures field in Monday</span></div>
             <div class="photo-zone" id="extras-zone" ondragover="onDragOver(event,'extras-zone')" ondragleave="onDragLeave('extras-zone')" ondrop="onDrop(event,'extra')">
-              <input type="file" accept="image/*" multiple onchange="onFileSelect(event,'extra')">
+              <input type="file" accept="image/*,.heic,.heif" multiple onchange="onFileSelect(event,'extra')">
               <div class="photo-zone-icon">📷</div>
               <div class="photo-zone-label">Drag extra photos here or click to select</div>
               <div class="photo-zone-sub">Multiple files OK · JPG, PNG, WEBP</div>
@@ -1532,13 +1532,19 @@ function onDrop(e, type){
   e.preventDefault();
   const zoneId = type === 'headshot' ? 'headshot-zone' : 'extras-zone';
   document.getElementById(zoneId).classList.remove('drag-over');
-  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+  const files = Array.from(e.dataTransfer.files).filter(isAcceptableImage);
   addPhotos(files, type);
 }
 function onFileSelect(e, type){
-  const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+  const files = Array.from(e.target.files).filter(isAcceptableImage);
   addPhotos(files, type);
   e.target.value = ''; // reset so same file can be re-added
+}
+// Accept standard images AND HEIC/HEIF (whose MIME type is often empty on iOS)
+function isAcceptableImage(f){
+  if(f.type && f.type.startsWith('image/')) return true;
+  const n = (f.name || '').toLowerCase();
+  return n.endsWith('.heic') || n.endsWith('.heif');
 }
 function addPhotos(files, type){
   if(type === 'headshot'){
@@ -1573,11 +1579,84 @@ function renderPreviews(containerId, files, type){
 // Upload a single file to a monday file column.
 // monday's /v2/file endpoint blocks browser CORS, so this goes through
 // our own server's /upload relay (same origin — no CORS at all).
+// Downscale + compress large images in the browser before upload.
+// iPhone photos are often 3-8MB; Render's request limit can reject them.
+// Targets: max 2000px on the long edge, JPEG quality 0.82. Skips small images.
+function isHeic(file){
+  const t = (file.type || '').toLowerCase();
+  const n = (file.name || '').toLowerCase();
+  return t.includes('heic') || t.includes('heif') || n.endsWith('.heic') || n.endsWith('.heif');
+}
+
+// Convert HEIC/HEIF → JPEG using heic2any. Canvas can't decode HEIC directly.
+async function decodeHeicIfNeeded(file){
+  if(!isHeic(file)) return file;
+  if(typeof heic2any === 'undefined'){
+    console.log('heic2any not loaded yet — sending HEIC as-is');
+    return file;
+  }
+  try {
+    const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+    const out = Array.isArray(blob) ? blob[0] : blob;
+    const newName = (file.name || 'photo').replace(/\.(heic|heif)$/i, '') + '.jpg';
+    return new File([out], newName, { type: 'image/jpeg' });
+  } catch(e) {
+    console.log('HEIC decode failed, sending original:', e.message);
+    return file;
+  }
+}
+
+async function compressImage(fileIn){
+  // First: if it's a HEIC/HEIF, convert to JPEG so the canvas can read it.
+  const file = await decodeHeicIfNeeded(fileIn);
+
+  // Only attempt for raster images we can draw. Skip if already small (<1.5MB).
+  if(!file.type.startsWith('image/')) return file;
+  if(file.size < 1.5 * 1024 * 1024) return file;
+
+  try {
+    const dataUrl = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = () => rej(new Error('read failed'));
+      r.readAsDataURL(file);
+    });
+    const img = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = () => rej(new Error('decode failed'));
+      im.src = dataUrl;
+    });
+
+    const MAX = 2000;
+    let { width, height } = img;
+    if(width <= MAX && height <= MAX && file.size < 4 * 1024 * 1024) return file; // already fine
+    if(width > height && width > MAX){ height = Math.round(height * MAX / width); width = MAX; }
+    else if(height >= width && height > MAX){ width = Math.round(width * MAX / height); height = MAX; }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.82));
+    if(!blob || blob.size >= file.size) return file; // no gain — keep original
+
+    const newName = file.name.replace(/\.(heic|heif|png|webp|jpe?g)$/i, '') + '.jpg';
+    return new File([blob], newName, { type: 'image/jpeg' });
+  } catch(e) {
+    console.log('compressImage fallback (sending original):', e.message);
+    return file; // any failure → send original unchanged
+  }
+}
+
 async function uploadFileToMonday(itemId, columnId, file, onProgress){
+  // Shrink oversized images first so we don't hit Render's request size limit
+  const sendFile = await compressImage(file);
+
   const fd = new FormData();
   fd.append('itemId', itemId);
   fd.append('columnId', columnId);
-  fd.append('file', file, file.name);
+  fd.append('file', sendFile, sendFile.name);
 
   await new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
