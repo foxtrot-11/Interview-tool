@@ -459,6 +459,7 @@
           </div>
           <div class="field"><div class="field-label">Twitter / X</div><input type="text" id="f-lien_internet" placeholder="https://twitter.com/..." oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Instagram</div><input type="text" id="f-lien_internet9" placeholder="https://instagram.com/..." oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Other Social Media</div><input type="text" id="f-lien_internet3" placeholder="https://..." oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Bluesky</div><input type="text" id="f-dup__of_facebook" placeholder="https://bsky.app/..." oninput="markDirty()"></div>
           <div class="field"><div class="field-label">OnlyFans</div><input type="text" id="f-text_mkncy7gf" placeholder="https://onlyfans.com/..." oninput="markDirty()"></div>
           <div class="field"><div class="field-label">JustForFans</div><input type="text" id="f-text_mknc3aty" placeholder="https://justfor.fans/..." oninput="markDirty()"></div>
@@ -583,6 +584,9 @@
           <div class="field"><div class="field-label">Email</div><input type="email" id="iv-text_mknk1txg" placeholder="email@domain.com" oninput="syncIvField('text_mknk1txg',this.value)"></div>
           <div class="field"><div class="field-label">Phone</div><input type="tel" id="iv-phone9ouk2t6x" placeholder="+1 ..." oninput="syncIvField('phone9ouk2t6x',this.value)"></div>
           <div class="field"><div class="field-label">Referred By</div><textarea id="iv-long_text_mm1zhkyq" oninput="syncIvField('long_text_mm1zhkyq',this.value)"></textarea></div>
+          <div class="field"><div class="field-label">Twitter / X</div><input type="text" id="iv-lien_internet" placeholder="https://twitter.com/..." oninput="syncIvField('lien_internet',this.value)"></div>
+          <div class="field"><div class="field-label">Instagram</div><input type="text" id="iv-lien_internet9" placeholder="https://instagram.com/..." oninput="syncIvField('lien_internet9',this.value)"></div>
+          <div class="field"><div class="field-label">Other Social Media</div><input type="text" id="iv-lien_internet3" placeholder="https://..." oninput="syncIvField('lien_internet3',this.value)"></div>
           <div class="field"><div class="field-label">Age</div><input type="number" id="iv-age-quick" min="18" max="99" placeholder="e.g. 28" oninput="syncAgeFromQuick(this.value)"></div>
           <div class="field"><div class="field-label">Height</div><input type="text" id="iv-text_mknc1sps" placeholder="5\u201911&quot;" oninput="syncIvField('text_mknc1sps',this.value)"></div>
           <div class="field"><div class="field-label">Weight</div><input type="text" id="iv-text_mm1yx2wg" placeholder="175 lbs" oninput="syncIvField('text_mm1yx2wg',this.value)"></div>
@@ -1067,9 +1071,9 @@ function populateForm(item){
   const fsEl=document.getElementById('f-date_mknb5z70');if(fsEl){const v=val('date_mknb5z70');fsEl.value=v?.date||'';}
 
   // Links
-  ['lien_internet','lien_internet9','dup__of_facebook'].forEach(id=>{
+  ['lien_internet','lien_internet9','lien_internet3','dup__of_facebook'].forEach(id=>{
     const v=val(id);const url=v?.url||'';
-    const el=document.getElementById('f-'+id);if(el)el.value=url;
+    ['f-','iv-','ive-'].forEach(pre=>{const el=document.getElementById(pre+id);if(el)el.value=url;});
   });
 
   // Phone
@@ -1776,7 +1780,7 @@ function buildColumnValues(){
   if(dob) cv['date_of_birth_mkncwsrj'] = {date: dob};
   const fs=gv('f-date_mknb5z70');if(fs)cv['date_mknb5z70']={date:fs};
 
-  ['lien_internet','lien_internet9','dup__of_facebook'].forEach(id=>{const v=gv('f-'+id);if(v!==null)cv[id]={url:v,text:v};});
+  ['lien_internet','lien_internet9','lien_internet3','dup__of_facebook'].forEach(id=>{const v=gv('f-'+id);if(v!==null)cv[id]={url:v,text:v};});
 
   const phone=document.getElementById('f-phone9ouk2t6x')?.value||document.getElementById('iv-phone9ouk2t6x')?.value||document.getElementById('ive-phone')?.value||'';
   if(phone)cv['phone9ouk2t6x']={phone:phone.replace(/\D/g,''),countryShortName:'US'};
