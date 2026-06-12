@@ -66,6 +66,10 @@
   .candidate-avatar{width:40px;height:40px;border-radius:4px;background:var(--border);overflow:hidden;flex-shrink:0;border:1px solid var(--border)}
   .candidate-avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--text-muted);background:linear-gradient(135deg,var(--surface),var(--border))}
   .candidate-name{font-family:var(--font-display);font-weight:700;font-size:16px;color:var(--text)}
+  .strip-status-bar{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+  .strip-status-pill{padding:5px 10px;border-radius:4px;font-size:10px;font-family:var(--font-mono);font-weight:500;letter-spacing:0.05em;cursor:pointer;border:2px solid transparent;transition:all 0.12s;user-select:none;opacity:0.45}
+  .strip-status-pill:hover{opacity:0.8}
+  .strip-status-pill.selected{opacity:1;border-color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.4)}
   .candidate-meta{display:flex;gap:14px;margin-top:2px;flex-wrap:wrap}
   .candidate-meta-item{font-size:11px;color:var(--text-muted)}
 
@@ -323,6 +327,7 @@
     <button class="mode-btn" data-mode="4" onclick="setMode('4')">4-REVIEW</button>
     <button class="mode-btn" data-mode="5a" onclick="setMode('5a')">5-APPROVED</button>
     <button class="mode-btn" data-mode="5r" onclick="setMode('5r')">5-REJECTED</button>
+    <button class="mode-btn batch-btn" data-mode="batch" onclick="setMode('batch')">EVERNOTE BATCH IMPORT</button>
   </div>
 
   <div class="save-area">
@@ -358,6 +363,7 @@
       <div class="candidate-meta-item" id="strip-location"></div>
       <div class="candidate-meta-item" id="strip-role"></div>
     </div>
+    <div class="strip-status-bar" id="strip-status-bar"></div>
   </div>
   <div class="strip-photo-grid" id="strip-photo-grid"></div>
   <div class="photo-controls" id="photo-controls" style="display:none">
@@ -567,72 +573,48 @@
           <textarea id="iv-general-notes" placeholder="General observations..." oninput="document.getElementById('sidebar-general-notes').value=this.value;markDirty()"></textarea>
         </div>
 
-        <div class="field-grid single">
-          <!-- Age at top -->
-          <div class="field">
-            <div class="field-label">Age</div>
-            <input type="number" id="iv-age-quick" min="18" max="99" placeholder="e.g. 28" oninput="syncAgeFromQuick(this.value)">
-          </div>
-          <!-- Role, Type, Sexuality -->
-          <div class="field"><div class="field-label">Role</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mknbe0p0" onclick="event.stopPropagation();toggleCustom('dropdown_mknbe0p0',true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mknbe0p0"></div></div></div>
+<div class="field-grid single">
+          <div class="field"><div class="field-label">Experience in Porn</div><textarea id="iv-long_text_mm2mxr92" oninput="syncIvField('long_text_mm2mxr92',this.value)"></textarea></div>
+          <div class="field"><div class="field-label">Other Studios?</div><div class="status-group" id="iv-color_mm25jb44"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm25jb44')">No Prev Exp</div><div class="status-pill" style="background:#df2f4a;color:#fff" data-value="2" onclick="selectStatusIv(this,'color_mm25jb44')">OF Only</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm25jb44')">Occasional</div><div class="status-pill" style="background:#037f4c;color:#fff" data-value="6" onclick="selectStatusIv(this,'color_mm25jb44')">Mix</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm25jb44')">Regularly</div></div></div>
+          <div class="field"><div class="field-label">Other Studios Notes</div><textarea id="iv-long_text_mm252r65" oninput="syncIvField('long_text_mm252r65',this.value)"></textarea></div>
+          <div class="field"><div class="field-label">FTM?</div><div class="status-group" id="iv-color_mm1zk5e2"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1zk5e2')">YES</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1zk5e2')">Will Film</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zk5e2')">NO</div></div></div>
+          <div class="field"><div class="field-label">FTM Notes</div><textarea id="iv-long_text_mm1zbe1t" oninput="syncIvField('long_text_mm1zbe1t',this.value)"></textarea></div>
+          <div class="field"><div class="field-label">Location</div><input type="text" id="iv-text_mkncbdr1" placeholder="City, State" oninput="syncIvField('text_mkncbdr1',this.value)"></div>
+          <div class="field"><div class="field-label">Email</div><input type="email" id="iv-text_mknk1txg" placeholder="email@domain.com" oninput="syncIvField('text_mknk1txg',this.value)"></div>
+          <div class="field"><div class="field-label">Phone</div><input type="tel" id="iv-phone9ouk2t6x" placeholder="+1 ..." oninput="syncIvField('phone9ouk2t6x',this.value)"></div>
+          <div class="field"><div class="field-label">Referred By</div><textarea id="iv-long_text_mm1zhkyq" oninput="syncIvField('long_text_mm1zhkyq',this.value)"></textarea></div>
+          <div class="field"><div class="field-label">Age</div><input type="number" id="iv-age-quick" min="18" max="99" placeholder="e.g. 28" oninput="syncAgeFromQuick(this.value)"></div>
+          <div class="field"><div class="field-label">Height</div><input type="text" id="iv-text_mknc1sps" placeholder="5\u201911&quot;" oninput="syncIvField('text_mknc1sps',this.value)"></div>
+          <div class="field"><div class="field-label">Weight</div><input type="text" id="iv-text_mm1yx2wg" placeholder="175 lbs" oninput="syncIvField('text_mm1yx2wg',this.value)"></div>
+          <div class="field"><div class="field-label">Hair Color</div><input type="text" id="iv-text_mkncjzx8" placeholder="Brown" oninput="syncIvField('text_mkncjzx8',this.value)"></div>
+          <div class="field"><div class="field-label">Eye Color</div><input type="text" id="iv-text_mkncsqaq" placeholder="Blue" oninput="syncIvField('text_mkncsqaq',this.value)"></div>
+          <div class="field"><div class="field-label">Cock Size</div><input type="text" id="iv-text_mm1y2znz" placeholder="7&quot;" oninput="syncIvField('text_mm1y2znz',this.value)"></div>
+          <div class="field"><div class="field-label">Cut vs Uncut</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mkx04tbr" onclick="event.stopPropagation();toggleCustom('dropdown_mkx04tbr',false,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mkx04tbr"></div></div></div>
+          <div class="field"><div class="field-label">Shirt Size</div><input type="text" id="iv-text_mknc62rg" placeholder="XS/S/M/L/XL" oninput="syncIvField('text_mknc62rg',this.value)"></div>
+          <div class="field"><div class="field-label">Shoe Size</div><input type="text" id="iv-text_mknc2t7g" placeholder="10.5" oninput="syncIvField('text_mknc2t7g',this.value)"></div>
+          <div class="field"><div class="field-label">Pant Size</div><input type="text" id="iv-text_mknc808t" placeholder="32x30" oninput="syncIvField('text_mknc808t',this.value)"></div>
+          <div class="field"><div class="field-label">Role</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mknbe0p0" onclick="event.stopPropagation();toggleCustom('dropdown_mknbe0p0',true,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mknbe0p0"></div></div></div>
           <div class="field"><div class="field-label">Type</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1zzwcg" onclick="event.stopPropagation();toggleCustom('dropdown_mm1zzwcg',true,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1zzwcg"></div></div></div>
           <div class="field"><div class="field-label">Sexuality (on camera)</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1by5q0" onclick="event.stopPropagation();toggleCustom('dropdown_mm1by5q0',true,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1by5q0"></div></div></div>
-          <!-- Tattoos, FTM, Collab -->
-          <div class="field"><div class="field-label">Tattoos</div><div class="status-group" id="iv-color_mm1zghx9"><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zghx9')">NONE</div><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1zghx9')">TINY</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1zghx9')">YES</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm1zghx9')">A LOT</div></div></div>
-          <div class="field"><div class="field-label">Tattoo Notes</div><textarea id="iv-long_text_mm1zsdyv" placeholder="" oninput="syncIvField('long_text_mm1zsdyv',this.value)"></textarea></div>
-          <div class="field"><div class="field-label">FTM?</div><div class="status-group" id="iv-color_mm1zk5e2"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1zk5e2')">YES</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1zk5e2')">Will Film</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zk5e2')">NO</div></div></div>
-          <div class="field"><div class="field-label">FTM Notes</div><textarea id="iv-long_text_mm1zbe1t" placeholder="" oninput="syncIvField('long_text_mm1zbe1t',this.value)"></textarea></div>
-          <!-- Rate, Dick Enhancement -->
-          <div class="field"><div class="field-label">Rate Offered</div><input type="text" id="iv-text_mm1zb8xf" placeholder="e.g. $800" oninput="syncIvField('text_mm1zb8xf',this.value)"></div>
+          <div class="field"><div class="field-label">Ethnicity</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1zcar6" onclick="event.stopPropagation();toggleCustom('dropdown_mm1zcar6',true,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1zcar6"></div></div></div>
+          <div class="field"><div class="field-label">Language(s)</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mknb18b7" onclick="event.stopPropagation();toggleCustom('dropdown_mknb18b7',true,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mknb18b7"></div></div></div>
+          <div class="field"><div class="field-label">Passport</div><div class="status-group" id="iv-color_mm26w6hs"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm26w6hs')">NO</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm26w6hs')">YES</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm26w6hs')">N/A</div></div></div>
+          <div class="field"><div class="field-label">State ID (state)</div><input type="text" id="iv-text_mm1z66yj" placeholder="e.g. California" oninput="syncIvField('text_mm1z66yj',this.value)"></div>
+          <div class="field"><div class="field-label">Medical Allergies</div><input type="text" id="iv-text_mkncgkwk" placeholder="medications, bees, etc." oninput="syncIvField('text_mkncgkwk',this.value)"></div>
+          <div class="field"><div class="field-label">Food Restrictions</div><input type="text" id="iv-text_mkncht8f" placeholder="vegan, gluten-free, etc." oninput="syncIvField('text_mkncht8f',this.value)"></div>
+          <div class="field"><div class="field-label">Experience Bottoming</div><textarea id="iv-long_text_mm1zaqzq" oninput="syncIvField('long_text_mm1zaqzq',this.value)"></textarea></div>
           <div class="field"><div class="field-label">Dick Enhancement</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1ztytq" onclick="event.stopPropagation();toggleCustom('dropdown_mm1ztytq',false,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1ztytq"></div></div></div>
-          <!-- HIV, Syphilis -->
           <div class="field"><div class="field-label">HIV</div><div class="status-group" id="iv-color_mm1zzkz6"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1zzkz6')">Non-detectable</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1zzkz6')">YES</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zzkz6')">NONE</div></div></div>
           <div class="field"><div class="field-label">Syphilis</div><div class="status-group" id="iv-color_mm1zbze8"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1zbze8')">Past Infection</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zbze8')">NONE</div></div></div>
-          <!-- Haircut -->
+          <div class="field"><div class="field-label">Availability Notes</div><textarea id="iv-long_text_mm1z9aeg" oninput="syncIvField('long_text_mm1z9aeg',this.value)"></textarea></div>
+          <div class="field"><div class="field-label">Collab House?</div><div class="status-group" id="iv-color_mm1z2f56"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1z2f56')">YES</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1z2f56')">MAYBE</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1z2f56')">NO</div></div></div>
+          <div class="field"><div class="field-label">Tattoos</div><div class="status-group" id="iv-color_mm1zghx9"><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zghx9')">NONE</div><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1zghx9')">TINY</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1zghx9')">YES</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm1zghx9')">A LOT</div></div></div>
+          <div class="field"><div class="field-label">Tattoo Notes</div><textarea id="iv-long_text_mm1zsdyv" oninput="syncIvField('long_text_mm1zsdyv',this.value)"></textarea></div>
           <div class="field"><div class="field-label">Haircut?</div><div class="status-group" id="iv-color_mm1zzwv8"><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zzwv8')">NONE</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm1zzwv8')">A LITTLE</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1zzwv8')">YES</div></div></div>
-          <div class="field"><div class="field-label">Haircut Notes</div><textarea id="iv-long_text_mm1zshaw" placeholder="" oninput="syncIvField('long_text_mm1zshaw',this.value)"></textarea></div>
-          <!-- Availability -->
-          <div class="field field-full"><div class="field-label">Availability Notes</div><textarea id="iv-long_text_mm1z9aeg" placeholder="" oninput="syncIvField('long_text_mm1z9aeg',this.value)"></textarea></div>
-          <!-- Rating -->
-          <div class="field"><div class="field-label">Rating — Intake</div><input type="number" id="iv-numeric_mm1z34ca" min="1" max="10" placeholder="1–10" oninput="syncIvField('numeric_mm1z34ca',this.value)"></div>
-          <div class="field"><div class="field-label">Rating Notes</div><textarea id="iv-text_mm1znrfv" placeholder="" oninput="syncIvField('text_mm1znrfv',this.value)"></textarea></div>
-          <!-- Status -->
-          <div class="field field-full">
-            <div class="field-label">Model Status</div>
-            <div class="status-group" id="iv-label">
-              <div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'label')">0-APPLICANT</div>
-              <div class="status-pill" style="background:#cab641;color:#111" data-value="8" onclick="selectStatusIv(this,'label')">1-SCREEN</div>
-              <div class="status-pill" style="background:#ff6d3b;color:#fff" data-value="10" onclick="selectStatusIv(this,'label')">2-POTENTIAL</div>
-              <div class="status-pill" style="background:#ffcb00;color:#111" data-value="7" onclick="selectStatusIv(this,'label')">3-INTERVIEW</div>
-              <div class="status-pill" style="background:#579bfc;color:#fff" data-value="9" onclick="selectStatusIv(this,'label')">4-REVIEW</div>
-              <div class="status-pill" style="background:#037f4c;color:#fff" data-value="2" onclick="selectStatusIv(this,'label')">5-APPROVED</div>
-              <div class="status-pill" style="background:#df2f4a;color:#fff" data-value="3" onclick="selectStatusIv(this,'label')">5-REJECTED</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- OTHER INFO COLLAPSIBLE -->
-        <div class="other-info-tab" onclick="toggleOtherInfo()">
-          <div class="other-info-tab-label">Other Info</div>
-          <div class="other-info-tab-chevron" id="other-info-chevron">▾</div>
-        </div>
-        <div class="other-info-panel" id="other-info-panel">
-          <div class="field-grid single">
-            <div class="field"><div class="field-label">Legal Name</div><input type="text" id="iv-text_mknceqty" placeholder="Full legal name" oninput="syncIvField('text_mknceqty',this.value)"></div>
-            <div class="field"><div class="field-label">Date of Birth</div><input type="date" id="iv-dob" onchange="syncIvField('date_of_birth_mkncwsrj',this.value);onDobChange(this.value)"></div>
-            <div class="field"><div class="field-label">Age</div><input type="number" id="iv-age" placeholder="yrs" min="18" max="99" oninput="syncIvField('age',this.value)"></div>
-            <div class="field"><div class="field-label">Location</div><input type="text" id="iv-text_mkncbdr1" placeholder="City, State" oninput="syncIvField('text_mkncbdr1',this.value)"></div>
-            <div class="field"><div class="field-label">Email</div><input type="email" id="iv-text_mknk1txg" placeholder="email@domain.com" oninput="syncIvField('text_mknk1txg',this.value)"></div>
-            <div class="field"><div class="field-label">Phone</div><input type="tel" id="iv-phone" placeholder="+1 ..." oninput="syncIvField('phone9ouk2t6x',this.value)"></div>
-            <div class="field"><div class="field-label">Height</div><input type="text" id="iv-text_mknc1sps" placeholder='5&apos;11"' oninput="syncIvField('text_mknc1sps',this.value)"></div>
-            <div class="field"><div class="field-label">Weight</div><input type="text" id="iv-text_mm1yx2wg" placeholder="175 lbs" oninput="syncIvField('text_mm1yx2wg',this.value)"></div>
-            <div class="field"><div class="field-label">Cock Size</div><input type="text" id="iv-text_mm1y2znz" placeholder='7"' oninput="syncIvField('text_mm1y2znz',this.value)"></div>
-            <div class="field"><div class="field-label">Collab House?</div><div class="status-group" id="iv2-color_mm1z2f56"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1z2f56')">YES</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1z2f56')">MAYBE</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1z2f56')">NO</div></div></div>
-            <div class="field"><div class="field-label">Referred By</div><textarea id="iv-long_text_mm1zhkyq" placeholder="" oninput="syncIvField('long_text_mm1zhkyq',this.value)"></textarea></div>
-            <div class="field"><div class="field-label">Experience in Porn</div><textarea id="iv-long_text_mm2mxr92" placeholder="" oninput="syncIvField('long_text_mm2mxr92',this.value)"></textarea></div>
-            <div class="field"><div class="field-label">Experience Bottoming</div><textarea id="iv-long_text_mm1zaqzq" placeholder="" oninput="syncIvField('long_text_mm1zaqzq',this.value)"></textarea></div>
-            <div class="field"><div class="field-label">Other Studios?</div><div class="status-group" id="iv-color_mm25jb44"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm25jb44')">No Prev Exp</div><div class="status-pill" style="background:#df2f4a;color:#fff" data-value="2" onclick="selectStatusIv(this,'color_mm25jb44')">OF Only</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm25jb44')">Occasional</div><div class="status-pill" style="background:#037f4c;color:#fff" data-value="6" onclick="selectStatusIv(this,'color_mm25jb44')">Mix</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm25jb44')">Regularly</div></div></div>
-          </div>
+          <div class="field"><div class="field-label">Haircut Notes</div><textarea id="iv-long_text_mm1zshaw" oninput="syncIvField('long_text_mm1zshaw',this.value)"></textarea></div>
+          <div class="field"><div class="field-label">Rating — Intake</div><input type="number" id="iv-numeric_mm1z34ca" min="1" max="10" placeholder="1\u201310" oninput="syncIvField('numeric_mm1z34ca',this.value)"></div>
+          <div class="field"><div class="field-label">Rating Notes</div><input type="text" id="iv-text_mm1znrfv" placeholder="" oninput="syncIvField('text_mm1znrfv',this.value)"></div>
+          <div class="field"><div class="field-label">Rate Offered</div><input type="text" id="iv-text_mm1zb8xf" placeholder="e.g. $800" oninput="syncIvField('text_mm1zb8xf',this.value)"></div>
         </div>
 
         <!-- PHOTO UPLOAD IN INTERVIEW -->
@@ -665,38 +647,22 @@
           <div class="field-grid single" style="margin-bottom:24px">
             <div class="field"><div class="field-label">Legal Name</div><input type="text" id="ive-text_mknceqty" placeholder="Full legal name" oninput="syncIvField('text_mknceqty',this.value)"></div>
             <div class="field"><div class="field-label">Date of Birth</div><input type="date" id="ive-dob" onchange="syncIvField('date_of_birth_mkncwsrj',this.value);onDobChange(this.value)"></div>
-            <div class="field"><div class="field-label">Location</div><input type="text" id="ive-text_mkncbdr1" placeholder="City, State" oninput="syncIvField('text_mkncbdr1',this.value)"></div>
-            <div class="field"><div class="field-label">Email</div><input type="email" id="ive-text_mknk1txg" placeholder="email@domain.com" oninput="syncIvField('text_mknk1txg',this.value)"></div>
-            <div class="field"><div class="field-label">Phone</div><input type="tel" id="ive-phone" placeholder="+1 ..." oninput="syncIvField('phone9ouk2t6x',this.value)"></div>
-            <div class="field"><div class="field-label">Height</div><input type="text" id="ive-text_mknc1sps" placeholder='5&apos;11"' oninput="syncIvField('text_mknc1sps',this.value)"></div>
-            <div class="field"><div class="field-label">Weight</div><input type="text" id="ive-text_mm1yx2wg" placeholder="175 lbs" oninput="syncIvField('text_mm1yx2wg',this.value)"></div>
-            <div class="field"><div class="field-label">Cock Size</div><input type="text" id="ive-text_mm1y2znz" placeholder='7"' oninput="syncIvField('text_mm1y2znz',this.value)"></div>
-            <div class="field"><div class="field-label">Collab House?</div><div class="status-group" id="ive-color_mm1z2f56"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1z2f56')">YES</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1z2f56')">MAYBE</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1z2f56')">NO</div></div></div>
-            <div class="field"><div class="field-label">Ethnicity</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mm1zcar6" onclick="event.stopPropagation();toggleCustom('dropdown_mm1zcar6',true,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mm1zcar6"></div></div></div>
-            <div class="field"><div class="field-label">Language(s)</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mknb18b7" onclick="event.stopPropagation();toggleCustom('dropdown_mknb18b7',true,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mknb18b7"></div></div></div>
-            <div class="field"><div class="field-label">Citizenship</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mm26n6qx" onclick="event.stopPropagation();toggleCustom('dropdown_mm26n6qx',true,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mm26n6qx"></div></div></div>
-            <div class="field"><div class="field-label">Passport</div><div class="status-group" id="ive-color_mm26w6hs"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm26w6hs')">NO</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm26w6hs')">YES</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm26w6hs')">N/A</div></div></div>
-            <div class="field"><div class="field-label">State ID (state)</div><input type="text" id="ive-text_mm1z66yj" placeholder="e.g. California" oninput="syncIvField('text_mm1z66yj',this.value)"></div>
             <div class="field"><div class="field-label">Address</div><input type="text" id="ive-text_mknct7cn" placeholder="Full address" oninput="syncIvField('text_mknct7cn',this.value)"></div>
             <div class="field"><div class="field-label">Location (general)</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mm254xed" onclick="event.stopPropagation();toggleCustom('dropdown_mm254xed',false,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mm254xed"></div></div></div>
-            <div class="field"><div class="field-label">Cut vs Uncut</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mkx04tbr" onclick="event.stopPropagation();toggleCustom('dropdown_mkx04tbr',false,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mkx04tbr"></div></div></div>
-            <div class="field"><div class="field-label">Hair Color</div><input type="text" id="ive-text_mkncjzx8" placeholder="Brown" oninput="syncIvField('text_mkncjzx8',this.value)"></div>
-            <div class="field"><div class="field-label">Eye Color</div><input type="text" id="ive-text_mkncsqaq" placeholder="Blue" oninput="syncIvField('text_mkncsqaq',this.value)"></div>
-            <div class="field"><div class="field-label">Shirt Size</div><input type="text" id="ive-text_mknc62rg" placeholder="XS/S/M/L/XL" oninput="syncIvField('text_mknc62rg',this.value)"></div>
-            <div class="field"><div class="field-label">Shoe Size</div><input type="text" id="ive-text_mknc2t7g" placeholder="10.5" oninput="syncIvField('text_mknc2t7g',this.value)"></div>
-            <div class="field"><div class="field-label">Pant Size</div><input type="text" id="ive-text_mknc808t" placeholder="32x30" oninput="syncIvField('text_mknc808t',this.value)"></div>
-            <div class="field"><div class="field-label">Medical Allergies</div><input type="text" id="ive-text_mkncgkwk" placeholder="medications, bees, etc." oninput="syncIvField('text_mkncgkwk',this.value)"></div>
-            <div class="field"><div class="field-label">Food Restrictions</div><input type="text" id="ive-text_mkncht8f" placeholder="vegan, gluten-free, etc." oninput="syncIvField('text_mkncht8f',this.value)"></div>
-            <div class="field"><div class="field-label">Dick Enhancement</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mm1ztytq" onclick="event.stopPropagation();toggleCustom('dropdown_mm1ztytq',false,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mm1ztytq"></div></div></div>
-            <div class="field"><div class="field-label">Referred By</div><textarea id="ive-long_text_mm1zhkyq" placeholder="" oninput="syncIvField('long_text_mm1zhkyq',this.value)"></textarea></div>
-            <div class="field"><div class="field-label">Experience in Porn</div><textarea id="ive-long_text_mm2mxr92" placeholder="" oninput="syncIvField('long_text_mm2mxr92',this.value)"></textarea></div>
-            <div class="field"><div class="field-label">Experience Bottoming</div><textarea id="ive-long_text_mm1zaqzq" placeholder="" oninput="syncIvField('long_text_mm1zaqzq',this.value)"></textarea></div>
-            <div class="field"><div class="field-label">Other Studios?</div><div class="status-group" id="ive-color_mm25jb44"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm25jb44')">No Prev Exp</div><div class="status-pill" style="background:#df2f4a;color:#fff" data-value="2" onclick="selectStatusIv(this,'color_mm25jb44')">OF Only</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm25jb44')">Occasional</div><div class="status-pill" style="background:#037f4c;color:#fff" data-value="6" onclick="selectStatusIv(this,'color_mm25jb44')">Mix</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm25jb44')">Regularly</div></div></div>
-            <div class="field"><div class="field-label">Other Studios Notes</div><textarea id="ive-long_text_mm252r65" placeholder="" oninput="syncIvField('long_text_mm252r65',this.value)"></textarea></div>
-            <div class="field"><div class="field-label">2nd Form Notes</div><textarea id="ive-long_text_mm252tt7" placeholder="" oninput="syncIvField('long_text_mm252tt7',this.value)"></textarea></div>
-            <div class="field"><div class="field-label">Rating — Final</div><input type="number" id="ive-numeric_mm1zjjrp" min="1" max="10" placeholder="1–10" oninput="syncIvField('numeric_mm1zjjrp',this.value)"></div>
-            <div class="field"><div class="field-label">Rate Offered</div><input type="text" id="ive-text_mm1zb8xf" placeholder="e.g. $800" oninput="syncIvField('text_mm1zb8xf',this.value)"></div>
+            <div class="field"><div class="field-label">Citizenship</div><div class="custom-select-wrap"><div class="custom-select-display" id="ive-display-dropdown_mm26n6qx" onclick="event.stopPropagation();toggleCustom('dropdown_mm26n6qx',true,'ive')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="ive-dropdown-dropdown_mm26n6qx"></div></div></div>
+            <div class="field"><div class="field-label">Twitter / X</div><input type="text" id="ive-lien_internet" placeholder="https://twitter.com/..." oninput="syncIvField('lien_internet',this.value)"></div>
+            <div class="field"><div class="field-label">Instagram</div><input type="text" id="ive-lien_internet9" placeholder="https://instagram.com/..." oninput="syncIvField('lien_internet9',this.value)"></div>
+            <div class="field"><div class="field-label">Bluesky</div><input type="text" id="ive-dup__of_facebook" placeholder="https://bsky.app/..." oninput="syncIvField('dup__of_facebook',this.value)"></div>
+            <div class="field"><div class="field-label">OnlyFans</div><input type="text" id="ive-text_mkncy7gf" placeholder="https://onlyfans.com/..." oninput="syncIvField('text_mkncy7gf',this.value)"></div>
+            <div class="field"><div class="field-label">JustForFans</div><input type="text" id="ive-text_mknc3aty" placeholder="https://justfor.fans/..." oninput="syncIvField('text_mknc3aty',this.value)"></div>
+            <div class="field"><div class="field-label">Rating — Final</div><input type="number" id="ive-numeric_mm1zjjrp" min="1" max="10" placeholder="1\u201310" oninput="syncIvField('numeric_mm1zjjrp',this.value)"></div>
             <div class="field"><div class="field-label">Date First Shot</div><input type="date" id="ive-date_mknb5z70" oninput="syncIvField('date_mknb5z70',this.value)"></div>
+            <div class="field"><div class="field-label">2nd Form Notes</div><textarea id="ive-long_text_mm252tt7" oninput="syncIvField('long_text_mm252tt7',this.value)"></textarea></div>
+            <div class="field"><div class="field-label">Model Input Notes</div><textarea id="ive-long_text_mknct6wd" oninput="syncIvField('long_text_mknct6wd',this.value)"></textarea></div>
+            <div class="field"><div class="field-label">T-Shirt Size</div><input type="text" id="ive-short_text0dkc9zdq" placeholder="" oninput="syncIvField('short_text0dkc9zdq',this.value)"></div>
+            <div class="field"><div class="field-label">Suit Size</div><input type="text" id="ive-text_mm1yf8cd" placeholder="" oninput="syncIvField('text_mm1yf8cd',this.value)"></div>
+            <div class="field"><div class="field-label">Neck Size</div><input type="text" id="ive-text_mm2dwvec" placeholder="" oninput="syncIvField('text_mm2dwvec',this.value)"></div>
+            <div class="field"><div class="field-label">Head Circumference</div><input type="text" id="ive-text_mm2dqqdw" placeholder="" oninput="syncIvField('text_mm2dqqdw',this.value)"></div>
           </div>
           <div style="display:flex;justify-content:flex-end">
             <button class="save-btn" onclick="saveAndUploadIv()">✓ Save All Changes</button>
@@ -774,11 +740,14 @@
 
 <script>
 const API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0MjE2NDAwMywiYWFpIjoxMSwidWlkIjoyMzMyNTE1NywiaWFkIjoiMjAyNi0wNC0wNlQyMDo0NTowMC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6ODgyNjM1NywicmduIjoidXNlMSJ9.eI5q0d8WflnpvZh1Tno_xBcI7DGJpkL9-p-iTMiH7YA';
-const BOARD_ID = '3636652411';
+const MAIN_BOARD_ID  = '3636652411';
+const BATCH_BOARD_ID = '18416230588';
+let BOARD_ID = MAIN_BOARD_ID;        // active board — switched by the EVERNOTE tab
+const GROUP_POTENTIAL = 'group_mm202zgr';
 const API_URL  = 'https://api.monday.com/v2';
 
 // Status label index → mode key
-const MODE_STATUS_IDS = { '0':[5], '1':[8], '2':[10], '3':[7], '4':[9], '5a':[2,4,105], '5r':[3] };
+const MODE_STATUS_IDS = { '0':[5], '1':[8], '2':[10], '3':[7], '4':[9], '5a':[2,4,105], '5r':[3], 'batch':null };
 // Status index → hex colors
 const STATUS_COLORS = {5:{bg:'#c4c4c4',fg:'#111'},8:{bg:'#cab641',fg:'#111'},10:{bg:'#ff6d3b',fg:'#fff'},7:{bg:'#ffcb00',fg:'#111'},9:{bg:'#579bfc',fg:'#fff'},2:{bg:'#037f4c',fg:'#fff'},3:{bg:'#df2f4a',fg:'#fff'},4:{bg:'#9d50dd',fg:'#fff'},105:{bg:'#00c875',fg:'#fff'}};
 const STATUS_LABELS = {5:'0-APPLICANT',8:'1-SCREEN',10:'2-POTENTIAL',7:'3-INTERVIEW',9:'4-REVIEW',2:'5-APPROVED',3:'5-REJECTED',4:'00 - ALL-STAR',105:'00 - EXCLUSIVE'};
@@ -874,6 +843,12 @@ function buildAllDropdowns(){
 
 // ── MODE ──
 async function setMode(mode){
+  // Switch active board: batch tab → batch board, everything else → main board.
+  const wantBoard = (mode === 'batch') ? BATCH_BOARD_ID : MAIN_BOARD_ID;
+  if(wantBoard !== BOARD_ID){
+    BOARD_ID = wantBoard;
+    fullBoardCache = null;   // force re-fetch from the newly active board
+  }
   currentMode=mode;
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
   resetForm();
@@ -904,7 +879,7 @@ async function setMode(mode){
   hide('full-view');
   hide('interview-view');
   show('empty-state');
-  document.getElementById('empty-title').textContent='Select a candidate';
+  document.getElementById('empty-title').textContent = (mode==='batch') ? 'Select an imported model' : 'Select a candidate';
   document.getElementById('empty-sub').textContent='Choose from the list below';
   if(mode==='3') document.getElementById('sidebar-notes-pin').classList.remove('visible');
   buildSidebarNav(mode==='3'?'interview':'full');
@@ -974,7 +949,7 @@ async function ensureBoardCache(){
 
 async function loadCandidatesForMode(mode){
   if(mode === 'new') return;
-  const statusIds = MODE_STATUS_IDS[mode] || [5];
+  const statusIds = MODE_STATUS_IDS[mode];   // null for batch = no filter
 
   // Show loading state immediately
   const sel = document.getElementById('candidate-select');
@@ -982,11 +957,16 @@ async function loadCandidatesForMode(mode){
 
   await ensureBoardCache();
 
-  const filtered = fullBoardCache.filter(item => {
-    const lc = item.column_values.find(c => c.id === 'label');
-    if(!lc?.value) return false;
-    try { return statusIds.includes(JSON.parse(lc.value).index); } catch { return false; }
-  });
+  let filtered;
+  if(statusIds === null){
+    filtered = fullBoardCache.slice();   // batch: show every item on the board
+  } else {
+    filtered = fullBoardCache.filter(item => {
+      const lc = item.column_values.find(c => c.id === 'label');
+      if(!lc?.value) return false;
+      try { return statusIds.includes(JSON.parse(lc.value).index); } catch { return false; }
+    });
+  }
   filtered.sort((a,b) => a.name.localeCompare(b.name));
   allCandidates = filtered;
   renderCandidateList(filtered);
@@ -1095,7 +1075,7 @@ function populateForm(item){
   // Phone
   const rawPhone=txt('phone9ouk2t6x')||(val('phone9ouk2t6x')?.phone)||'';
   const fmtPhone=rawPhone?formatPhoneDisplay(rawPhone):'';
-  ['f-phone9ouk2t6x','iv-phone'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=fmtPhone;});
+  ['f-phone9ouk2t6x','iv-phone9ouk2t6x','ive-phone'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=fmtPhone;});
 
   // Status / color fields — sync to both f- and iv- groups
   statusValues={};
@@ -1128,6 +1108,7 @@ function populateForm(item){
   document.getElementById('strip-location').textContent=txt('text_mkncbdr1')?'◎ '+txt('text_mkncbdr1'):'';
   document.getElementById('strip-role').textContent=txt('dropdown_mknbe0p0')?'▸ '+txt('dropdown_mknbe0p0'):'';
   updateStatusBadge(statusValues['label']);
+  buildStripStatusBar();
 }
 
 function syncIvField(field,value){
@@ -1169,6 +1150,40 @@ function updateStatusBadge(index){
   const badge=document.getElementById('candidate-status-badge');
   const s=STATUS_COLORS[index];const l=STATUS_LABELS[index];
   badge.innerHTML=s?`<div class="status-badge" style="background:${s.bg};color:${s.fg}"><div class="status-dot" style="background:${s.fg}"></div>${l}</div>`:'';
+}
+
+// Status pills shown right under the model name in the strip.
+// Order mirrors the workflow; clicking sets the label + syncs the form's status group.
+const STRIP_STATUS_ORDER = [
+  [5,'0-APPLICANT'],[8,'1-SCREEN'],[10,'2-POTENTIAL'],[7,'3-INTERVIEW'],
+  [9,'4-REVIEW'],[2,'5-APPROVED'],[3,'5-REJECTED'],[4,'ALL-STAR'],[105,'EXCLUSIVE']
+];
+function buildStripStatusBar(){
+  const bar=document.getElementById('strip-status-bar');
+  if(!bar) return;
+  const current=statusValues['label'];
+  bar.innerHTML='';
+  STRIP_STATUS_ORDER.forEach(([idx,label])=>{
+    const c=STATUS_COLORS[idx]||{bg:'#888',fg:'#fff'};
+    const pill=document.createElement('div');
+    pill.className='strip-status-pill'+(idx===current?' selected':'');
+    pill.style.background=c.bg;pill.style.color=c.fg;
+    pill.textContent=label;
+    pill.onclick=()=>setStatusFromStrip(idx);
+    bar.appendChild(pill);
+  });
+}
+function setStatusFromStrip(idx){
+  statusValues['label']=idx;
+  // sync the form's status pill group(s) so a later Save writes the same value
+  ['f-','iv-','iv2-','ive-'].forEach(pre=>{
+    const g=document.getElementById(pre+'label');
+    if(!g) return;
+    g.querySelectorAll('.status-pill').forEach(p=>p.classList.toggle('selected',parseInt(p.dataset.value)===idx));
+  });
+  buildStripStatusBar();
+  updateStatusBadge(idx);
+  markDirty();
 }
 
 // ── CUSTOM DROPDOWNS ──
@@ -1255,7 +1270,7 @@ function updateMultiDropdownState(fieldId,pre){
 function selectStatus(pill,fieldKey){
   document.getElementById('f-'+fieldKey)?.querySelectorAll('.status-pill').forEach(p=>p.classList.remove('selected'));
   pill.classList.add('selected');statusValues[fieldKey]=parseInt(pill.dataset.value);
-  if(fieldKey==='label')updateStatusBadge(statusValues['label']);
+  if(fieldKey==='label'){updateStatusBadge(statusValues['label']);buildStripStatusBar();}
   markDirty();
 }
 
@@ -1269,15 +1284,8 @@ function selectStatusIv(pill,fieldKey){
     const g=document.getElementById(pre+fieldKey);
     if(g)g.querySelectorAll(`.status-pill[data-value="${pill.dataset.value}"]`).forEach(p=>p.classList.add('selected'));
   });
-  if(fieldKey==='label')updateStatusBadge(statusValues['label']);
+  if(fieldKey==='label'){updateStatusBadge(statusValues['label']);buildStripStatusBar();}
   markDirty();
-}
-
-// ── OTHER INFO TOGGLE ──
-function toggleOtherInfo(){
-  const panel=document.getElementById('other-info-panel');
-  const chevron=document.getElementById('other-info-chevron');
-  panel.classList.toggle('open');chevron.classList.toggle('open');
 }
 
 // ── DIRTY ──
@@ -1602,7 +1610,7 @@ async function saveNewModel(){
     const s0 = addUploadStep(stepList, 'Creating model record...', 'active');
     const createData = await gql(
       `mutation($b:ID!,$g:String!,$n:String!){create_item(board_id:$b,group_id:$g,item_name:$n){id}}`,
-      {b:BOARD_ID, g:'group_mm202zgr', n:name}
+      {b:MAIN_BOARD_ID, g:GROUP_POTENTIAL, n:name}
     );
     const newId = createData.create_item.id;
     setUploadStep(stepList, s0, 'done', `✓ Created: ${name} (ID ${newId})`);
@@ -1770,7 +1778,7 @@ function buildColumnValues(){
 
   ['lien_internet','lien_internet9','dup__of_facebook'].forEach(id=>{const v=gv('f-'+id);if(v!==null)cv[id]={url:v,text:v};});
 
-  const phone=document.getElementById('f-phone9ouk2t6x')?.value||document.getElementById('iv-phone')?.value||'';
+  const phone=document.getElementById('f-phone9ouk2t6x')?.value||document.getElementById('iv-phone9ouk2t6x')?.value||document.getElementById('ive-phone')?.value||'';
   if(phone)cv['phone9ouk2t6x']={phone:phone.replace(/\D/g,''),countryShortName:'US'};
 
   ['label','color_mm1zghx9','color_mm1zk5e2','color_mm1z2f56','color_mm1zzkz6','color_mm1zbze8','color_mm1zzwv8','color_mm26w6hs','color_mm25jb44','color_mm26br5p'].forEach(id=>{if(statusValues[id]!=null)cv[id]={index:statusValues[id]};});
