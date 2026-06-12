@@ -61,12 +61,24 @@
   .status-dot{width:5px;height:5px;border-radius:50%}
 
   /* CANDIDATE STRIP */
-  .candidate-strip{flex-shrink:0;background:var(--surface2);border-bottom:1px solid var(--border);padding:12px 28px;display:none;align-items:flex-start;gap:16px;max-height:40vh;overflow-y:auto}
+  .candidate-strip{flex-shrink:0;background:var(--surface2);border-bottom:1px solid var(--border);padding:12px 28px;display:none;align-items:flex-start;gap:16px}
   .candidate-strip.visible{display:flex}
   .candidate-avatar{width:40px;height:40px;border-radius:4px;background:var(--border);overflow:hidden;flex-shrink:0;border:1px solid var(--border)}
   .candidate-avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--text-muted);background:linear-gradient(135deg,var(--surface),var(--border))}
   .candidate-name{font-family:var(--font-display);font-weight:700;font-size:16px;color:var(--text)}
   .strip-status-bar{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+  /* STICKY STATUS BAR — pinned at top of the scroll area in every view */
+  .sticky-status-bar{position:sticky;top:0;z-index:60;background:var(--bg);display:flex;align-items:center;gap:12px;padding:10px 0 12px;margin-bottom:8px;border-bottom:1px solid var(--border)}
+  .sticky-status-label{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);font-weight:500}
+  .status-dd-wrap{position:relative}
+  .status-dd-display{display:flex;align-items:center;gap:10px;cursor:pointer;border-radius:5px;padding:6px 12px;font-size:12px;font-weight:600;letter-spacing:0.05em;min-width:160px;border:2px solid transparent;transition:filter 0.12s}
+  .status-dd-display:hover{filter:brightness(1.1)}
+  .status-dd-chevron{margin-left:auto;font-size:10px;opacity:0.8}
+  .status-dd-menu{position:absolute;top:calc(100% + 4px);left:0;background:var(--surface2);border:1px solid var(--border-active);border-radius:6px;z-index:500;display:none;min-width:200px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.5)}
+  .status-dd-menu.open{display:block}
+  .status-dd-option{padding:9px 12px;cursor:pointer;font-size:12px;font-weight:600;letter-spacing:0.04em;display:flex;align-items:center;gap:8px;transition:filter 0.1s}
+  .status-dd-option:hover{filter:brightness(1.15)}
+  .status-dd-swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0}
   .strip-status-pill{padding:5px 10px;border-radius:4px;font-size:10px;font-family:var(--font-mono);font-weight:500;letter-spacing:0.05em;cursor:pointer;border:2px solid transparent;transition:all 0.12s;user-select:none;opacity:0.45}
   .strip-status-pill:hover{opacity:0.8}
   .strip-status-pill.selected{opacity:1;border-color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.4)}
@@ -202,7 +214,7 @@
   #lightbox-close:hover { border-color:var(--danger); color:var(--danger); }
 
   /* STICKY GENERAL NOTES IN INTERVIEW VIEW */
-  .iv-notes-sticky { position:sticky; top:0; z-index:50; background:var(--surface); border-bottom:1px solid var(--border); padding:10px 0 14px; margin-bottom:20px; }
+  .iv-notes-sticky { position:sticky; top:50px; z-index:50; background:var(--surface); border-bottom:1px solid var(--border); padding:10px 0 14px; margin-bottom:20px; }
   .iv-notes-sticky .field-label { font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--accent); font-weight:500; margin-bottom:6px; }
   .iv-notes-sticky textarea { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-family:var(--font-mono); font-size:13px; padding:9px 12px; outline:none; resize:none; height:80px; line-height:1.6; transition:border-color 0.15s; }
   .iv-notes-sticky textarea:focus { border-color:var(--accent); background:var(--surface2); }
@@ -363,7 +375,6 @@
       <div class="candidate-meta-item" id="strip-location"></div>
       <div class="candidate-meta-item" id="strip-role"></div>
     </div>
-    <div class="strip-status-bar" id="strip-status-bar"></div>
   </div>
   <div class="strip-photo-grid" id="strip-photo-grid"></div>
   <div class="photo-controls" id="photo-controls" style="display:none">
@@ -386,6 +397,16 @@
 
   <!-- FORM AREA -->
   <div class="form-area" id="form-area">
+    <!-- STICKY STATUS BAR (all views) -->
+    <div class="sticky-status-bar" id="sticky-status-bar" style="display:none">
+      <span class="sticky-status-label">Model Status</span>
+      <div class="status-dd-wrap">
+        <div class="status-dd-display" id="status-dd-display" onclick="event.stopPropagation();toggleStatusDD()">
+          <span id="status-dd-current">—</span><span class="status-dd-chevron">▾</span>
+        </div>
+        <div class="status-dd-menu" id="status-dd-menu"></div>
+      </div>
+    </div>
     <div id="empty-state">
       <div class="empty-icon">◈</div>
       <div class="empty-title" id="empty-title">Choose a mode and candidate</div>
@@ -988,6 +1009,7 @@ async function loadCandidate(itemId){
   if(!itemId){
     resetForm();show('empty-state');
     document.getElementById('candidate-strip').classList.remove('visible');
+  const ssb=document.getElementById('sticky-status-bar');if(ssb)ssb.style.display='none';
     document.getElementById('save-btn').disabled=true;currentItem=null;return;
   }
   showToast('Loading...','saving');
@@ -1004,6 +1026,7 @@ async function loadCandidate(itemId){
     goFSection(0);
   }
   document.getElementById('candidate-strip').classList.add('visible');
+  document.getElementById('sticky-status-bar').style.display='flex';
   if(currentMode !== '3'){
     document.getElementById('sidebar-notes-pin').classList.add('visible');
   }
@@ -1152,20 +1175,37 @@ const STRIP_STATUS_ORDER = [
   [5,'0-APPLICANT'],[8,'1-SCREEN'],[10,'2-POTENTIAL'],[7,'3-INTERVIEW'],
   [9,'4-REVIEW'],[2,'5-APPROVED'],[3,'5-REJECTED'],[4,'ALL-STAR'],[105,'EXCLUSIVE']
 ];
+// Sticky status DROPDOWN (replaces the old pill bar). Compact, pinned above the form.
 function buildStripStatusBar(){
-  const bar=document.getElementById('strip-status-bar');
-  if(!bar) return;
+  const bar=document.getElementById('sticky-status-bar');
+  const disp=document.getElementById('status-dd-display');
+  const cur=document.getElementById('status-dd-current');
+  const menu=document.getElementById('status-dd-menu');
+  if(!bar||!disp||!cur||!menu) return;
   const current=statusValues['label'];
-  bar.innerHTML='';
+  const c=STATUS_COLORS[current]||{bg:'#2a2a2e',fg:'#e8e8f0'};
+  // current pill styling
+  disp.style.background=c.bg;disp.style.color=c.fg;
+  cur.textContent=STATUS_LABELS[current]||'— set status —';
+  // build menu
+  menu.innerHTML='';
   STRIP_STATUS_ORDER.forEach(([idx,label])=>{
-    const c=STATUS_COLORS[idx]||{bg:'#888',fg:'#fff'};
-    const pill=document.createElement('div');
-    pill.className='strip-status-pill'+(idx===current?' selected':'');
-    pill.style.background=c.bg;pill.style.color=c.fg;
-    pill.textContent=label;
-    pill.onclick=()=>setStatusFromStrip(idx);
-    bar.appendChild(pill);
+    const cc=STATUS_COLORS[idx]||{bg:'#888',fg:'#fff'};
+    const opt=document.createElement('div');
+    opt.className='status-dd-option';
+    opt.style.background=cc.bg;opt.style.color=cc.fg;
+    opt.innerHTML=`<span class="status-dd-swatch" style="background:${cc.fg}"></span>${label}`;
+    opt.onclick=(e)=>{e.stopPropagation();setStatusFromStrip(idx);closeStatusDD();};
+    menu.appendChild(opt);
   });
+}
+function toggleStatusDD(){
+  const menu=document.getElementById('status-dd-menu');
+  if(menu) menu.classList.toggle('open');
+}
+function closeStatusDD(){
+  const menu=document.getElementById('status-dd-menu');
+  if(menu) menu.classList.remove('open');
 }
 function setStatusFromStrip(idx){
   statusValues['label']=idx;
@@ -1198,7 +1238,7 @@ function closeAllDropdowns(){
   document.querySelectorAll('.custom-select-display.open').forEach(d=>d.classList.remove('open'));
 }
 
-document.addEventListener('click',e=>{if(!e.target.closest('.custom-select-wrap'))closeAllDropdowns();});
+document.addEventListener('click',e=>{if(!e.target.closest('.custom-select-wrap'))closeAllDropdowns();if(!e.target.closest('.status-dd-wrap'))closeStatusDD();});
 
 function selectSingleOption(fieldId,optId,optLabel,ctx){
   ctx=ctx||'main';
@@ -1806,6 +1846,7 @@ function resetForm(){
   hide('full-view');hide('interview-view');hide('new-model-view');
   document.getElementById('sidebar-notes-pin').classList.remove('visible');
   document.getElementById('candidate-strip').classList.remove('visible');
+  const ssb=document.getElementById('sticky-status-bar');if(ssb)ssb.style.display='none';
   document.getElementById('candidate-select').value='';
   document.getElementById('search-input').value='';
   document.getElementById('candidate-status-badge').innerHTML='';
