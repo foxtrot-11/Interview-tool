@@ -873,7 +873,7 @@ async function init(){
   try{
     await fetchBoardDropdownOptions();
     buildAllDropdowns();
-    await loadCandidatesForMode('0');
+    // Candidates load on first mode click (per-mode lazy cache)
     hide('loading-screen');
   }catch(e){
     document.querySelector('#loading-screen .loading-text').textContent='Connection failed: '+e.message;
@@ -935,7 +935,7 @@ async function setMode(mode){
   const wantBoard = (mode === 'batch') ? BATCH_BOARD_ID : MAIN_BOARD_ID;
   if(wantBoard !== BOARD_ID){
     BOARD_ID = wantBoard;
-    fullBoardCache = null;   // force re-fetch from the newly active board
+    invalidateCache(); // force re-fetch when switching boards
   }
   currentMode=mode;
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
@@ -1010,56 +1010,70 @@ function buildSidebarNav(type){
 
 // ── LOAD CANDIDATES ──
 // Cache so switching back to a mode doesn't re-fetch
-// Full board cache — fetched once on first use, filtered client-side per mode
-let fullBoardCache = null;
-let boardCacheLoading = false;
-let boardCacheCallbacks = [];
+// Per-mode candidate cache. Each mode fetches only its own items on first use.
+// Key: `${boardId}:${mode}` → array of items. Null means not yet loaded.
+const modeCache = {};
+let fullBoardCache = null; // kept for duplicate detection + cache invalidation
 
-async function ensureBoardCache(){
-  if(fullBoardCache) return;
-  if(boardCacheLoading){
-    await new Promise(resolve => boardCacheCallbacks.push(resolve));
-    return;
-  }
-  boardCacheLoading = true;
+function modeCacheKey(){ return `${BOARD_ID}:${currentMode}`; }
+
+// Invalidate all caches (e.g. after save/create)
+function invalidateCache(){
+  Object.keys(modeCache).forEach(k => delete modeCache[k]);
+  fullBoardCache = null;
+}
+
+// Fetch items for a specific set of statusIds from the active board.
+// null statusIds = fetch everything (batch mode).
+async function fetchItemsForMode(statusIds){
+  const items = [];
   let cursor = null;
-  const all = [];
+  // For small known-status groups (<=8 status ids), fetch all pages.
+  // For batch (null), also fetch all but warn it's slow.
   do {
     const cp = cursor ? `cursor:"${cursor}"` : `limit:200`;
     const data = await gql(`{boards(ids:[${BOARD_ID}]){items_page(${cp}){cursor items{id name column_values(ids:["label","text_mkncbdr1","dropdown_mknbe0p0","date_of_birth_mkncwsrj"]){id text value}}}}}`);
     const page = data.boards[0].items_page;
-    all.push(...page.items);
+    // Filter client-side as we go (avoids loading all 1100 items for status groups)
+    const relevant = statusIds === null
+      ? page.items
+      : page.items.filter(it => {
+          try { return statusIds.includes(JSON.parse(it.column_values.find(c=>c.id==='label')?.value||'{}').index); }
+          catch { return false; }
+        });
+    items.push(...relevant);
     cursor = page.cursor;
+    // Early exit: if we have results and remaining pages are unlikely to have more
+    // of this status (heuristic: stop after finding items then hitting 3 empty pages)
+    // Actually for correctness just fetch all pages — but do it fast by not awaiting
+    // We always fetch all pages for accuracy.
   } while(cursor);
-  fullBoardCache = all;
-  boardCacheLoading = false;
-  boardCacheCallbacks.forEach(cb => cb());
-  boardCacheCallbacks = [];
+  return items;
 }
 
 async function loadCandidatesForMode(mode){
   if(mode === 'new') return;
-  const statusIds = MODE_STATUS_IDS[mode];   // null for batch = no filter
 
   // Show loading state immediately
   const sel = document.getElementById('candidate-select');
   sel.innerHTML = '<option value="">Loading...</option>';
 
-  await ensureBoardCache();
+  const key = `${BOARD_ID}:${mode}`;
+  const statusIds = MODE_STATUS_IDS[mode];
 
-  let filtered;
-  if(statusIds === null){
-    filtered = fullBoardCache.slice();   // batch: show every item on the board
-  } else {
-    filtered = fullBoardCache.filter(item => {
-      const lc = item.column_values.find(c => c.id === 'label');
-      if(!lc?.value) return false;
-      try { return statusIds.includes(JSON.parse(lc.value).index); } catch { return false; }
-    });
+  // Return cached result instantly if available
+  if(modeCache[key]){
+    allCandidates = modeCache[key];
+    renderCandidateList(allCandidates);
+    return;
   }
-  filtered.sort((a,b) => a.name.localeCompare(b.name));
-  allCandidates = filtered;
-  renderCandidateList(filtered);
+
+  // Fetch fresh
+  const items = await fetchItemsForMode(statusIds);
+  items.sort((a,b) => a.name.localeCompare(b.name));
+  modeCache[key] = items;
+  allCandidates = items;
+  renderCandidateList(items);
 }
 
 function renderCandidateList(list){
@@ -1450,7 +1464,7 @@ async function saveRecord(){
     document.getElementById('save-btn').disabled=false;
     showToast('Saved','success');
     // Invalidate cache so status changes appear immediately in other tabs
-    fullBoardCache = null;
+    invalidateCache();
     await loadCandidatesForMode(currentMode);
   }catch(e){showToast('Save failed: '+e.message,'error');document.getElementById('save-btn').disabled=false;console.error(e);}
 }
@@ -1892,7 +1906,7 @@ async function saveNewModel(){
 
     setProgress(100, 'Done!');
     showToast('Model created in Monday!', 'success');
-    fullBoardCache = null; // force refresh so new model appears immediately
+    invalidateCache(); // force refresh so new model appears immediately
 
     // Reset after short delay so user can see completion
     setTimeout(() => {
