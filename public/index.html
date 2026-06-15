@@ -2474,16 +2474,19 @@ async function mergePhotos(oldest, rest, addLog){
   const existingHeadshot = colEntries('files_mkncw5nm');
   const existingExtras   = colEntries('file_mkp1n4bt');
 
-  // Dedup key: name+size
-  const dedupKey = entry => {
-    const a = assetById[String(entry.assetId)];
-    return a ? `${a.name}|${a.file_size}` : String(entry.assetId);
+  // Dedup keys: prefer name+size (robust across items), fall back to name+assetId
+  const dedupKey = (entry, lookup) => {
+    const a = lookup[String(entry.assetId)];
+    if(a && a.file_size != null) return `${a.name}|${a.file_size}`;
+    if(a) return `${a.name}|noSize`;
+    return `${entry.name}|missingAsset|${entry.assetId}`;
   };
-  const seenKeys = new Set([...existingHeadshot, ...existingExtras].map(e => dedupKey(e)));
+  const seenKeys = new Set([...existingHeadshot, ...existingExtras].map(e => dedupKey(e, assetById)));
 
   let newExtras = [...existingExtras];
   let newHeadshot = [...existingHeadshot];
   let added = 0;
+  let skippedDead = 0;
 
   for(const newer of rest){
     const nd = await gql(`{items(ids:[${newer.id}]){
@@ -2500,38 +2503,56 @@ async function mergePhotos(oldest, rest, addLog){
       try { return JSON.parse(cv.value).files||[]; } catch { return []; }
     };
 
+    // SAFETY: only port entries whose asset actually exists on the source item.
+    // Restored-from-recycle-bin items can have column refs to orphaned assetIds —
+    // copying those would write dead references that monday can't render.
+    const isLive = entry => naById[String(entry.assetId)] !== undefined;
+
     // Try to port headshot if oldest has none
     if(!newHeadshot.length){
       const nh = nColEntries('files_mkncw5nm');
       if(nh.length){
-        const key = `${naById[String(nh[0].assetId)]?.name}|${naById[String(nh[0].assetId)]?.file_size}`;
-        if(!seenKeys.has(key)){
-          newHeadshot = [nh[0]];
-          seenKeys.add(key);
-          addLog(`  + Porting headshot from ${newer.id}`, 'log-ok');
-          added++;
+        if(!isLive(nh[0])){
+          addLog(`  ~ Skipping headshot from ${newer.id} (asset ${nh[0].assetId} orphaned — re-upload manually)`, 'log-warn');
+          skippedDead++;
+        } else {
+          const key = dedupKey(nh[0], naById);
+          if(!seenKeys.has(key)){
+            newHeadshot = [nh[0]];
+            seenKeys.add(key);
+            addLog(`  + Porting headshot from ${newer.id} (${naById[String(nh[0].assetId)].name})`, 'log-ok');
+            added++;
+          }
         }
       }
     }
 
-    // Port all extra photos (dedup by name+size)
+    // Port extra photos (dedup by name+size, skip orphaned)
     const ne = [...nColEntries('files_mkncw5nm').slice(newHeadshot.length?1:0), ...nColEntries('file_mkp1n4bt')];
     for(const entry of ne){
+      if(!isLive(entry)){
+        addLog(`  ~ Skipping extra "${entry.name}" from ${newer.id} (asset ${entry.assetId} orphaned)`, 'log-warn');
+        skippedDead++;
+        continue;
+      }
       const a = naById[String(entry.assetId)];
-      const key = a ? `${a.name}|${a.file_size}` : String(entry.assetId);
+      const key = dedupKey(entry, naById);
       if(seenKeys.has(key)){
-        addLog(`  ~ Skipping duplicate photo: ${a?.name||entry.assetId}`);
+        addLog(`  ~ Skipping duplicate photo: ${a.name}`);
         continue;
       }
       seenKeys.add(key);
       newExtras.push(entry);
       added++;
-      addLog(`  + Adding photo: ${a?.name||entry.assetId}`, 'log-ok');
+      addLog(`  + Adding photo: ${a.name}`, 'log-ok');
     }
   }
 
+  if(skippedDead > 0){
+    addLog(`  ⚠ ${skippedDead} photo(s) had orphaned asset refs and were skipped — re-upload manually if needed`, 'log-warn');
+  }
   if(added === 0){
-    addLog('  No new photos to add (all duplicates by name+size)');
+    addLog('  No new photos to add');
     return;
   }
 
