@@ -106,6 +106,9 @@
   .candidate-avatar{width:40px;height:40px;border-radius:4px;background:var(--border);overflow:hidden;flex-shrink:0;border:1px solid var(--border)}
   .candidate-avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--text-muted);background:linear-gradient(135deg,var(--surface),var(--border))}
   .candidate-name{font-family:var(--font-display);font-weight:700;font-size:16px;color:var(--text)}
+  .candidate-name-input{font-family:var(--font-display);font-weight:700;font-size:16px;color:var(--text);background:transparent;border:none;border-bottom:1px solid transparent;outline:none;padding:2px 4px;min-width:120px;max-width:260px;transition:border-color 0.15s}
+  .candidate-name-input:hover{border-bottom-color:var(--border)}
+  .candidate-name-input:focus{border-bottom-color:var(--accent);background:rgba(200,180,255,0.05)}
   .strip-status-bar{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
   /* STICKY STATUS BAR — pinned at top of the scroll area in every view */
   .sticky-status-bar{position:sticky;top:0;z-index:60;background:var(--bg);display:flex;align-items:center;gap:12px;padding:4px 0 12px;margin-bottom:16px;border-bottom:1px solid var(--border)}
@@ -387,7 +390,6 @@
   <div class="save-area">
     <div class="unsaved-dot" id="unsaved-dot"></div>
     <div class="save-status" id="save-status"></div>
-    <button class="save-btn" id="save-btn" onclick="saveRecord()" disabled>Save</button>
   </div>
 </header>
 
@@ -430,12 +432,19 @@
         <div class="status-dd-menu" id="status-dd-menu"></div>
       </div>
     </div>
+    <button class="save-btn" id="save-btn" onclick="saveRecord()" disabled style="margin-left:auto">Save Changes</button>
     <div class="candidate-strip" id="candidate-strip">
       <div class="candidate-avatar" id="candidate-avatar-wrap">
         <div class="candidate-avatar-placeholder" id="avatar-initial">?</div>
       </div>
       <div style="flex:1">
-        <div class="candidate-name" id="strip-name">—</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input class="candidate-name-input" id="strip-name" value="—" 
+            title="Stage name (item name in Monday)" 
+            oninput="markDirty()" 
+            onblur="updateItemName(this.value)">
+          <span style="font-size:10px;color:var(--text-dim);letter-spacing:0.1em;text-transform:uppercase">stage name</span>
+        </div>
         <div class="candidate-meta">
           <div class="candidate-meta-item" id="strip-age"></div>
           <div class="candidate-meta-item" id="strip-location"></div>
@@ -637,6 +646,7 @@
         </div>
 
 <div class="field-grid single">
+          <div class="field"><div class="field-label">Legal Name</div><input type="text" id="iv-text_mknceqty" placeholder="Full legal name" oninput="syncIvField('text_mknceqty',this.value)"></div>
           <div class="field"><div class="field-label">Experience in Porn</div><textarea id="iv-long_text_mm2mxr92" oninput="syncIvField('long_text_mm2mxr92',this.value)"></textarea></div>
           <div class="field"><div class="field-label">Other Studios?</div><div class="status-group" id="iv-color_mm25jb44"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm25jb44')">No Prev Exp</div><div class="status-pill" style="background:#df2f4a;color:#fff" data-value="2" onclick="selectStatusIv(this,'color_mm25jb44')">OF Only</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm25jb44')">Occasional</div><div class="status-pill" style="background:#037f4c;color:#fff" data-value="6" onclick="selectStatusIv(this,'color_mm25jb44')">Mix</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm25jb44')">Regularly</div></div></div>
           <div class="field"><div class="field-label">Other Studios Notes</div><textarea id="iv-long_text_mm252r65" oninput="syncIvField('long_text_mm252r65',this.value)"></textarea></div>
@@ -655,21 +665,21 @@
           <div class="field"><div class="field-label">Hair Color</div><input type="text" id="iv-text_mkncjzx8" placeholder="Brown" oninput="syncIvField('text_mkncjzx8',this.value)"></div>
           <div class="field"><div class="field-label">Eye Color</div><input type="text" id="iv-text_mkncsqaq" placeholder="Blue" oninput="syncIvField('text_mkncsqaq',this.value)"></div>
           <div class="field"><div class="field-label">Cock Size</div><input type="text" id="iv-text_mm1y2znz" placeholder="7&quot;" oninput="syncIvField('text_mm1y2znz',this.value)"></div>
-          <div class="field"><div class="field-label">Cut vs Uncut</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mkx04tbr" onclick="event.stopPropagation();toggleCustom('dropdown_mkx04tbr',false,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mkx04tbr"></div></div></div>
+          <div class="field"><div class="field-label">Cut vs Uncut</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mkx04tbr" onclick="event.stopPropagation();toggleCustom('dropdown_mkx04tbr',false,'iv')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mkx04tbr"></div></div></div>
           <div class="field"><div class="field-label">Shirt Size</div><input type="text" id="iv-text_mknc62rg" placeholder="XS/S/M/L/XL" oninput="syncIvField('text_mknc62rg',this.value)"></div>
           <div class="field"><div class="field-label">Shoe Size</div><input type="text" id="iv-text_mknc2t7g" placeholder="10.5" oninput="syncIvField('text_mknc2t7g',this.value)"></div>
           <div class="field"><div class="field-label">Pant Size</div><input type="text" id="iv-text_mknc808t" placeholder="32x30" oninput="syncIvField('text_mknc808t',this.value)"></div>
-          <div class="field"><div class="field-label">Role</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mknbe0p0" onclick="event.stopPropagation();toggleCustom('dropdown_mknbe0p0',true,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mknbe0p0"></div></div></div>
-          <div class="field"><div class="field-label">Type</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1zzwcg" onclick="event.stopPropagation();toggleCustom('dropdown_mm1zzwcg',true,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1zzwcg"></div></div></div>
-          <div class="field"><div class="field-label">Sexuality (on camera)</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1by5q0" onclick="event.stopPropagation();toggleCustom('dropdown_mm1by5q0',true,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1by5q0"></div></div></div>
-          <div class="field"><div class="field-label">Ethnicity</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1zcar6" onclick="event.stopPropagation();toggleCustom('dropdown_mm1zcar6',true,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1zcar6"></div></div></div>
-          <div class="field"><div class="field-label">Language(s)</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mknb18b7" onclick="event.stopPropagation();toggleCustom('dropdown_mknb18b7',true,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mknb18b7"></div></div></div>
+          <div class="field"><div class="field-label">Role</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mknbe0p0" onclick="event.stopPropagation();toggleCustom('dropdown_mknbe0p0',true,'iv')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mknbe0p0"></div></div></div>
+          <div class="field"><div class="field-label">Type</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1zzwcg" onclick="event.stopPropagation();toggleCustom('dropdown_mm1zzwcg',true,'iv')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1zzwcg"></div></div></div>
+          <div class="field"><div class="field-label">Sexuality (on camera)</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1by5q0" onclick="event.stopPropagation();toggleCustom('dropdown_mm1by5q0',true,'iv')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1by5q0"></div></div></div>
+          <div class="field"><div class="field-label">Ethnicity</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1zcar6" onclick="event.stopPropagation();toggleCustom('dropdown_mm1zcar6',true,'iv')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1zcar6"></div></div></div>
+          <div class="field"><div class="field-label">Language(s)</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mknb18b7" onclick="event.stopPropagation();toggleCustom('dropdown_mknb18b7',true,'iv')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mknb18b7"></div></div></div>
           <div class="field"><div class="field-label">Passport</div><div class="status-group" id="iv-color_mm26w6hs"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm26w6hs')">NO</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm26w6hs')">YES</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm26w6hs')">N/A</div></div></div>
           <div class="field"><div class="field-label">State ID (state)</div><input type="text" id="iv-text_mm1z66yj" placeholder="e.g. California" oninput="syncIvField('text_mm1z66yj',this.value)"></div>
           <div class="field"><div class="field-label">Medical Allergies</div><input type="text" id="iv-text_mkncgkwk" placeholder="medications, bees, etc." oninput="syncIvField('text_mkncgkwk',this.value)"></div>
           <div class="field"><div class="field-label">Food Restrictions</div><input type="text" id="iv-text_mkncht8f" placeholder="vegan, gluten-free, etc." oninput="syncIvField('text_mkncht8f',this.value)"></div>
           <div class="field"><div class="field-label">Experience Bottoming</div><textarea id="iv-long_text_mm1zaqzq" oninput="syncIvField('long_text_mm1zaqzq',this.value)"></textarea></div>
-          <div class="field"><div class="field-label">Dick Enhancement</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1ztytq" onclick="event.stopPropagation();toggleCustom('dropdown_mm1ztytq',false,true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1ztytq"></div></div></div>
+          <div class="field"><div class="field-label">Dick Enhancement</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mm1ztytq" onclick="event.stopPropagation();toggleCustom('dropdown_mm1ztytq',false,'iv')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mm1ztytq"></div></div></div>
           <div class="field"><div class="field-label">HIV</div><div class="status-group" id="iv-color_mm1zzkz6"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1zzkz6')">Non-detectable</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm1zzkz6')">YES</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zzkz6')">NONE</div></div></div>
           <div class="field"><div class="field-label">Syphilis</div><div class="status-group" id="iv-color_mm1zbze8"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm1zbze8')">Past Infection</div><div class="status-pill" style="background:#c4c4c4;color:#111" data-value="5" onclick="selectStatusIv(this,'color_mm1zbze8')">NONE</div></div></div>
           <div class="field"><div class="field-label">Availability Notes</div><textarea id="iv-long_text_mm1z9aeg" oninput="syncIvField('long_text_mm1z9aeg',this.value)"></textarea></div>
@@ -1108,7 +1118,7 @@ async function loadCandidate(itemId){
 
 function populateForm(item){
   const cols={};item.column_values.forEach(c=>cols[c.id]=c);
-  document.getElementById('strip-name').textContent=item.name;
+  const sn=document.getElementById('strip-name');if(sn)sn.value=item.name;
   // Rebuild the avatar placeholder — the previous candidate's headshot <img> may have replaced it
   const aw=document.getElementById('candidate-avatar-wrap');
   if(aw) aw.innerHTML='<div class="candidate-avatar-placeholder" id="avatar-initial">'+item.name.charAt(0).toUpperCase()+'</div>';
@@ -1395,6 +1405,31 @@ function markDirty(){
   document.getElementById('save-btn').disabled=false;
 }
 
+// ── RENAME item (stage name) ──
+async function updateItemName(newName){
+  newName = (newName||'').trim();
+  if(!currentItem || !newName || newName === currentItem.name) return;
+  try {
+    await gql(`mutation($i:ID!,$n:String!){change_item_value(item_id:$i,column_id:"name",value:$n){id}}`,
+      {i: currentItem.id, n: JSON.stringify(newName)});
+    currentItem.name = newName;
+    // Update the cache entry too
+    if(fullBoardCache){
+      const cached = fullBoardCache.find(it=>it.id===currentItem.id);
+      if(cached) cached.name = newName;
+    }
+    // Update the dropdown option
+    const opt = document.querySelector(`#candidate-select option[value="${currentItem.id}"]`);
+    if(opt) opt.textContent = newName;
+    showToast('Stage name updated','success');
+  } catch(e) {
+    showToast('Rename failed: '+e.message,'error');
+    // Revert the input
+    const sn = document.getElementById('strip-name');
+    if(sn) sn.value = currentItem.name;
+  }
+}
+
 // ── SAVE (existing model) ──
 async function saveRecord(){
   if(!currentItem&&currentMode!=='new')return;
@@ -1414,6 +1449,8 @@ async function saveRecord(){
     document.getElementById('save-status').textContent='Saved '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     document.getElementById('save-btn').disabled=false;
     showToast('Saved','success');
+    // Invalidate cache so status changes appear immediately in other tabs
+    fullBoardCache = null;
     await loadCandidatesForMode(currentMode);
   }catch(e){showToast('Save failed: '+e.message,'error');document.getElementById('save-btn').disabled=false;console.error(e);}
 }
@@ -1855,6 +1892,7 @@ async function saveNewModel(){
 
     setProgress(100, 'Done!');
     showToast('Model created in Monday!', 'success');
+    fullBoardCache = null; // force refresh so new model appears immediately
 
     // Reset after short delay so user can see completion
     setTimeout(() => {
