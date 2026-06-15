@@ -2152,7 +2152,7 @@ async function loadDuplicates(){
     // Keep only groups that have at least one DUPLICATE-status item
     dupGroups = Object.values(byName)
       .filter(g => g.some(it => it.statusIdx === STATUS_DUPLICATE))
-      .map(g => ({ name: g[0].name, items: g.sort((a,b) => new Date(a.created_at)-new Date(b.created_at)) }));
+      .map((g, i) => ({ gid: 'g'+i+'_'+g[0].id, name: g[0].name, done: false, items: g.sort((a,b) => new Date(a.created_at)-new Date(b.created_at)) }));
 
     summary.textContent = dupGroups.length
       ? `${dupGroups.length} group${dupGroups.length>1?'s':''} found`
@@ -2188,12 +2188,14 @@ function classifyCase(group){
 function renderDupGroups(){
   const container = document.getElementById('dup-groups-container');
   container.innerHTML = '';
-  dupGroups.forEach((group, gi) => {
+  dupGroups.forEach((group) => {
+    if(group.done) return;
+    const gid = group.gid;
     const {case:c, label} = classifyCase(group);
     const oldest = group.items[0];
     const div = document.createElement('div');
     div.className = 'dup-group';
-    div.id = `dup-group-${gi}`;
+    div.id = `dup-group-${gid}`;
 
     const caseColors = {1:'dup-case-1',2:'dup-case-2',3:'dup-case-3',4:'dup-case-4'};
     div.innerHTML = `
@@ -2201,27 +2203,30 @@ function renderDupGroups(){
         <div class="dup-group-name">${group.items[0].name}</div>
         <div class="dup-group-count">${group.items.length} versions</div>
         <div class="dup-case-badge ${caseColors[c]}">Case ${c}: ${label}</div>
-        <div style="margin-left:auto;font-size:10px;color:var(--text-dim)">oldest: ${oldest.created_at.slice(0,10)}</div>
+        <div style="margin-left:auto;font-size:10px;color:var(--text-dim)">oldest: ${oldest.created_at.slice(0,10)} · id ${oldest.id}</div>
       </div>
-      <div class="dup-items" id="dup-items-${gi}">
+      <div class="dup-items" id="dup-items-${gid}">
         <div style="padding:12px;color:var(--text-muted);font-size:12px">Loading details...</div>
       </div>
       <div class="dup-actions">
-        <button class="merge-btn" onclick="runMerge(${gi})" id="merge-btn-${gi}">
+        <button class="merge-btn" onclick="runMerge('${gid}')" id="merge-btn-${gid}">
           ${c===2?'Keep Oldest & Delete Others':'Merge All → Oldest'}
         </button>
-        <button class="skip-btn" onclick="skipGroup(${gi})">Skip</button>
-        <div id="dup-log-${gi}" class="dup-merge-log"></div>
+        <button class="skip-btn" onclick="skipGroup('${gid}')">Skip</button>
+        <div id="dup-log-${gid}" class="dup-merge-log"></div>
       </div>`;
     container.appendChild(div);
-    // Load full details async
-    loadGroupDetails(gi);
+    loadGroupDetails(gid);
   });
 }
 
-async function loadGroupDetails(gi){
-  const group = dupGroups[gi];
-  const container = document.getElementById(`dup-items-${gi}`);
+// Look up a group by its stable gid (never by array index)
+function getDupGroup(gid){ return dupGroups.find(g => g.gid === gid); }
+
+async function loadGroupDetails(gid){
+  const group = getDupGroup(gid);
+  const container = document.getElementById(`dup-items-${gid}`);
+  if(!group || !container) return;
   try {
     // Fetch full column values + assets for each item in the group
     const ids = group.items.map(it=>it.id).join(',');
@@ -2275,10 +2280,17 @@ async function loadGroupDetails(gi){
 }
 
 // ── MERGE ENGINE ──
-async function runMerge(gi){
-  const group = dupGroups[gi];
-  const btn   = document.getElementById(`merge-btn-${gi}`);
-  const log   = document.getElementById(`dup-log-${gi}`);
+async function runMerge(gid){
+  const group = getDupGroup(gid);
+  const btn   = document.getElementById(`merge-btn-${gid}`);
+  const log   = document.getElementById(`dup-log-${gid}`);
+  if(!group){ console.error('Merge: group not found for gid', gid); return; }
+  // Cross-wiring guard: every item in the group must share the same normalised name
+  const names = new Set(group.items.map(it => it.name.trim().toLowerCase()));
+  if(names.size !== 1){
+    alert('Safety stop: this group contains mismatched names ('+[...names].join(', ')+'). Merge aborted.');
+    return;
+  }
   btn.disabled = true;
   log.className = 'dup-merge-log visible';
   log.innerHTML = '';
@@ -2304,6 +2316,16 @@ async function runMerge(gi){
     const {case:c} = classifyCase(group);
     const oldest = group.items[0];
     const rest   = group.items.slice(1);
+
+    // SAFETY CONFIRMATION — show exactly what will happen with names + IDs
+    const keepLine = `KEEP: ${oldest.name} (id ${oldest.id}, ${oldest.created_at.slice(0,10)})`;
+    const delLines = rest.map(r => `DELETE: ${r.name} (id ${r.id}, ${r.created_at.slice(0,10)})`).join('\n');
+    const confirmMsg = `Confirm merge for "${group.name}":\n\n${keepLine}\n${delLines}\n\nData from the deleted item(s) merges into the kept item. Proceed?`;
+    if(!confirm(confirmMsg)){
+      addLog('Merge cancelled by user', 'log-warn');
+      btn.disabled = false;
+      return;
+    }
     addLog(`Merge strategy: Case ${c} — ${rest.length} item(s) → oldest (${oldest.id})`);
 
     // ── CASE 2: identical imports — just delete all but oldest ──
@@ -2316,6 +2338,9 @@ async function runMerge(gi){
       }
       addLog('✓ Done — oldest record kept', 'log-ok');
       btn.textContent = '✓ Merged';
+      group.done = true;
+      const card2 = document.getElementById(`dup-group-${gid}`);
+      if(card2){ card2.style.opacity='0.5'; card2.querySelectorAll('button').forEach(b=>b.disabled=true); }
       return;
     }
 
@@ -2420,9 +2445,9 @@ async function runMerge(gi){
 
     addLog('✓ Merge complete', 'log-ok');
     btn.textContent = '✓ Merged';
-
-    // Remove from dupGroups so refresh shows accurately
-    dupGroups.splice(gi, 1);
+    group.done = true;  // mark complete; never splice (would shift indices)
+    const cardC = document.getElementById(`dup-group-${gid}`);
+    if(cardC){ cardC.style.opacity='0.5'; cardC.querySelectorAll('button').forEach(b=>b.disabled=true); }
 
   } catch(e){
     addLog(`✗ Error: ${e.message}`, 'log-err');
@@ -2521,8 +2546,8 @@ async function mergePhotos(oldest, rest, addLog){
   addLog(`  ✓ Merged ${added} new photo(s)`, 'log-ok');
 }
 
-function skipGroup(gi){
-  const el = document.getElementById(`dup-group-${gi}`);
+function skipGroup(gid){
+  const el = document.getElementById(`dup-group-${gid}`);
   if(el){ el.style.opacity='0.4'; el.style.pointerEvents='none'; }
 }
 
