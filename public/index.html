@@ -1026,27 +1026,43 @@ function invalidateCache(){
 // Fetch items for a specific set of statusIds from the active board.
 // null statusIds = fetch everything (batch mode).
 async function fetchItemsForMode(statusIds){
+  // Snapshot the board ID at the start; if it changes mid-fetch, abandon results
+  const boardAtStart = BOARD_ID;
   const items = [];
   let cursor = null;
-  // For small known-status groups (<=8 status ids), fetch all pages.
-  // For batch (null), also fetch all but warn it's slow.
+  let pagesWithoutMatches = 0;
+  const MAX_EMPTY_STREAK = 6;     // stop after this many consecutive empty pages
+
   do {
     const cp = cursor ? `cursor:"${cursor}"` : `limit:200`;
-    const data = await gql(`{boards(ids:[${BOARD_ID}]){items_page(${cp}){cursor items{id name column_values(ids:["label","text_mkncbdr1","dropdown_mknbe0p0","date_of_birth_mkncwsrj"]){id text value}}}}}`);
+    let data;
+    try {
+      data = await gql(`{boards(ids:[${boardAtStart}]){items_page(${cp}){cursor items{id name column_values(ids:["label","text_mkncbdr1","dropdown_mknbe0p0","date_of_birth_mkncwsrj"]){id text value}}}}}`);
+    } catch(e) {
+      console.error('fetchItemsForMode page error:', e);
+      throw e;
+    }
+    if(BOARD_ID !== boardAtStart) return []; // board switched mid-fetch — abandon
+
     const page = data.boards[0].items_page;
-    // Filter client-side as we go (avoids loading all 1100 items for status groups)
     const relevant = statusIds === null
       ? page.items
       : page.items.filter(it => {
           try { return statusIds.includes(JSON.parse(it.column_values.find(c=>c.id==='label')?.value||'{}').index); }
           catch { return false; }
         });
-    items.push(...relevant);
+
+    if(relevant.length === 0) pagesWithoutMatches++;
+    else { pagesWithoutMatches = 0; items.push(...relevant); }
+
     cursor = page.cursor;
-    // Early exit: if we have results and remaining pages are unlikely to have more
-    // of this status (heuristic: stop after finding items then hitting 3 empty pages)
-    // Actually for correctness just fetch all pages — but do it fast by not awaiting
-    // We always fetch all pages for accuracy.
+
+    // Heuristic early exit: for non-batch (status-filtered) modes, stop after many
+    // consecutive empty pages if we already have some results.
+    // This skips paging through 600+ EVERNOTE items just to find the 8 INTERVIEW ones.
+    if(statusIds !== null && items.length > 0 && pagesWithoutMatches >= MAX_EMPTY_STREAK){
+      break;
+    }
   } while(cursor);
   return items;
 }
@@ -1069,11 +1085,17 @@ async function loadCandidatesForMode(mode){
   }
 
   // Fetch fresh
-  const items = await fetchItemsForMode(statusIds);
-  items.sort((a,b) => a.name.localeCompare(b.name));
-  modeCache[key] = items;
-  allCandidates = items;
-  renderCandidateList(items);
+  try {
+    const items = await fetchItemsForMode(statusIds);
+    items.sort((a,b) => a.name.localeCompare(b.name));
+    modeCache[key] = items;
+    allCandidates = items;
+    renderCandidateList(items);
+  } catch(e) {
+    console.error('loadCandidatesForMode failed:', e);
+    sel.innerHTML = `<option value="">Load failed — ${e.message.slice(0,40)}</option>`;
+    showToast('Failed to load candidates: '+e.message, 'error');
+  }
 }
 
 function renderCandidateList(list){
