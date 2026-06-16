@@ -91,6 +91,12 @@
 
   /* SELECTOR BAR */
   .selector-bar{flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 28px;z-index:90;position:relative}
+  /* Loading indicator shown while a tab's candidates are fetched */
+  .load-bar{display:none;align-items:center;gap:10px;margin-top:10px;font-family:var(--font-mono);font-size:12px;color:var(--accent)}
+  .load-bar.active{display:flex}
+  .load-bar-track{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;position:relative}
+  .load-bar-fill{position:absolute;top:0;left:0;height:100%;width:35%;background:var(--accent);border-radius:2px;animation:loadslide 1.1s ease-in-out infinite}
+  @keyframes loadslide{0%{left:-35%}100%{left:100%}}
   .selector-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .search-wrap{position:relative;flex:1;min-width:180px;max-width:300px}
   .search-wrap input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 12px 8px 32px;outline:none;transition:border-color 0.2s}
@@ -406,6 +412,10 @@
     </select>
     <div id="candidate-status-badge"></div>
   </div>
+  <div class="load-bar" id="load-bar">
+    <span id="load-bar-text">Loading models… please wait</span>
+    <div class="load-bar-track"><div class="load-bar-fill"></div></div>
+  </div>
 </div>
 
 <!-- CANDIDATE STRIP -->
@@ -432,8 +442,8 @@
         </div>
         <div class="status-dd-menu" id="status-dd-menu"></div>
       </div>
+      <button class="save-btn" id="save-btn" onclick="saveRecord()" disabled style="margin-left:auto">Save Changes</button>
     </div>
-    <button class="save-btn" id="save-btn" onclick="saveRecord()" disabled style="margin-left:auto">Save Changes</button>
     <div class="candidate-strip" id="candidate-strip">
       <div class="candidate-avatar" id="candidate-avatar-wrap">
         <div class="candidate-avatar-placeholder" id="avatar-initial">?</div>
@@ -1068,9 +1078,10 @@ async function fetchItemsForMode(statusIds){
 async function loadCandidatesForMode(mode){
   if(mode === 'new') return;
 
-  // Show loading state immediately
   const sel = document.getElementById('candidate-select');
-  sel.innerHTML = '<option value="">Loading...</option>';
+  const loadBar = document.getElementById('load-bar');
+  const loadText = document.getElementById('load-bar-text');
+  sel.innerHTML = '<option value="">Loading…</option>';
 
   const key = `${BOARD_ID}:${mode}`;
   const statusIds = MODE_STATUS_IDS[mode];
@@ -1079,8 +1090,13 @@ async function loadCandidatesForMode(mode){
   if(modeCache[key]){
     allCandidates = modeCache[key];
     renderCandidateList(allCandidates);
+    if(loadBar) loadBar.classList.remove('active');
     return;
   }
+
+  // Show the visible loading bar while we fetch fresh
+  if(loadBar){ loadBar.classList.add('active'); }
+  if(loadText){ loadText.textContent = 'Loading models… please wait'; }
 
   // Fetch fresh
   try {
@@ -1089,10 +1105,15 @@ async function loadCandidatesForMode(mode){
     modeCache[key] = items;
     allCandidates = items;
     renderCandidateList(items);
+    if(loadText){ loadText.textContent = `Loaded ${items.length} model${items.length===1?'':'s'}`; }
   } catch(e) {
     console.error('loadCandidatesForMode failed:', e);
     sel.innerHTML = `<option value="">Load failed — ${e.message.slice(0,40)}</option>`;
+    if(loadText){ loadText.textContent = 'Load failed — try again'; }
     showToast('Failed to load candidates: '+e.message, 'error');
+  } finally {
+    // Hide the spinner bar shortly after so the user sees the final count briefly
+    if(loadBar){ setTimeout(()=>loadBar.classList.remove('active'), 600); }
   }
 }
 
