@@ -13,6 +13,18 @@ if (!MONDAY_TOKEN) {
   process.exit(1);
 }
 
+// Tell search engines not to index this app, on EVERY response (strongest signal —
+// works even for crawlers that don't parse the HTML meta tag).
+app.use((_req, res, next) => {
+  res.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+  next();
+});
+
+// Explicit robots.txt disallowing all crawlers.
+app.get('/robots.txt', (_req, res) => {
+  res.type('text/plain').send('User-agent: *\nDisallow: /\n');
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '5mb' }));
 
