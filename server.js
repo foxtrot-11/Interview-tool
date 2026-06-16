@@ -5,12 +5,41 @@ const path = require('path');
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
-// Token comes from Render env var MONDAY_TOKEN; falls back to hardcoded
-const MONDAY_TOKEN = process.env.MONDAY_TOKEN || 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0MjE2NDAwMywiYWFpIjoxMSwidWlkIjoyMzMyNTE1NywiaWFkIjoiMjAyNi0wNC0wNlQyMDo0NTowMC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6ODgyNjM1NywicmduIjoidXNlMSJ9.eI5q0d8WflnpvZh1Tno_xBcI7DGJpkL9-p-iTMiH7YA';
+// Token comes ONLY from Render env var MONDAY_TOKEN. No hardcoded fallback,
+// so a misconfigured deploy fails loudly instead of silently using an old token.
+const MONDAY_TOKEN = process.env.MONDAY_TOKEN;
+if (!MONDAY_TOKEN) {
+  console.error('FATAL: MONDAY_TOKEN environment variable is not set.');
+  process.exit(1);
+}
 
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json({ limit: '5mb' }));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+// Relay GraphQL queries/mutations to monday, attaching the token server-side.
+// The browser never sees the token — it only ever calls this same-origin endpoint.
+app.post('/api', async (req, res) => {
+  try {
+    const { query, variables } = req.body || {};
+    if (!query) return res.status(400).json({ error: 'missing query' });
+
+    const r = await fetch('https://api.monday.com/v2', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: MONDAY_TOKEN,
+        'API-Version': '2024-01',
+      },
+      body: JSON.stringify({ query, variables: variables || {} }),
+    });
+    const j = await r.json();
+    res.status(r.ok ? 200 : r.status).json(j);
+  } catch (e) {
+    res.status(500).json({ errors: [{ message: e.message }] });
+  }
+});
 
 // Relay a file upload to monday's /v2/file endpoint (which blocks browser CORS)
 app.post('/upload', upload.single('file'), async (req, res) => {
