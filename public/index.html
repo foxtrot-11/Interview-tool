@@ -102,8 +102,18 @@
   .search-wrap input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 12px 8px 32px;outline:none;transition:border-color 0.2s}
   .search-wrap input:focus{border-color:var(--accent)}
   .search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px}
-  .candidate-select{flex:1;min-width:180px;max-width:380px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 30px 8px 12px;outline:none;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6b7e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;transition:border-color 0.2s}
-  .candidate-select:focus{border-color:var(--accent)}
+  .combo-wrap{position:relative;flex:1;min-width:220px;max-width:420px}
+  .combo-wrap .search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px;pointer-events:none}
+  .combo-wrap input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:8px 30px 8px 32px;outline:none;transition:border-color 0.2s}
+  .combo-wrap input:focus{border-color:var(--accent)}
+  .combo-chevron{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:12px;cursor:pointer}
+  .combo-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:320px;overflow-y:auto;background:var(--surface);border:1px solid var(--border-active);border-radius:var(--radius);z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.5)}
+  .combo-panel.open{display:block}
+  .combo-opt{padding:9px 14px;font-family:var(--font-mono);font-size:13px;color:var(--text);cursor:pointer;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .combo-opt:last-child{border-bottom:none}
+  .combo-opt:hover,.combo-opt.active{background:var(--surface2);color:var(--accent)}
+  .combo-opt .combo-hl{color:var(--accent2);font-weight:600}
+  .combo-empty{padding:10px 14px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim)}
   .status-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:4px 9px;border-radius:2px;font-weight:500;white-space:nowrap}
   .status-dot{width:5px;height:5px;border-radius:50%}
 
@@ -403,13 +413,13 @@
 <!-- SELECTOR BAR (hidden in new model mode) -->
 <div class="selector-bar" id="selector-bar">
   <div class="selector-row">
-    <div class="search-wrap">
+    <div class="combo-wrap" id="combo-wrap">
       <span class="search-icon">⌕</span>
-      <input type="text" id="search-input" placeholder="Search..." oninput="filterCandidates(this.value)">
+      <input type="text" id="candidate-combo" autocomplete="off" placeholder="Type to search candidates…"
+             oninput="onComboInput(this.value)" onfocus="onComboFocus()" onkeydown="onComboKey(event)">
+      <span class="combo-chevron" onclick="toggleComboPanel()">▾</span>
+      <div class="combo-panel" id="combo-panel"></div>
     </div>
-    <select class="candidate-select" id="candidate-select" onchange="loadCandidate(this.value)">
-      <option value="">— choose a candidate —</option>
-    </select>
     <div id="candidate-status-badge"></div>
   </div>
   <div class="load-bar" id="load-bar">
@@ -1078,10 +1088,11 @@ async function fetchItemsForMode(statusIds){
 async function loadCandidatesForMode(mode){
   if(mode === 'new') return;
 
-  const sel = document.getElementById('candidate-select');
+  const combo = document.getElementById('candidate-combo');
   const loadBar = document.getElementById('load-bar');
   const loadText = document.getElementById('load-bar-text');
-  sel.innerHTML = '<option value="">Loading…</option>';
+  if(combo){ combo.value=''; combo.placeholder='Loading…'; }
+  closeComboPanel();
 
   const key = `${BOARD_ID}:${mode}`;
   const statusIds = MODE_STATUS_IDS[mode];
@@ -1090,6 +1101,7 @@ async function loadCandidatesForMode(mode){
   if(modeCache[key]){
     allCandidates = modeCache[key];
     renderCandidateList(allCandidates);
+    if(combo){ combo.placeholder='Type to search candidates…'; }
     if(loadBar) loadBar.classList.remove('active');
     return;
   }
@@ -1105,10 +1117,11 @@ async function loadCandidatesForMode(mode){
     modeCache[key] = items;
     allCandidates = items;
     renderCandidateList(items);
+    if(combo){ combo.placeholder = `Search ${items.length} candidate${items.length===1?'':'s'}…`; }
     if(loadText){ loadText.textContent = `Loaded ${items.length} model${items.length===1?'':'s'}`; }
   } catch(e) {
     console.error('loadCandidatesForMode failed:', e);
-    sel.innerHTML = `<option value="">Load failed — ${e.message.slice(0,40)}</option>`;
+    if(combo){ combo.placeholder = 'Load failed — switch tabs to retry'; }
     if(loadText){ loadText.textContent = 'Load failed — try again'; }
     showToast('Failed to load candidates: '+e.message, 'error');
   } finally {
@@ -1117,22 +1130,98 @@ async function loadCandidatesForMode(mode){
   }
 }
 
+// ── COMBOBOX (type-to-search candidate picker) ──
+let comboMatches = [];     // current filtered list shown in the panel
+let comboActive = -1;      // keyboard-highlighted index
+
 function renderCandidateList(list){
-  const sel=document.getElementById('candidate-select');
-  const cur=sel.value;
-  sel.innerHTML='<option value="">— choose a candidate —</option>';
-  if(list.length===0){
-    const o=document.createElement('option');o.disabled=true;o.textContent='No candidates in this status';sel.appendChild(o);
-  } else {
-    list.forEach(item=>{const o=document.createElement('option');o.value=item.id;o.textContent=item.name;sel.appendChild(o);});
-  }
-  if(cur)sel.value=cur;
+  // Called after load; store as the full set and (re)render the panel from current query.
+  onComboInput(document.getElementById('candidate-combo')?.value || '', /*keepClosed*/ true);
 }
 
-function filterCandidates(q){
-  q=q.toLowerCase().trim();
-  renderCandidateList(q?allCandidates.filter(c=>c.name.toLowerCase().includes(q)):allCandidates);
+function comboFilter(q){
+  q = q.toLowerCase().trim();
+  if(!q) return allCandidates.slice();
+  // substring match anywhere in the name (not just prefix)
+  return allCandidates.filter(c => c.name.toLowerCase().includes(q));
 }
+
+function highlight(name, q){
+  q = q.trim();
+  if(!q) return escapeHtml(name);
+  const i = name.toLowerCase().indexOf(q.toLowerCase());
+  if(i < 0) return escapeHtml(name);
+  return escapeHtml(name.slice(0,i)) +
+         '<span class="combo-hl">' + escapeHtml(name.slice(i, i+q.length)) + '</span>' +
+         escapeHtml(name.slice(i+q.length));
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function renderComboPanel(q){
+  const panel = document.getElementById('combo-panel');
+  if(!panel) return;
+  comboMatches = comboFilter(q);
+  comboActive = -1;
+  if(allCandidates.length === 0){
+    panel.innerHTML = '<div class="combo-empty">No candidates in this status</div>';
+    return;
+  }
+  if(comboMatches.length === 0){
+    panel.innerHTML = '<div class="combo-empty">No matches for “'+escapeHtml(q)+'”</div>';
+    return;
+  }
+  panel.innerHTML = comboMatches.map((c,idx)=>
+    `<div class="combo-opt" data-idx="${idx}" data-id="${c.id}" onclick="pickCombo('${c.id}')">${highlight(c.name,q)}</div>`
+  ).join('');
+}
+
+function onComboInput(val, keepClosed){
+  renderComboPanel(val);
+  if(!keepClosed) openComboPanel();
+}
+function onComboFocus(){
+  // On focus, show the full list (or current filtered) so a click-then-type flow works
+  renderComboPanel(document.getElementById('candidate-combo').value || '');
+  openComboPanel();
+}
+function onComboKey(e){
+  const panel = document.getElementById('combo-panel');
+  if(!panel) return;
+  if(e.key === 'ArrowDown'){ e.preventDefault(); moveCombo(1); }
+  else if(e.key === 'ArrowUp'){ e.preventDefault(); moveCombo(-1); }
+  else if(e.key === 'Enter'){
+    e.preventDefault();
+    if(comboActive >= 0 && comboMatches[comboActive]) pickCombo(comboMatches[comboActive].id);
+    else if(comboMatches.length === 1) pickCombo(comboMatches[0].id);
+  } else if(e.key === 'Escape'){ closeComboPanel(); }
+}
+function moveCombo(dir){
+  const opts = document.querySelectorAll('#combo-panel .combo-opt');
+  if(!opts.length) return;
+  comboActive = (comboActive + dir + opts.length) % opts.length;
+  opts.forEach((o,i)=>o.classList.toggle('active', i===comboActive));
+  opts[comboActive].scrollIntoView({block:'nearest'});
+}
+function pickCombo(id){
+  const c = allCandidates.find(x=>String(x.id)===String(id));
+  const combo = document.getElementById('candidate-combo');
+  if(combo && c){ combo.value = c.name; }
+  closeComboPanel();
+  loadCandidate(id);
+}
+function openComboPanel(){ const p=document.getElementById('combo-panel'); if(p) p.classList.add('open'); }
+function closeComboPanel(){ const p=document.getElementById('combo-panel'); if(p) p.classList.remove('open'); comboActive=-1; }
+function toggleComboPanel(){
+  const p=document.getElementById('combo-panel');
+  if(!p) return;
+  if(p.classList.contains('open')) closeComboPanel();
+  else { onComboFocus(); document.getElementById('candidate-combo')?.focus(); }
+}
+// Close the panel when clicking outside the combo
+document.addEventListener('click', (e)=>{
+  const wrap = document.getElementById('combo-wrap');
+  if(wrap && !wrap.contains(e.target)) closeComboPanel();
+});
 
 // ── LOAD CANDIDATE ──
 async function loadCandidate(itemId){
@@ -1473,9 +1562,9 @@ async function updateItemName(newName){
       const cached = fullBoardCache.find(it=>it.id===currentItem.id);
       if(cached) cached.name = newName;
     }
-    // Update the dropdown option
-    const opt = document.querySelector(`#candidate-select option[value="${currentItem.id}"]`);
-    if(opt) opt.textContent = newName;
+    // Update the combobox: if this candidate is the selected one, reflect new name
+    const combo = document.getElementById('candidate-combo');
+    if(combo && currentItem) combo.value = newName;
     showToast('Stage name updated','success');
   } catch(e) {
     showToast('Rename failed: '+e.message,'error');
@@ -2084,8 +2173,8 @@ function resetForm(){
   document.getElementById('sidebar-notes-pin').classList.remove('visible');
   document.getElementById('candidate-strip').classList.remove('visible');
   const ssb=document.getElementById('sticky-status-bar');if(ssb)ssb.style.display='none';
-  document.getElementById('candidate-select').value='';
-  document.getElementById('search-input').value='';
+  const combo=document.getElementById('candidate-combo');if(combo)combo.value='';
+  closeComboPanel();
   document.getElementById('candidate-status-badge').innerHTML='';
 }
 
