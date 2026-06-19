@@ -717,6 +717,17 @@
 
         <!-- PHOTO UPLOAD IN INTERVIEW -->
         <div class="iv-upload-section">
+          <div class="iv-upload-label">Replace Headshot → Monday</div>
+          <div class="photo-zone" id="iv-headshot-zone" ondragover="onDragOver(event,'iv-headshot-zone')" ondragleave="onDragLeave('iv-headshot-zone')" ondrop="onDrop(event,'iv-headshot')">
+            <input type="file" accept="image/*,.heic,.heif" onchange="onFileSelect(event,'iv-headshot')">
+            <div class="photo-zone-icon">⭐</div>
+            <div class="photo-zone-label">Drag a photo here or click to select</div>
+            <div class="photo-zone-sub">Replaces the Headshot in Monday on save</div>
+          </div>
+          <div class="photo-previews" id="iv-headshot-previews"></div>
+        </div>
+
+        <div class="iv-upload-section">
           <div class="iv-upload-label">Upload Extra Photos → Monday</div>
           <div class="photo-zone" id="iv-extras-zone" ondragover="onDragOver(event,'iv-extras-zone')" ondragleave="onDragLeave('iv-extras-zone')" ondrop="onDrop(event,'iv-extra')">
             <input type="file" accept="image/*,.heic,.heif" multiple onchange="onFileSelect(event,'iv-extra')">
@@ -1784,6 +1795,7 @@ document.addEventListener('keydown', e => {
 let headshotFiles = [];   // max 1
 let extraFiles    = [];   // unlimited
 let ivExtraFiles  = [];   // interview mode extra uploads
+let ivHeadshotFile = [];  // interview mode headshot replacement (max 1)
 
 function onDragOver(e, zoneId){
   e.preventDefault();
@@ -1814,6 +1826,9 @@ function addPhotos(files, type){
   if(type === 'headshot'){
     headshotFiles = [files[0]]; // only keep 1
     renderPreviews('headshot-previews', headshotFiles, 'headshot');
+  } else if(type === 'iv-headshot'){
+    ivHeadshotFile = [files[0]]; // only keep 1
+    renderPreviews('iv-headshot-previews', ivHeadshotFile, 'iv-headshot');
   } else if(type === 'iv-extra'){
     ivExtraFiles.push(...files);
     renderPreviews('iv-extras-previews', ivExtraFiles, 'iv-extra');
@@ -1825,6 +1840,7 @@ function addPhotos(files, type){
 }
 function removePhoto(type, idx){
   if(type === 'headshot'){ headshotFiles.splice(idx,1); renderPreviews('headshot-previews', headshotFiles, 'headshot'); }
+  else if(type === 'iv-headshot'){ ivHeadshotFile.splice(idx,1); renderPreviews('iv-headshot-previews', ivHeadshotFile, 'iv-headshot'); }
   else if(type === 'iv-extra'){ ivExtraFiles.splice(idx,1); renderPreviews('iv-extras-previews', ivExtraFiles, 'iv-extra'); }
   else { extraFiles.splice(idx,1); renderPreviews('extras-previews', extraFiles, 'extra'); }
 }
@@ -2100,21 +2116,68 @@ async function saveAndUploadIv(){
   if(!currentItem) return;
   // First save all field data
   await saveRecord();
-  // Then upload any queued iv-extra photos
-  if(ivExtraFiles.length === 0) return;
+
+  const haveHeadshot = ivHeadshotFile.length > 0;
+  const haveExtras = ivExtraFiles.length > 0;
+  if(!haveHeadshot && !haveExtras) return;
+
   const prog = document.getElementById('iv-upload-progress');
   const steps = document.getElementById('iv-upload-steps');
   const bar = document.getElementById('iv-upload-bar');
   steps.innerHTML=''; prog.classList.add('visible');
   document.getElementById('iv-upload-label').textContent='Uploading photos...';
   document.getElementById('iv-upload-pct').textContent='0%';
+
+  // ---- HEADSHOT REPLACEMENT (do first) ----
+  if(haveHeadshot){
+    const file = ivHeadshotFile[0];
+    const si = addUploadStep(steps, `Uploading headshot ${file.name}...`, 'active');
+    try{
+      // Read current headshot entries so we can demote the old one to extras (don't lose it)
+      const cur = await gql(`{items(ids:[${currentItem.id}]){column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
+      const cvals = cur.items[0].column_values;
+      const parseEntries = (cid)=>{ const c=cvals.find(x=>x.id===cid); if(!c||!c.value) return []; try{return (JSON.parse(c.value).files||[]);}catch{return [];} };
+      const oldHead = parseEntries('files_mkncw5nm');
+      const oldExtras = parseEntries('file_mkp1n4bt');
+
+      // Upload new file to the headshot column (this APPENDS)
+      await uploadFileToMonday(currentItem.id, 'files_mkncw5nm', file, pct=>{
+        bar.style.width = Math.round(pct*50)+'%';
+        document.getElementById('iv-upload-pct').textContent = Math.round(pct*50)+'%';
+      });
+
+      // Re-read: headshot column now has [old..., new]. Keep ONLY the newest as headshot,
+      // move any previous headshot(s) into extras so nothing is lost.
+      const after = await gql(`{items(ids:[${currentItem.id}]){column_values(ids:["files_mkncw5nm"]){id value}}}`);
+      let headNow = [];
+      try{ headNow = JSON.parse(after.items[0].column_values[0].value).files||[]; }catch{}
+      if(headNow.length > 1){
+        const newest = headNow[headNow.length-1];
+        const demoted = headNow.slice(0, headNow.length-1);
+        const cv = {
+          'files_mkncw5nm': { files: [newest] },
+          'file_mkp1n4bt':  { files: [...oldExtras.filter(e=>!demoted.some(d=>d.assetId===e.assetId)), ...demoted] }
+        };
+        await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+          {i: currentItem.id, b: BOARD_ID, c: JSON.stringify(cv)});
+      }
+      setUploadStep(steps, si, 'done', '✓ Headshot replaced: '+file.name);
+    }catch(e){
+      setUploadStep(steps, si, 'error', '✗ Headshot: '+e.message);
+    }
+  }
+
+  // ---- EXTRA PHOTOS ----
   for(let i=0; i<ivExtraFiles.length; i++){
     const file = ivExtraFiles[i];
     const si = addUploadStep(steps, `Uploading ${file.name}...`, 'active');
     try{
       await uploadFileToMonday(currentItem.id, 'file_mkp1n4bt', file, pct=>{
-        bar.style.width = Math.round(((i+pct)/ivExtraFiles.length)*100)+'%';
-        document.getElementById('iv-upload-pct').textContent = Math.round(((i+pct)/ivExtraFiles.length)*100)+'%';
+        const base = haveHeadshot ? 50 : 0;
+        const span = haveHeadshot ? 50 : 100;
+        const total = Math.round(base + ((i+pct)/ivExtraFiles.length)*span);
+        bar.style.width = total+'%';
+        document.getElementById('iv-upload-pct').textContent = total+'%';
       });
       setUploadStep(steps, si, 'done', '✓ '+file.name);
     }catch(e){
@@ -2125,9 +2188,11 @@ async function saveAndUploadIv(){
   document.getElementById('iv-upload-pct').textContent='100%';
   document.getElementById('iv-upload-label').textContent='Done!';
   ivExtraFiles=[];
+  ivHeadshotFile=[];
   // Refresh photo grid so new uploads appear next to the name
   if(currentItem) loadCandidatePhotos(currentItem.id);
   renderPreviews('iv-extras-previews',[],`iv-extra`);
+  renderPreviews('iv-headshot-previews',[],`iv-headshot`);
   setTimeout(()=>{ prog.classList.remove('visible'); steps.innerHTML=''; bar.style.width='0%'; },2500);
 }
 
