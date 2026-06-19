@@ -667,6 +667,7 @@
         </div>
 
 <div class="field-grid single">
+          <div class="field"><div class="field-label">Stage Name <span style="color:var(--text-dim);font-weight:400">(renames the model)</span></div><input type="text" id="iv-stage-name" placeholder="Stage / display name" onblur="updateStageName(this.value)" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Legal Name</div><input type="text" id="iv-text_mknceqty" placeholder="Full legal name" oninput="syncIvField('text_mknceqty',this.value)"></div>
           <div class="field"><div class="field-label">Experience in Porn</div><textarea id="iv-long_text_mm2mxr92" oninput="syncIvField('long_text_mm2mxr92',this.value)"></textarea></div>
           <div class="field"><div class="field-label">Other Studios?</div><div class="status-group" id="iv-color_mm25jb44"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm25jb44')">No Prev Exp</div><div class="status-pill" style="background:#df2f4a;color:#fff" data-value="2" onclick="selectStatusIv(this,'color_mm25jb44')">OF Only</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm25jb44')">Occasional</div><div class="status-pill" style="background:#037f4c;color:#fff" data-value="6" onclick="selectStatusIv(this,'color_mm25jb44')">Mix</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm25jb44')">Regularly</div></div></div>
@@ -1265,6 +1266,7 @@ async function loadCandidate(itemId){
 function populateForm(item){
   const cols={};item.column_values.forEach(c=>cols[c.id]=c);
   const sn=document.getElementById('strip-name');if(sn)sn.value=item.name;
+  const stageF=document.getElementById('iv-stage-name');if(stageF)stageF.value=item.name;
   // Rebuild the avatar placeholder — the previous candidate's headshot <img> may have replaced it
   const aw=document.getElementById('candidate-avatar-wrap');
   if(aw) aw.innerHTML='<div class="candidate-avatar-placeholder" id="avatar-initial">'+item.name.charAt(0).toUpperCase()+'</div>';
@@ -1563,6 +1565,9 @@ async function updateItemName(newName){
     // Update the combobox: if this candidate is the selected one, reflect new name
     const combo = document.getElementById('candidate-combo');
     if(combo && currentItem) combo.value = newName;
+    // Keep the Stage Name quick field in sync
+    const stageF = document.getElementById('iv-stage-name');
+    if(stageF) stageF.value = newName;
     showToast('Stage name updated','success');
   } catch(e) {
     showToast('Rename failed: '+e.message,'error');
@@ -1570,6 +1575,21 @@ async function updateItemName(newName){
     const sn = document.getElementById('strip-name');
     if(sn) sn.value = currentItem.name;
   }
+}
+
+// Stage Name field (interview Quick Fields) — renames the monday item, like the strip name input.
+async function updateStageName(newName){
+  newName = (newName||'').trim();
+  if(!currentItem || !newName || newName === currentItem.name){
+    // If blanked or unchanged, restore the field to the current name
+    const f = document.getElementById('iv-stage-name');
+    if(f && currentItem) f.value = currentItem.name;
+    return;
+  }
+  await updateItemName(newName);
+  // Keep the Stage Name field reflecting the (possibly reverted) current name
+  const f = document.getElementById('iv-stage-name');
+  if(f) f.value = currentItem.name;
 }
 
 // ── SAVE (existing model) ──
