@@ -478,6 +478,42 @@
         <div class="photo-hint" id="photo-hint"></div>
       </div>
     </div>
+    <!-- Shared photo upload (full-view modes: applicant → approved/rejected) -->
+    <div id="fv-upload-section" style="display:none;margin-bottom:20px">
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:240px">
+          <div class="iv-upload-label">Replace Headshot → Monday</div>
+          <div class="photo-zone" id="fv-headshot-zone" ondragover="onDragOver(event,'fv-headshot-zone')" ondragleave="onDragLeave('fv-headshot-zone')" ondrop="onDrop(event,'fv-headshot')">
+            <input type="file" accept="image/*,.heic,.heif" onchange="onFileSelect(event,'fv-headshot')">
+            <div class="photo-zone-icon">⭐</div>
+            <div class="photo-zone-label">Drag a photo here or click</div>
+            <div class="photo-zone-sub">Replaces Headshot on save</div>
+          </div>
+          <div class="photo-previews" id="fv-headshot-previews"></div>
+        </div>
+        <div style="flex:1;min-width:240px">
+          <div class="iv-upload-label">Upload Extra Photos → Monday</div>
+          <div class="photo-zone" id="fv-extras-zone" ondragover="onDragOver(event,'fv-extras-zone')" ondragleave="onDragLeave('fv-extras-zone')" ondrop="onDrop(event,'fv-extra')">
+            <input type="file" accept="image/*,.heic,.heif" multiple onchange="onFileSelect(event,'fv-extra')">
+            <div class="photo-zone-icon">📷</div>
+            <div class="photo-zone-label">Drag photos here or click</div>
+            <div class="photo-zone-sub">Appended to Extra Pictures on save</div>
+          </div>
+          <div class="photo-previews" id="fv-extras-previews"></div>
+        </div>
+      </div>
+      <div class="upload-progress" id="fv-upload-progress">
+        <div class="upload-progress-label">
+          <span id="fv-upload-label">Uploading...</span>
+          <span id="fv-upload-pct">0%</span>
+        </div>
+        <div class="upload-bar-track"><div class="upload-bar-fill" id="fv-upload-bar"></div></div>
+        <div class="upload-step-list" id="fv-upload-steps"></div>
+      </div>
+      <div style="margin-top:12px;display:flex;justify-content:flex-end">
+        <button class="save-btn" onclick="saveAndUploadFv()">✓ Save Changes & Upload Photos</button>
+      </div>
+    </div>
     <div id="empty-state">
       <div class="empty-icon">◈</div>
       <div class="empty-title" id="empty-title">Choose a mode and candidate</div>
@@ -488,6 +524,12 @@
          FULL VIEW (all modes except 3-INTERVIEW)
     ═════════════════════════════════════════════ -->
     <div id="full-view" style="display:none">
+
+      <!-- STICKY GENERAL NOTES (matches interview view) -->
+      <div class="iv-notes-sticky">
+        <div class="field-label">General Notes</div>
+        <textarea id="fv-general-notes" placeholder="General observations..." oninput="document.getElementById('sidebar-general-notes').value=this.value;markDirty()"></textarea>
+      </div>
 
       <!-- S0: Identity -->
       <div class="section active" id="fs-0">
@@ -1254,15 +1296,20 @@ async function loadCandidate(itemId){
   if(currentMode==='3'){
     hide('full-view');show('interview-view');
     const s=document.getElementById('iv-0');if(s)s.classList.add('active');
+    document.getElementById('fv-upload-section').style.display='none';
   }else{
     hide('interview-view');show('full-view');
     goFSection(0);
+    // Photo upload available in all standard candidate modes (applicant → approved/rejected),
+    // but not batch/duplicate which use their own views.
+    const showUpload = !['batch','dup','new'].includes(currentMode);
+    document.getElementById('fv-upload-section').style.display = showUpload ? 'block' : 'none';
   }
   document.getElementById('candidate-strip').classList.add('visible');
   document.getElementById('sticky-status-bar').style.display='flex';
-  if(currentMode !== '3'){
-    document.getElementById('sidebar-notes-pin').classList.add('visible');
-  }
+  // General Notes now lives in a sticky block at the top of each view (interview + full),
+  // so the old sidebar-corner pin stays hidden.
+  document.getElementById('sidebar-notes-pin').classList.remove('visible');
   // Populate fields — wrapped so one bad field never blanks the form
   try { populateForm(currentItem); }
   catch(e){ console.error('populateForm error:', e); showToast('Some fields failed to load: '+e.message,'error'); }
@@ -1304,6 +1351,7 @@ function populateForm(item){
   // General notes in sidebar + interview sticky
   const gn=document.getElementById('sidebar-general-notes');if(gn)gn.value=txt('long_text_mktg36ee');
   const ivgn=document.getElementById('iv-general-notes');if(ivgn)ivgn.value=txt('long_text_mktg36ee');
+  const fvgn=document.getElementById('fv-general-notes');if(fvgn)fvgn.value=txt('long_text_mktg36ee');
 
   // Numbers
   ['numeric_mm1z34ca','numeric_mm1zjjrp'].forEach(id=>setTxt(id,txt(id)||''));
@@ -1796,6 +1844,8 @@ let headshotFiles = [];   // max 1
 let extraFiles    = [];   // unlimited
 let ivExtraFiles  = [];   // interview mode extra uploads
 let ivHeadshotFile = [];  // interview mode headshot replacement (max 1)
+let fvExtraFiles  = [];   // full-view mode extra uploads
+let fvHeadshotFile = [];  // full-view mode headshot replacement (max 1)
 
 function onDragOver(e, zoneId){
   e.preventDefault();
@@ -1832,6 +1882,12 @@ function addPhotos(files, type){
   } else if(type === 'iv-extra'){
     ivExtraFiles.push(...files);
     renderPreviews('iv-extras-previews', ivExtraFiles, 'iv-extra');
+  } else if(type === 'fv-headshot'){
+    fvHeadshotFile = [files[0]];
+    renderPreviews('fv-headshot-previews', fvHeadshotFile, 'fv-headshot');
+  } else if(type === 'fv-extra'){
+    fvExtraFiles.push(...files);
+    renderPreviews('fv-extras-previews', fvExtraFiles, 'fv-extra');
   } else {
     extraFiles.push(...files);
     renderPreviews('extras-previews', extraFiles, 'extra');
@@ -1842,6 +1898,8 @@ function removePhoto(type, idx){
   if(type === 'headshot'){ headshotFiles.splice(idx,1); renderPreviews('headshot-previews', headshotFiles, 'headshot'); }
   else if(type === 'iv-headshot'){ ivHeadshotFile.splice(idx,1); renderPreviews('iv-headshot-previews', ivHeadshotFile, 'iv-headshot'); }
   else if(type === 'iv-extra'){ ivExtraFiles.splice(idx,1); renderPreviews('iv-extras-previews', ivExtraFiles, 'iv-extra'); }
+  else if(type === 'fv-headshot'){ fvHeadshotFile.splice(idx,1); renderPreviews('fv-headshot-previews', fvHeadshotFile, 'fv-headshot'); }
+  else if(type === 'fv-extra'){ fvExtraFiles.splice(idx,1); renderPreviews('fv-extras-previews', fvExtraFiles, 'fv-extra'); }
   else { extraFiles.splice(idx,1); renderPreviews('extras-previews', extraFiles, 'extra'); }
 }
 function renderPreviews(containerId, files, type){
@@ -2196,6 +2254,84 @@ async function saveAndUploadIv(){
   setTimeout(()=>{ prog.classList.remove('visible'); steps.innerHTML=''; bar.style.width='0%'; },2500);
 }
 
+// Full-view (applicant → approved/rejected) save + photo upload. Mirrors saveAndUploadIv.
+async function saveAndUploadFv(){
+  if(!currentItem) return;
+  await saveRecord();
+
+  const haveHeadshot = fvHeadshotFile.length > 0;
+  const haveExtras = fvExtraFiles.length > 0;
+  if(!haveHeadshot && !haveExtras) return;
+
+  const prog = document.getElementById('fv-upload-progress');
+  const steps = document.getElementById('fv-upload-steps');
+  const bar = document.getElementById('fv-upload-bar');
+  steps.innerHTML=''; prog.classList.add('visible');
+  document.getElementById('fv-upload-label').textContent='Uploading photos...';
+  document.getElementById('fv-upload-pct').textContent='0%';
+
+  // ---- HEADSHOT REPLACEMENT (first) ----
+  if(haveHeadshot){
+    const file = fvHeadshotFile[0];
+    const si = addUploadStep(steps, `Uploading headshot ${file.name}...`, 'active');
+    try{
+      const cur = await gql(`{items(ids:[${currentItem.id}]){column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
+      const cvals = cur.items[0].column_values;
+      const parseEntries = (cid)=>{ const c=cvals.find(x=>x.id===cid); if(!c||!c.value) return []; try{return (JSON.parse(c.value).files||[]);}catch{return [];} };
+      const oldExtras = parseEntries('file_mkp1n4bt');
+
+      await uploadFileToMonday(currentItem.id, 'files_mkncw5nm', file, pct=>{
+        bar.style.width = Math.round(pct*50)+'%';
+        document.getElementById('fv-upload-pct').textContent = Math.round(pct*50)+'%';
+      });
+
+      const after = await gql(`{items(ids:[${currentItem.id}]){column_values(ids:["files_mkncw5nm"]){id value}}}`);
+      let headNow = [];
+      try{ headNow = JSON.parse(after.items[0].column_values[0].value).files||[]; }catch{}
+      if(headNow.length > 1){
+        const newest = headNow[headNow.length-1];
+        const demoted = headNow.slice(0, headNow.length-1);
+        const cv = {
+          'files_mkncw5nm': { files: [newest] },
+          'file_mkp1n4bt':  { files: [...oldExtras.filter(e=>!demoted.some(d=>d.assetId===e.assetId)), ...demoted] }
+        };
+        await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+          {i: currentItem.id, b: BOARD_ID, c: JSON.stringify(cv)});
+      }
+      setUploadStep(steps, si, 'done', '✓ Headshot replaced: '+file.name);
+    }catch(e){
+      setUploadStep(steps, si, 'error', '✗ Headshot: '+e.message);
+    }
+  }
+
+  // ---- EXTRA PHOTOS ----
+  for(let i=0; i<fvExtraFiles.length; i++){
+    const file = fvExtraFiles[i];
+    const si = addUploadStep(steps, `Uploading ${file.name}...`, 'active');
+    try{
+      await uploadFileToMonday(currentItem.id, 'file_mkp1n4bt', file, pct=>{
+        const base = haveHeadshot ? 50 : 0;
+        const span = haveHeadshot ? 50 : 100;
+        const total = Math.round(base + ((i+pct)/fvExtraFiles.length)*span);
+        bar.style.width = total+'%';
+        document.getElementById('fv-upload-pct').textContent = total+'%';
+      });
+      setUploadStep(steps, si, 'done', '✓ '+file.name);
+    }catch(e){
+      setUploadStep(steps, si, 'error', '✗ '+file.name+': '+e.message);
+    }
+  }
+  bar.style.width='100%';
+  document.getElementById('fv-upload-pct').textContent='100%';
+  document.getElementById('fv-upload-label').textContent='Done!';
+  fvExtraFiles=[];
+  fvHeadshotFile=[];
+  if(currentItem) loadCandidatePhotos(currentItem.id);
+  renderPreviews('fv-extras-previews',[],`fv-extra`);
+  renderPreviews('fv-headshot-previews',[],`fv-headshot`);
+  setTimeout(()=>{ prog.classList.remove('visible'); steps.innerHTML=''; bar.style.width='0%'; },2500);
+}
+
 function buildColumnValues(){
   const cv={};
   const gv=id=>{const el=document.getElementById('f-'+id);return el?el.value:null;};
@@ -2264,6 +2400,7 @@ function resetForm(){
   document.getElementById('save-status').textContent='';
   document.getElementById('save-btn').disabled=true;
   hide('full-view');hide('interview-view');hide('new-model-view');
+  document.getElementById('fv-upload-section').style.display='none';
   document.getElementById('sidebar-notes-pin').classList.remove('visible');
   document.getElementById('candidate-strip').classList.remove('visible');
   const ssb=document.getElementById('sticky-status-bar');if(ssb)ssb.style.display='none';
