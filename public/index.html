@@ -1554,8 +1554,8 @@ async function updateItemName(newName){
   newName = (newName||'').trim();
   if(!currentItem || !newName || newName === currentItem.name) return;
   try {
-    await gql(`mutation($i:ID!,$n:String!){change_item_value(item_id:$i,column_id:"name",value:$n){id}}`,
-      {i: currentItem.id, n: JSON.stringify(newName)});
+    await gql(`mutation($i:ID!,$b:ID!,$v:String!){change_simple_column_value(item_id:$i,board_id:$b,column_id:"name",value:$v){id}}`,
+      {i: currentItem.id, b: BOARD_ID, v: newName});
     currentItem.name = newName;
     // Update the cache entry too
     if(fullBoardCache){
