@@ -452,7 +452,7 @@
         </div>
         <div class="status-dd-menu" id="status-dd-menu"></div>
       </div>
-      <button class="save-btn" id="save-btn" onclick="saveRecord()" disabled style="margin-left:auto">Save Changes</button>
+      <button class="save-btn" id="save-btn" onclick="saveAll()" disabled style="margin-left:auto">Save Changes</button>
     </div>
     <div class="candidate-strip" id="candidate-strip">
       <div class="candidate-avatar" id="candidate-avatar-wrap">
@@ -509,9 +509,6 @@
         </div>
         <div class="upload-bar-track"><div class="upload-bar-fill" id="fv-upload-bar"></div></div>
         <div class="upload-step-list" id="fv-upload-steps"></div>
-      </div>
-      <div style="margin-top:12px;display:flex;justify-content:flex-end">
-        <button class="save-btn" onclick="saveAndUploadFv()">✓ Save Changes & Upload Photos</button>
       </div>
     </div>
     <div id="empty-state">
@@ -687,7 +684,7 @@
           <div class="field"><div class="field-label">Rate Offered</div><input type="text" id="f-text_mm1zb8xf" placeholder="e.g. $800" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Date First Shot</div><input type="date" id="f-date_mknb5z70" oninput="markDirty()"></div>
         </div>
-        <div class="section-nav"><button class="nav-btn" onclick="goFSection(5)">← Prev</button><div class="section-progress">7/7</div><button class="save-btn" onclick="saveRecord()">✓ Save All</button></div>
+        <div class="section-nav"><button class="nav-btn" onclick="goFSection(5)">← Prev</button><div class="section-progress">7/7</div><button class="save-btn" onclick="saveAll()">✓ Save All</button></div>
       </div>
 
     </div><!-- /full-view -->
@@ -788,9 +785,6 @@
           </div>
         </div>
 
-        <div style="margin-top:24px;display:flex;justify-content:flex-end">
-          <button class="save-btn" onclick="saveAndUploadIv()">✓ Save All Changes</button>
-        </div>
         </div><!-- /iv-quick-section -->
 
         <!-- EXTRA FIELDS SECTION (hidden by default) -->
@@ -814,9 +808,6 @@
             <div class="field"><div class="field-label">Suit Size</div><input type="text" id="ive-text_mm1yf8cd" placeholder="" oninput="syncIvField('text_mm1yf8cd',this.value)"></div>
             <div class="field"><div class="field-label">Neck Size</div><input type="text" id="ive-text_mm2dwvec" placeholder="" oninput="syncIvField('text_mm2dwvec',this.value)"></div>
             <div class="field"><div class="field-label">Head Circumference</div><input type="text" id="ive-text_mm2dqqdw" placeholder="" oninput="syncIvField('text_mm2dqqdw',this.value)"></div>
-          </div>
-          <div style="display:flex;justify-content:flex-end">
-            <button class="save-btn" onclick="saveAndUploadIv()">✓ Save All Changes</button>
           </div>
         </div><!-- /iv-extra-section -->
 
@@ -1652,6 +1643,15 @@ async function updateStageName(newName){
 }
 
 // ── SAVE (existing model) ──
+// Single unified save entry point used by the sticky "Save Changes" button.
+// Saves all field data AND uploads any queued photos for whichever view is active.
+async function saveAll(){
+  if(currentMode==='new'){ return saveNewModel('potential'); }
+  if(currentMode==='3'){ return saveAndUploadIv(); }   // interview view (saves fields + photos)
+  // all other candidate modes use the full view
+  return saveAndUploadFv();                              // full view (saves fields + photos)
+}
+
 async function saveRecord(){
   if(!currentItem&&currentMode!=='new')return;
   document.getElementById('save-btn').disabled=true;
