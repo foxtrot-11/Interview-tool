@@ -187,6 +187,7 @@
   .compat-btn{padding:5px 11px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:600;cursor:pointer;border:2px solid transparent;transition:all 0.12s;user-select:none;white-space:nowrap}
   .compat-btn:hover{filter:brightness(1.08)}
   .compat-btn.on{outline:2px solid #ffcb00;outline-offset:1px;box-shadow:0 0 0 1px #ffcb00}
+  .compat-btn.new{outline:2px solid #ff3b5c;outline-offset:1px;box-shadow:0 0 0 2px #ff3b5c}
   .section.active{display:block}
   .section-header{display:flex;align-items:baseline;gap:14px;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid var(--border)}
   .section-title{font-family:var(--font-display);font-weight:700;font-size:20px;color:var(--text)}
@@ -969,6 +970,7 @@ let isDirty       = false;
 let statusValues  = {};
 let selectValues  = {};
 let multiValues   = {};
+let compatSavedIds = new Set(); // Site Compat tags already saved on the model (yellow); others picked this session show red
 let boardDropdownOptions = {};
 
 const MULTI_DROPDOWNS = new Set(['dropdown_mm1zzwcg','dropdown_mknbe0p0','dropdown_mm1by5q0','dropdown_mm1zcar6','dropdown_mknb18b7','dropdown_mm26n6qx','dropdown_mm254xed','dropdown_mkx04tbr','dropdown_mm1ztytq']);
@@ -1056,8 +1058,11 @@ function renderCompatButtons(){
   if(!opts.length){ grid.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">No channels configured</span>'; return; }
   opts.forEach(opt=>{
     const color = COMPAT_COLORS[compatKey(opt.label)] || COMPAT_FALLBACK;
+    const id = Number(opt.id);
+    const isSelected = selected.has(id);
+    const isNew = isSelected && !compatSavedIds.has(id); // picked this session, not yet saved
     const b=document.createElement('div');
-    b.className='compat-btn'+(selected.has(Number(opt.id))?' on':'');
+    b.className='compat-btn'+(isSelected ? (isNew ? ' new' : ' on') : '');
     b.style.background=color;
     b.style.color=compatTextColor(color);
     b.textContent=opt.label;
@@ -1517,6 +1522,8 @@ function populateForm(item){
     // Site Compatibility uses color-coded buttons rather than the dropdown UI.
     const compat=val('dropdown_mkncp6xy');
     multiValues['dropdown_mkncp6xy']=compat?.ids||[];
+    // Snapshot what's already saved so we can show NEW picks (red) vs existing (yellow).
+    compatSavedIds = new Set((compat?.ids||[]).map(Number));
     renderCompatButtons();
   });
 
@@ -1827,6 +1834,10 @@ async function saveRecord(){
       catch(e){ showToast('Headshot swap failed: '+e.message,'error'); console.error(e); }
     }
     isDirty=false;
+    // Newly-added Site Compat tags are now saved → fold them into the baseline so
+    // they switch from red (new) to yellow (existing), and re-render.
+    compatSavedIds = new Set((multiValues['dropdown_mkncp6xy']||[]).map(Number));
+    renderCompatButtons();
     document.getElementById('unsaved-dot').classList.remove('visible');
     document.getElementById('save-status').textContent='Saved '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     // Invalidate cache so status changes appear immediately in other tabs
