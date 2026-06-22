@@ -1138,7 +1138,9 @@ async function loadCandidatesForMode(mode){
   const combo = document.getElementById('candidate-combo');
   const loadBar = document.getElementById('load-bar');
   const loadText = document.getElementById('load-bar-text');
-  if(combo){ combo.value=''; combo.placeholder='Loading…'; }
+  // Preserve the picker text if a candidate is currently open (e.g. after a save-triggered
+  // reload) so the box doesn't blank out under the user; otherwise clear it for a fresh pick.
+  if(combo){ if(!currentItem) combo.value=''; combo.placeholder='Loading…'; }
   closeComboPanel();
 
   const key = `${BOARD_ID}:${mode}`;
@@ -1710,7 +1712,7 @@ async function loadCandidatePhotos(itemId){
   const grid = document.getElementById('strip-photo-grid');
   const avatarWrap = document.getElementById('candidate-avatar-wrap');
   grid.innerHTML = '';
-  avatarWrap.innerHTML = '<div class="candidate-avatar-placeholder" id="avatar-initial">'+document.getElementById('strip-name').textContent.charAt(0).toUpperCase()+'</div>';
+  avatarWrap.innerHTML = '<div class="candidate-avatar-placeholder" id="avatar-initial">'+((document.getElementById('strip-name').value||'?').charAt(0).toUpperCase())+'</div>';
   photoState = { headshotEntries: [], extraEntries: [] };
   candidatePhotos = [];
   document.getElementById('photo-controls').style.display = 'none';
@@ -1807,19 +1809,17 @@ function selectPendingHeadshot(assetId){
   showToast('New headshot selected — hit Save to apply','saving');
 }
 
-// Builds the swap and writes both file columns referencing existing assetIds
+// Re-choose an existing photo as the headshot. Delegates to the atomic server
+// rearrange so it cannot orphan: chosen → headshot, everything else → extras.
 async function applyHeadshotSwap(){
   if(!pendingHeadshotAssetId || !currentItem) return;
   const all = [...photoState.headshotEntries, ...photoState.extraEntries];
   const chosen = all.find(e => e.assetId === pendingHeadshotAssetId);
   if(!chosen) throw new Error('Chosen photo not found on item');
-  const rest = all.filter(e => e.assetId !== pendingHeadshotAssetId);
-  const cv = {
-    'files_mkncw5nm': { files: [chosen] },
-    'file_mkp1n4bt':  { files: rest }
-  };
-  await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
-    {i: currentItem.id, b: BOARD_ID, c: JSON.stringify(cv)});
+  const restIds = all.filter(e => e.assetId !== pendingHeadshotAssetId).map(e => e.assetId);
+
+  await rearrangePhotos(currentItem.id, [chosen.assetId], restIds);
+
   pendingHeadshotAssetId = null;
   rechooseMode = false;
 }
@@ -2032,6 +2032,32 @@ async function uploadFileToMonday(itemId, columnId, file, onProgress){
   });
 }
 
+// Foolproof photo move/copy: server downloads real bytes of an existing asset and
+// re-uploads to a target column (genuine owned asset). Returns new asset id.
+async function moveAssetToColumn(itemId, targetColumnId, assetId){
+  const r = await fetch('/move-asset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ itemId, targetColumnId, assetId })
+  });
+  const j = await r.json();
+  if(!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+  return j.newAssetId;
+}
+
+// Atomic rearrange: tell the server the desired final arrangement of EXISTING assets.
+// Server downloads all bytes first, clears, then re-uploads — cannot orphan.
+async function rearrangePhotos(itemId, headshotAssetIds, extraAssetIds){
+  const r = await fetch('/rearrange-photos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ itemId, boardId: BOARD_ID, headshotAssetIds, extraAssetIds })
+  });
+  const j = await r.json();
+  if(!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
 function setUploadStep(list, idx, state, text){
   const steps = list.querySelectorAll('.upload-step');
   if(steps[idx]){
@@ -2211,34 +2237,31 @@ async function saveAndUploadIv(){
     const file = ivHeadshotFile[0];
     const si = addUploadStep(steps, `Uploading headshot ${file.name}...`, 'active');
     try{
-      // Read current headshot entries so we can demote the old one to extras (don't lose it)
+      // Snapshot existing photos BEFORE the new upload
       const cur = await gql(`{items(ids:[${currentItem.id}]){column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
       const cvals = cur.items[0].column_values;
       const parseEntries = (cid)=>{ const c=cvals.find(x=>x.id===cid); if(!c||!c.value) return []; try{return (JSON.parse(c.value).files||[]);}catch{return [];} };
       const oldHead = parseEntries('files_mkncw5nm');
       const oldExtras = parseEntries('file_mkp1n4bt');
 
-      // Upload new file to the headshot column (this APPENDS)
+      // Upload the new file to the headshot column (real bytes → owned asset; this APPENDS)
       await uploadFileToMonday(currentItem.id, 'files_mkncw5nm', file, pct=>{
         bar.style.width = Math.round(pct*50)+'%';
         document.getElementById('iv-upload-pct').textContent = Math.round(pct*50)+'%';
       });
 
-      // Re-read: headshot column now has [old..., new]. Keep ONLY the newest as headshot,
-      // move any previous headshot(s) into extras so nothing is lost.
+      // Find the newly-uploaded asset id (the entry not present before)
       const after = await gql(`{items(ids:[${currentItem.id}]){column_values(ids:["files_mkncw5nm"]){id value}}}`);
       let headNow = [];
       try{ headNow = JSON.parse(after.items[0].column_values[0].value).files||[]; }catch{}
-      if(headNow.length > 1){
-        const newest = headNow[headNow.length-1];
-        const demoted = headNow.slice(0, headNow.length-1);
-        const cv = {
-          'files_mkncw5nm': { files: [newest] },
-          'file_mkp1n4bt':  { files: [...oldExtras.filter(e=>!demoted.some(d=>d.assetId===e.assetId)), ...demoted] }
-        };
-        await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
-          {i: currentItem.id, b: BOARD_ID, c: JSON.stringify(cv)});
-      }
+      const oldHeadIds = new Set(oldHead.map(e=>e.assetId));
+      const newEntry = headNow.find(e=>!oldHeadIds.has(e.assetId)) || headNow[headNow.length-1];
+
+      // Final arrangement: new upload = headshot; old headshot(s) + existing extras = extras.
+      // Atomic server rearrange re-uploads everything fresh → no orphans.
+      const extrasToKeep = [...oldExtras.map(e=>e.assetId), ...oldHead.map(e=>e.assetId)];
+      await rearrangePhotos(currentItem.id, [newEntry.assetId], extrasToKeep);
+
       setUploadStep(steps, si, 'done', '✓ Headshot replaced: '+file.name);
     }catch(e){
       setUploadStep(steps, si, 'error', '✗ Headshot: '+e.message);
@@ -2298,6 +2321,7 @@ async function saveAndUploadFv(){
       const cur = await gql(`{items(ids:[${currentItem.id}]){column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
       const cvals = cur.items[0].column_values;
       const parseEntries = (cid)=>{ const c=cvals.find(x=>x.id===cid); if(!c||!c.value) return []; try{return (JSON.parse(c.value).files||[]);}catch{return [];} };
+      const oldHead = parseEntries('files_mkncw5nm');
       const oldExtras = parseEntries('file_mkp1n4bt');
 
       await uploadFileToMonday(currentItem.id, 'files_mkncw5nm', file, pct=>{
@@ -2308,16 +2332,12 @@ async function saveAndUploadFv(){
       const after = await gql(`{items(ids:[${currentItem.id}]){column_values(ids:["files_mkncw5nm"]){id value}}}`);
       let headNow = [];
       try{ headNow = JSON.parse(after.items[0].column_values[0].value).files||[]; }catch{}
-      if(headNow.length > 1){
-        const newest = headNow[headNow.length-1];
-        const demoted = headNow.slice(0, headNow.length-1);
-        const cv = {
-          'files_mkncw5nm': { files: [newest] },
-          'file_mkp1n4bt':  { files: [...oldExtras.filter(e=>!demoted.some(d=>d.assetId===e.assetId)), ...demoted] }
-        };
-        await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
-          {i: currentItem.id, b: BOARD_ID, c: JSON.stringify(cv)});
-      }
+      const oldHeadIds = new Set(oldHead.map(e=>e.assetId));
+      const newEntry = headNow.find(e=>!oldHeadIds.has(e.assetId)) || headNow[headNow.length-1];
+
+      const extrasToKeep = [...oldExtras.map(e=>e.assetId), ...oldHead.map(e=>e.assetId)];
+      await rearrangePhotos(currentItem.id, [newEntry.assetId], extrasToKeep);
+
       setUploadStep(steps, si, 'done', '✓ Headshot replaced: '+file.name);
     }catch(e){
       setUploadStep(steps, si, 'error', '✗ Headshot: '+e.message);
@@ -2864,7 +2884,6 @@ async function mergePhotos(oldest, rest, addLog){
   };
   const seenKeys = new Set([...existingHeadshot, ...existingExtras].map(e => dedupKey(e, assetById)));
 
-  let newExtras = [...existingExtras];
   let newHeadshot = [...existingHeadshot];
   let added = 0;
   let skippedDead = 0;
@@ -2899,16 +2918,18 @@ async function mergePhotos(oldest, rest, addLog){
         } else {
           const key = dedupKey(nh[0], naById);
           if(!seenKeys.has(key)){
-            newHeadshot = [nh[0]];
+            // Foolproof: re-upload the real bytes onto the oldest item (owned asset)
+            await moveAssetToColumn(oldest.id, 'files_mkncw5nm', nh[0].assetId);
+            newHeadshot = [nh[0]]; // mark as filled so we don't port another headshot
             seenKeys.add(key);
-            addLog(`  + Porting headshot from ${newer.id} (${naById[String(nh[0].assetId)].name})`, 'log-ok');
+            addLog(`  + Ported headshot from ${newer.id} (${naById[String(nh[0].assetId)].name})`, 'log-ok');
             added++;
           }
         }
       }
     }
 
-    // Port extra photos (dedup by name+size, skip orphaned)
+    // Port extra photos (dedup by name+size, skip orphaned) — re-upload real bytes
     const ne = [...nColEntries('files_mkncw5nm').slice(newHeadshot.length?1:0), ...nColEntries('file_mkp1n4bt')];
     for(const entry of ne){
       if(!isLive(entry)){
@@ -2923,9 +2944,10 @@ async function mergePhotos(oldest, rest, addLog){
         continue;
       }
       seenKeys.add(key);
-      newExtras.push(entry);
+      // Foolproof: re-upload the real bytes onto the oldest item (owned asset)
+      await moveAssetToColumn(oldest.id, 'file_mkp1n4bt', entry.assetId);
       added++;
-      addLog(`  + Adding photo: ${a.name}`, 'log-ok');
+      addLog(`  + Added photo: ${a.name}`, 'log-ok');
     }
   }
 
@@ -2936,15 +2958,7 @@ async function mergePhotos(oldest, rest, addLog){
     addLog('  No new photos to add');
     return;
   }
-
-  // Write merged photo columns back to oldest
-  const cv = {};
-  if(newHeadshot.length) cv['files_mkncw5nm'] = {files: newHeadshot};
-  cv['file_mkp1n4bt'] = {files: newExtras};
-  await gql(
-    `mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
-    {i: oldest.id, b: oldest.board, c: JSON.stringify(cv)}
-  );
+  // All ported photos were uploaded as real owned assets above — no reference write needed.
   addLog(`  ✓ Merged ${added} new photo(s)`, 'log-ok');
 }
 
