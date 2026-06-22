@@ -184,7 +184,7 @@
   .field.flash{outline:1px solid var(--accent);outline-offset:4px;border-radius:6px;transition:outline 0.2s}
   /* Site Compatibility channel buttons (multi-select, color-coded, yellow ring when on) */
   .compat-grid{display:flex;flex-wrap:wrap;gap:7px}
-  .compat-btn{padding:5px 11px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:600;cursor:pointer;border:2px solid transparent;color:#111;transition:all 0.12s;user-select:none;white-space:nowrap}
+  .compat-btn{padding:5px 11px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:600;cursor:pointer;border:2px solid transparent;transition:all 0.12s;user-select:none;white-space:nowrap}
   .compat-btn:hover{filter:brightness(1.08)}
   .compat-btn.on{outline:2px solid #ffcb00;outline-offset:1px;box-shadow:0 0 0 1px #ffcb00}
   .section.active{display:block}
@@ -1024,9 +1024,26 @@ function getOptions(id){return boardDropdownOptions[id]||FALLBACK_OPTIONS[id]||[
 
 // Build ALL dropdown instances (main, interview, new)
 // ── SITE COMPATIBILITY (dynamic color-coded channel buttons) ──
-// A palette cycled across channels so each button is visually distinct. Color is
-// cosmetic only; selection state is the yellow ring (.on).
-const COMPAT_COLORS = ['#037f4c','#579bfc','#9d50dd','#ff6d3b','#00c875','#ff7575','#fdab3d','#66ccff','#cab641','#bb3354','#7f5347','#df2f4a','#0086c0','#a25ddc','#037f4c','#ffcb00','#784bd1','#9cd326','#ff158a','#401694','#5559df','#225091','#ff642e','#fdab3d','#7e3b8a','#2b76e5','#c4c4c4','#808080','#4eccc6','#cab641'];
+// Fixed colors per channel, matched to the team's reference swatches. Channels not
+// listed here fall back to a neutral grey (and still render), so adding a new channel
+// in monday never breaks — it just shows grey until a color is assigned here.
+const COMPAT_COLORS = {
+  bbs:'#6b43c4', bfs:'#23bf70', cbs:'#1372a8', fsb:'#2263d4', gct:'#faa246',
+  msb:'#60c4fb', sls:'#214682', stg:'#5090f5', sbs:'#167346', ttp:'#fdc536',
+  tct:'#fca5a5', cds:'#fb6d6c', hfk:'#371784', jpy:'#bc4f65', fmn:'#f698ea',
+  tbs:'#d72f43', gsb:'#c2ad48', bpi:'#9adef3', fps:'#9048d1', pup:'#dd7ab2',
+  thr:'#a0b6e1', kbs:'#734a40', ads:'#4cc4be', cpl:'#2d2d2d',
+  // No reference swatch yet — neutral until assigned:
+  bbk:'#808080', jht:'#808080', jpk:'#808080', blu:'#808080',
+};
+const COMPAT_FALLBACK = '#808080';
+// Pull the short channel code from a label like "jpk (JockPack)" → "jpk".
+function compatKey(label){ return String(label||'').trim().split(/\s+/)[0].toLowerCase(); }
+// Light vs dark text depending on background brightness.
+function compatTextColor(hex){
+  const h=hex.replace('#',''); const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+  return (r*299+g*587+b*114)/1000 > 150 ? '#111' : '#fff';
+}
 
 // Render the channel buttons from the dynamically-loaded labels (so adding a tag in
 // monday automatically creates a new button on next load — no code change needed).
@@ -1037,10 +1054,12 @@ function renderCompatButtons(){
   const selected = new Set((multiValues['dropdown_mkncp6xy'] || []).map(Number));
   grid.innerHTML = '';
   if(!opts.length){ grid.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">No channels configured</span>'; return; }
-  opts.forEach((opt, i)=>{
+  opts.forEach(opt=>{
+    const color = COMPAT_COLORS[compatKey(opt.label)] || COMPAT_FALLBACK;
     const b=document.createElement('div');
     b.className='compat-btn'+(selected.has(Number(opt.id))?' on':'');
-    b.style.background=COMPAT_COLORS[i % COMPAT_COLORS.length];
+    b.style.background=color;
+    b.style.color=compatTextColor(color);
     b.textContent=opt.label;
     b.dataset.id=opt.id;
     b.onclick=()=>toggleCompat(opt.id);
