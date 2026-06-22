@@ -237,9 +237,9 @@
   #interview-view { max-width: 600px; }
   /* In interview mode the strip is moved inside the scrolling form so it scrolls away;
      only the General Notes box stays sticky */
-  #interview-view .candidate-strip { border:1px solid var(--border); border-radius:6px; margin-bottom:16px; padding:12px 14px; max-height:none; overflow:visible; flex-wrap:wrap; }
-  #interview-view .candidate-strip .photo-controls { order:1; }
-  #interview-view .candidate-strip .strip-photo-grid { order:2; flex-basis:100%; }
+  #interview-view .candidate-strip, .candidate-strip.interview-mode { border:1px solid var(--border); border-radius:6px; margin-bottom:16px; padding:12px 14px; max-height:none; overflow:visible; flex-wrap:wrap; }
+  #interview-view .candidate-strip .photo-controls, .candidate-strip.interview-mode .photo-controls { order:1; }
+  #interview-view .candidate-strip .strip-photo-grid, .candidate-strip.interview-mode .strip-photo-grid { order:2; flex-basis:100%; }
 
   /* BIGGER HEADSHOT IN STRIP */
   .candidate-avatar { width:64px!important; height:64px!important; border-radius:6px!important; }
@@ -1288,9 +1288,11 @@ async function loadCandidate(itemId){
     hide('full-view');show('interview-view');
     const s=document.getElementById('iv-0');if(s)s.classList.add('active');
     document.getElementById('fv-upload-section').style.display='none';
+    document.getElementById('candidate-strip').classList.add('interview-mode');
   }else{
     hide('interview-view');show('full-view');
     goFSection(0);
+    document.getElementById('candidate-strip').classList.remove('interview-mode');
     // Photo upload available in all standard candidate modes (applicant → approved/rejected),
     // but not batch/duplicate which use their own views.
     const showUpload = !['batch','dup','new'].includes(currentMode);
@@ -1327,74 +1329,92 @@ function populateForm(item){
     ['f-','iv-','ive-'].forEach(pre=>{const el=document.getElementById(pre+col);if(el)el.value=value;});
   };
 
+  // Each block is guarded independently: a single malformed column value can no
+  // longer abort the whole populate and leave later fields (like phone) blank.
+  const guard=(label,fn)=>{try{fn();}catch(e){console.error('populate '+label+' failed:',e);}};
+
   // Text fields
-  ['text_mknceqty','text_mm1zb8xf','text_mknk1txg','text_mkncy7gf','text_mknc3aty',
+  guard('text',()=>['text_mknceqty','text_mm1zb8xf','text_mknk1txg','text_mkncy7gf','text_mknc3aty',
    'text_mknc1sps','text_mm1yx2wg','text_mm1y2znz','text_mknc2t7g','text_mknc62rg',
    'text_mknc808t','text_mkncjzx8','text_mkncsqaq','text_mkncbdr1','text_mknct7cn',
    'text_mkncgkwk','text_mkncht8f','text_mm1z66yj','text_mm1znrfv'
-  ].forEach(id=>setTxt(id,txt(id)));
+  ].forEach(id=>setTxt(id,txt(id))));
 
   // Long text
-  ['long_text_mm1zsdyv','long_text_mm1zbe1t','long_text_mm1zshaw','long_text_mm1z9aeg',
+  guard('longtext',()=>['long_text_mm1zsdyv','long_text_mm1zbe1t','long_text_mm1zshaw','long_text_mm1z9aeg',
    'long_text_mm1zhkyq','long_text_mm2mxr92','long_text_mm1zaqzq','long_text_mm252r65','long_text_mm252tt7'
-  ].forEach(id=>setTxt(id,txt(id)));
+  ].forEach(id=>setTxt(id,txt(id))));
 
-  // General notes in sidebar + interview sticky
-  const gn=document.getElementById('sidebar-general-notes');if(gn)gn.value=txt('long_text_mktg36ee');
-  const ivgn=document.getElementById('iv-general-notes');if(ivgn)ivgn.value=txt('long_text_mktg36ee');
-  const fvgn=document.getElementById('fv-general-notes');if(fvgn)fvgn.value=txt('long_text_mktg36ee');
-
-  // Numbers
-  ['numeric_mm1z34ca','numeric_mm1zjjrp'].forEach(id=>setTxt(id,txt(id)||''));
-
-  // Dates
-  const dobV=val('date_of_birth_mkncwsrj');
-  const dobStr=dobV?.date||'';
-  ['f-date_of_birth_mkncwsrj','iv-dob','ive-dob'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=dobStr;});
-  const ageVal=dobStr?String(calcAge(dobStr)):'';
-  ['f-age','iv-age','iv-age-quick'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=ageVal;});
-  const ivAgeQuick=document.getElementById('iv-age-quick');if(ivAgeQuick)ivAgeQuick.value=ageVal;
-  const fsEl=document.getElementById('f-date_mknb5z70');if(fsEl){const v=val('date_mknb5z70');fsEl.value=v?.date||'';}
-
-  // Links
-  ['lien_internet','lien_internet9','lien_internet3','dup__of_facebook'].forEach(id=>{
-    const v=val(id);const url=v?.url||'';
-    ['f-','iv-','ive-'].forEach(pre=>{const el=document.getElementById(pre+id);if(el)el.value=url;});
+  // General notes in sidebar + interview sticky + full-view sticky
+  guard('notes',()=>{
+    const gn=document.getElementById('sidebar-general-notes');if(gn)gn.value=txt('long_text_mktg36ee');
+    const ivgn=document.getElementById('iv-general-notes');if(ivgn)ivgn.value=txt('long_text_mktg36ee');
+    const fvgn=document.getElementById('fv-general-notes');if(fvgn)fvgn.value=txt('long_text_mktg36ee');
   });
 
-  // Phone
-  const rawPhone=txt('phone9ouk2t6x')||(val('phone9ouk2t6x')?.phone)||'';
-  const fmtPhone=rawPhone?formatPhoneDisplay(rawPhone):'';
-  ['f-phone9ouk2t6x','iv-phone9ouk2t6x','ive-phone'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=fmtPhone;});
+  // Numbers
+  guard('numbers',()=>['numeric_mm1z34ca','numeric_mm1zjjrp'].forEach(id=>setTxt(id,txt(id)||'')));
+
+  // Dates
+  guard('dates',()=>{
+    const dobV=val('date_of_birth_mkncwsrj');
+    const dobStr=dobV?.date||'';
+    ['f-date_of_birth_mkncwsrj','iv-dob','ive-dob'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=dobStr;});
+    const ageVal=dobStr?String(calcAge(dobStr)):'';
+    ['f-age','iv-age','iv-age-quick'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=ageVal;});
+    const ivAgeQuick=document.getElementById('iv-age-quick');if(ivAgeQuick)ivAgeQuick.value=ageVal;
+    const fsEl=document.getElementById('f-date_mknb5z70');if(fsEl){const v=val('date_mknb5z70');fsEl.value=v?.date||'';}
+  });
+
+  // Links
+  guard('links',()=>['lien_internet','lien_internet9','lien_internet3','dup__of_facebook'].forEach(id=>{
+    const v=val(id);const url=v?.url||'';
+    ['f-','iv-','ive-'].forEach(pre=>{const el=document.getElementById(pre+id);if(el)el.value=url;});
+  }));
+
+  // Phone — read JSON value.phone FIRST (most reliable), fall back to text
+  guard('phone',()=>{
+    const pv=val('phone9ouk2t6x');
+    const rawPhone=(pv&&pv.phone)?pv.phone:(txt('phone9ouk2t6x')||'');
+    const fmtPhone=rawPhone?formatPhoneDisplay(rawPhone):'';
+    ['f-phone9ouk2t6x','iv-phone9ouk2t6x','ive-phone'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=fmtPhone;});
+  });
 
   // Status / color fields — sync to both f- and iv- groups
-  statusValues={};
-  ['label','color_mm1zghx9','color_mm1zk5e2','color_mm1z2f56','color_mm1zzkz6','color_mm1zbze8','color_mm1zzwv8','color_mm26w6hs','color_mm25jb44','color_mm26br5p'].forEach(id=>{
-    const v=val(id);statusValues[id]=v?.index??null;
-    ['f-','iv-','iv2-','ive-'].forEach(pre=>{
-      const g=document.getElementById(pre+id);
-      if(!g)return;
-      g.querySelectorAll('.status-pill').forEach(p=>p.classList.toggle('selected',parseInt(p.dataset.value)===statusValues[id]));
+  guard('status',()=>{
+    statusValues={};
+    ['label','color_mm1zghx9','color_mm1zk5e2','color_mm1z2f56','color_mm1zzkz6','color_mm1zbze8','color_mm1zzwv8','color_mm26w6hs','color_mm25jb44','color_mm26br5p'].forEach(id=>{
+      const v=val(id);statusValues[id]=v?.index??null;
+      ['f-','iv-','iv2-','ive-'].forEach(pre=>{
+        const g=document.getElementById(pre+id);
+        if(!g)return;
+        g.querySelectorAll('.status-pill').forEach(p=>p.classList.toggle('selected',parseInt(p.dataset.value)===statusValues[id]));
+      });
     });
   });
 
-  // Single-select dropdowns (main + interview) — none currently; all dropdowns are multi in monday
+  // Single-select dropdowns — none currently; all dropdowns are multi in monday
   selectValues={};
 
   // Multi-select dropdowns (main + interview)
-  multiValues={};
-  ['dropdown_mm1zzwcg','dropdown_mknbe0p0','dropdown_mm1by5q0','dropdown_mm1zcar6','dropdown_mknb18b7','dropdown_mm26n6qx','dropdown_mm254xed','dropdown_mkx04tbr','dropdown_mm1ztytq'].forEach(id=>{
-    const v=val(id);multiValues[id]=v?.ids||[];
-    ['','iv-','ive-'].forEach(ctx=>{renderMultiDisplay(id,ctx);updateMultiDropdownState(id,ctx);});
+  guard('dropdowns',()=>{
+    multiValues={};
+    ['dropdown_mm1zzwcg','dropdown_mknbe0p0','dropdown_mm1by5q0','dropdown_mm1zcar6','dropdown_mknb18b7','dropdown_mm26n6qx','dropdown_mm254xed','dropdown_mkx04tbr','dropdown_mm1ztytq'].forEach(id=>{
+      const v=val(id);multiValues[id]=v?.ids||[];
+      ['','iv-','ive-'].forEach(ctx=>{renderMultiDisplay(id,ctx);updateMultiDropdownState(id,ctx);});
+    });
   });
 
   // Strip meta
-  const dob=dobV?.date;
-  document.getElementById('strip-age').textContent=dob?'◈ '+calcAge(dob)+' yrs':'';
-  document.getElementById('strip-location').textContent=txt('text_mkncbdr1')?'◎ '+txt('text_mkncbdr1'):'';
-  document.getElementById('strip-role').textContent=txt('dropdown_mknbe0p0')?'▸ '+txt('dropdown_mknbe0p0'):'';
-  updateStatusBadge(statusValues['label']);
-  buildStripStatusBar();
+  guard('stripmeta',()=>{
+    const dobV2=val('date_of_birth_mkncwsrj');
+    const dob=dobV2?.date;
+    document.getElementById('strip-age').textContent=dob?'◈ '+calcAge(dob)+' yrs':'';
+    document.getElementById('strip-location').textContent=txt('text_mkncbdr1')?'◎ '+txt('text_mkncbdr1'):'';
+    document.getElementById('strip-role').textContent=txt('dropdown_mknbe0p0')?'▸ '+txt('dropdown_mknbe0p0'):'';
+    updateStatusBadge(statusValues['label']);
+    buildStripStatusBar();
+  });
 }
 
 function syncIvField(field,value){
