@@ -157,7 +157,7 @@ async function mondayGql(query, variables) {
   return j.data;
 }
 async function downloadAsset(assetId) {
-  const d = await mondayGql(`query($ids:[ID!]){assets(ids:$ids){id name public_url}}`, { ids: [String(assetId)] });
+  const d = await mondayGql(`query($ids:[ID!]!){assets(ids:$ids){id name public_url}}`, { ids: [String(assetId)] });
   const asset = d?.assets?.[0];
   if (!asset || !asset.public_url) throw new Error('asset ' + assetId + ' not found / no url');
   const fr = await fetch(asset.public_url);
