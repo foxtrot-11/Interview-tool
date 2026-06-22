@@ -370,7 +370,7 @@
   </div>
 </div>
 <div id="loading-screen" style="display:none"><div class="spinner"></div><div class="loading-text">Connecting to monday.com</div></div>
-<div id="toast"></div>
+<div id="toast"><span id="toast-msg"></span><span id="toast-close" onclick="hideToast()" style="display:none;cursor:pointer;margin-left:10px;font-weight:700;opacity:0.7">×</span></div>
 
 <!-- LIGHTBOX GALLERY -->
 <div id="lightbox" onclick="if(event.target===this)closeLightbox()">
@@ -453,6 +453,7 @@
         <div class="status-dd-menu" id="status-dd-menu"></div>
       </div>
       <button class="save-btn" id="save-btn" onclick="saveAll()" disabled style="margin-left:auto">Save Changes</button>
+      <div id="save-progress-bar" style="display:none;position:absolute;bottom:0;left:0;height:3px;background:var(--accent);border-radius:2px;width:0%;transition:width 0.3s ease"></div>
     </div>
     <div class="candidate-strip" id="candidate-strip">
       <div class="candidate-avatar" id="candidate-avatar-wrap">
@@ -1090,19 +1091,28 @@ function invalidateCache(){
 
 // Fetch items for a specific set of statusIds from the active board.
 // null statusIds = fetch everything (batch mode).
-async function fetchItemsForMode(statusIds){
+async function fetchItemsForMode(statusIds, onProgress){
   // Snapshot the board ID at the start; if it changes mid-fetch, abandon results
   const boardAtStart = BOARD_ID;
   const items = [];
   let cursor = null;
-  let pagesWithoutMatches = 0;
-  const MAX_EMPTY_STREAK = 6;     // stop after this many consecutive empty pages
+  let pages = 0;
+  const MAX_PAGES = 6; // safety cap (500/page → up to 3000 items)
+
+  // Build a server-side status filter so monday only returns matching items.
+  // This avoids scanning the entire board (was ~9s); filtered fetch is ~0.7s.
+  // statusIds === null means "batch" / no filter (return everything on that board).
+  // The list only needs id + name (a candidate's full columns are fetched on select),
+  // so we omit column_values here — that alone roughly halves the big-tab load time.
+  const ruleJson = (statusIds && statusIds.length)
+    ? `,query_params:{rules:[{column_id:"label",compare_value:[${statusIds.join(',')}],operator:any_of}]}`
+    : '';
 
   do {
-    const cp = cursor ? `cursor:"${cursor}"` : `limit:200`;
+    const cp = cursor ? `cursor:"${cursor}"` : `limit:500${ruleJson}`;
     let data;
     try {
-      data = await gql(`{boards(ids:[${boardAtStart}]){items_page(${cp}){cursor items{id name column_values(ids:["label","text_mkncbdr1","dropdown_mknbe0p0","date_of_birth_mkncwsrj"]){id text value}}}}}`);
+      data = await gql(`{boards(ids:[${boardAtStart}]){items_page(${cp}){cursor items{id name}}}}`);
     } catch(e) {
       console.error('fetchItemsForMode page error:', e);
       throw e;
@@ -1110,25 +1120,12 @@ async function fetchItemsForMode(statusIds){
     if(BOARD_ID !== boardAtStart) return []; // board switched mid-fetch — abandon
 
     const page = data.boards[0].items_page;
-    const relevant = statusIds === null
-      ? page.items
-      : page.items.filter(it => {
-          try { return statusIds.includes(JSON.parse(it.column_values.find(c=>c.id==='label')?.value||'{}').index); }
-          catch { return false; }
-        });
-
-    if(relevant.length === 0) pagesWithoutMatches++;
-    else { pagesWithoutMatches = 0; items.push(...relevant); }
-
+    // Server already filtered by status; for the batch board (no filter) take everything.
+    items.push(...page.items);
     cursor = page.cursor;
-
-    // Heuristic early exit: for non-batch (status-filtered) modes, stop after many
-    // consecutive empty pages if we already have some results.
-    // This skips paging through 600+ EVERNOTE items just to find the 8 INTERVIEW ones.
-    if(statusIds !== null && items.length > 0 && pagesWithoutMatches >= MAX_EMPTY_STREAK){
-      break;
-    }
-  } while(cursor);
+    pages++;
+    if(onProgress) onProgress(items.length);
+  } while(cursor && pages < MAX_PAGES);
   return items;
 }
 
@@ -1161,7 +1158,9 @@ async function loadCandidatesForMode(mode){
 
   // Fetch fresh
   try {
-    const items = await fetchItemsForMode(statusIds);
+    const items = await fetchItemsForMode(statusIds, (count)=>{
+      if(loadText) loadText.textContent = `Loading models… ${count} so far`;
+    });
     items.sort((a,b) => a.name.localeCompare(b.name));
     modeCache[key] = items;
     allCandidates = items;
@@ -1668,16 +1667,42 @@ async function updateStageName(newName){
 // Single unified save entry point used by the sticky "Save Changes" button.
 // Saves all field data AND uploads any queued photos for whichever view is active.
 async function saveAll(){
-  if(currentMode==='new'){ return saveNewModel('potential'); }
-  if(currentMode==='3'){ return saveAndUploadIv(); }   // interview view (saves fields + photos)
-  // all other candidate modes use the full view
-  return saveAndUploadFv();                              // full view (saves fields + photos)
+  const btn = document.getElementById('save-btn');
+  const pbar = document.getElementById('save-progress-bar');
+  const origLabel = btn ? btn.textContent : 'Save Changes';
+  // Show a clear, persistent "working" state across the WHOLE save (fields + photos),
+  // so a coworker never thinks it hung and clicks away.
+  let pct = 8;
+  let ticker = null;
+  if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
+  if(pbar){
+    pbar.style.display = 'block';
+    pbar.style.width = '8%';
+    // Creep the bar forward so it always looks alive during long photo uploads.
+    ticker = setInterval(()=>{ pct = Math.min(pct + 3, 90); pbar.style.width = pct + '%'; }, 400);
+  }
+  const finish = (ok)=>{
+    if(ticker) clearInterval(ticker);
+    if(pbar){ pbar.style.width = '100%'; setTimeout(()=>{ pbar.style.display='none'; pbar.style.width='0%'; }, 500); }
+    if(btn){
+      btn.textContent = ok ? 'Saved ✓' : origLabel;
+      setTimeout(()=>{ if(btn.textContent==='Saved ✓') btn.textContent = origLabel; btn.disabled=false; }, ok ? 1500 : 0);
+    }
+  };
+  try{
+    if(currentMode==='new'){ await saveNewModel('potential'); }
+    else if(currentMode==='3'){ await saveAndUploadIv(); }   // interview view (fields + photos)
+    else { await saveAndUploadFv(); }                          // full view (fields + photos)
+    finish(true);
+  }catch(e){
+    finish(false);
+    showToast('Save failed: '+(e&&e.message ? e.message : e), 'error');
+    console.error('saveAll failed:', e);
+  }
 }
 
 async function saveRecord(){
   if(!currentItem&&currentMode!=='new')return;
-  document.getElementById('save-btn').disabled=true;
-  showToast('Saving...','saving');
   try{
     const cv=buildColumnValues();
     await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
@@ -1690,12 +1715,10 @@ async function saveRecord(){
     isDirty=false;
     document.getElementById('unsaved-dot').classList.remove('visible');
     document.getElementById('save-status').textContent='Saved '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    document.getElementById('save-btn').disabled=false;
-    showToast('Saved','success');
     // Invalidate cache so status changes appear immediately in other tabs
     invalidateCache();
     await loadCandidatesForMode(currentMode);
-  }catch(e){showToast('Save failed: '+e.message,'error');document.getElementById('save-btn').disabled=false;console.error(e);}
+  }catch(e){showToast('Save failed: '+e.message,'error');console.error(e);throw e;}
 }
 
 // ── LOAD PHOTOS FROM MONDAY ──
@@ -2454,8 +2477,25 @@ function show(id){const el=document.getElementById(id);if(el)el.style.display=''
 function hide(id){const el=document.getElementById(id);if(el)el.style.display='none';}
 let toastTimer;
 function showToast(msg,type='success'){
-  const t=document.getElementById('toast');t.textContent=msg;t.className=`show ${type}`;
-  clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.className='';},3000);
+  const t=document.getElementById('toast');
+  const m=document.getElementById('toast-msg');
+  const close=document.getElementById('toast-close');
+  (m||t).textContent=msg;
+  t.className=`show ${type}`;
+  clearTimeout(toastTimer);
+  if(type==='error'){
+    // Errors stay up until the user dismisses them — easy to read and screenshot.
+    if(close) close.style.display='inline';
+  } else {
+    if(close) close.style.display='none';
+    // Success/saving messages auto-hide; give a bit longer than before.
+    toastTimer=setTimeout(()=>{t.className='';},4000);
+  }
+}
+function hideToast(){
+  const t=document.getElementById('toast');
+  clearTimeout(toastTimer);
+  t.className='';
 }
 
 // ── PASSWORD GATE ──
