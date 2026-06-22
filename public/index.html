@@ -171,6 +171,22 @@
 
   /* SECTIONS */
   .section{margin-bottom:40px;display:none}
+  /* In full-view "one scroll" mode, every section is visible and stacked. */
+  #full-view.one-scroll .section{display:block!important}
+  #full-view.one-scroll .section-nav{display:none}
+  /* Compact question list in the left sidebar (full-view) */
+  .qnav-group-label{font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-dim);padding:12px 18px 4px;font-family:var(--font-mono)}
+  .qnav-item{display:block;padding:4px 18px 4px 26px;font-size:11px;color:var(--text-muted);cursor:pointer;border-left:2px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:all 0.1s;user-select:none}
+  .qnav-item:hover{color:var(--text);background:var(--surface2)}
+  .qnav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(200,180,255,0.06)}
+  /* Brief highlight when a field is scrolled to */
+  .field.flash > .field-label{color:var(--accent);transition:color 0.2s}
+  .field.flash{outline:1px solid var(--accent);outline-offset:4px;border-radius:6px;transition:outline 0.2s}
+  /* Site Compatibility channel buttons (multi-select, color-coded, yellow ring when on) */
+  .compat-grid{display:flex;flex-wrap:wrap;gap:7px}
+  .compat-btn{padding:5px 11px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:600;cursor:pointer;border:2px solid transparent;color:#111;transition:all 0.12s;user-select:none;white-space:nowrap}
+  .compat-btn:hover{filter:brightness(1.08)}
+  .compat-btn.on{outline:2px solid #ffcb00;outline-offset:1px;box-shadow:0 0 0 1px #ffcb00}
   .section.active{display:block}
   .section-header{display:flex;align-items:baseline;gap:14px;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid var(--border)}
   .section-title{font-family:var(--font-display);font-weight:700;font-size:20px;color:var(--text)}
@@ -679,6 +695,10 @@
               <div class="status-pill" style="background:#df2f4a;color:#fff" data-value="3" onclick="selectStatus(this,'label')">5-REJECTED</div>
             </div>
           </div>
+          <div class="field field-full" id="compat-section">
+            <div class="field-label">Site Compatibility <span style="color:var(--text-dim);font-weight:400">— click each channel that fits</span></div>
+            <div class="compat-grid" id="compat-grid"></div>
+          </div>
           <div class="field"><div class="field-label">Rating — Intake</div><input type="number" id="f-numeric_mm1z34ca" min="1" max="10" placeholder="1–10" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Rating — Final</div><input type="number" id="f-numeric_mm1zjjrp" min="1" max="10" placeholder="1–10" oninput="markDirty()"></div>
           <div class="field field-full"><div class="field-label">Rating Notes</div><textarea id="f-text_mm1znrfv" placeholder="Notes on rating..." oninput="markDirty()"></textarea></div>
@@ -904,6 +924,40 @@ const API_URL  = '/api';   // same-origin proxy; the token lives only on the ser
 
 // Status label index → mode key
 const MODE_STATUS_IDS = { '0':[5], '1':[8], '2':[10], '3':[7], '4':[9], '5a':[2,4,105], '5r':[3], 'batch':null };
+
+// Map of the full-view sections → their questions, in display order. Each question
+// points at the input/control id to scroll to. Drives the left-side question list.
+const FULL_QUESTION_MAP = [
+  ['Identity', [
+    ['Legal Name','f-text_mknceqty'],['Date of Birth','f-date_of_birth_mkncwsrj'],['Age','f-age'],
+    ['Language(s)','display-dropdown_mknb18b7'],['Citizenship','display-dropdown_mm26n6qx'],['Passport','f-color_mm26w6hs'],
+    ['State ID','f-text_mm1z66yj'],['Address','f-text_mknct7cn'],['Location (specific)','f-text_mkncbdr1'],['Location (general)','display-dropdown_mm254xed'],
+  ]],
+  ['Contact & Links', [
+    ['Email','f-text_mknk1txg'],['Phone','f-phone9ouk2t6x'],['Twitter / X','f-lien_internet'],['Instagram','f-lien_internet9'],
+    ['Other Social','f-lien_internet3'],['Bluesky','f-dup__of_facebook'],['OnlyFans','f-text_mkncy7gf'],['JustForFans','f-text_mknc3aty'],
+  ]],
+  ['Casting Details', [
+    ['Type','display-dropdown_mm1zzwcg'],['Role','display-dropdown_mknbe0p0'],['Sexuality','display-dropdown_mm1by5q0'],['Ethnicity','display-dropdown_mm1zcar6'],
+    ['FTM?','f-color_mm1zk5e2'],['FTM Notes','f-long_text_mm1zbe1t'],['Tattoos','f-color_mm1zghx9'],['Tattoo Notes','f-long_text_mm1zsdyv'],
+    ['Collab House?','f-color_mm1z2f56'],['Haircut?','f-color_mm1zzwv8'],['Haircut Notes','f-long_text_mm1zshaw'],['Availability Notes','f-long_text_mm1z9aeg'],
+  ]],
+  ['Physical', [
+    ['Height','f-text_mknc1sps'],['Weight','f-text_mm1yx2wg'],['Cock Size','f-text_mm1y2znz'],['Hair Color','f-text_mkncjzx8'],
+    ['Eye Color','f-text_mkncsqaq'],['Cut vs Uncut','display-dropdown_mkx04tbr'],['Shirt Size','f-text_mknc62rg'],['Shoe Size','f-text_mknc2t7g'],['Pant Size','f-text_mknc808t'],
+  ]],
+  ['Health & Medical', [
+    ['HIV','f-color_mm1zzkz6'],['Syphilis','f-color_mm1zbze8'],['Medical Allergies','f-text_mkncgkwk'],['Food Restrictions','f-text_mkncht8f'],['Dick Enhancement','display-dropdown_mm1ztytq'],
+  ]],
+  ['Experience & Notes', [
+    ['Referred By','f-long_text_mm1zhkyq'],['Experience in Porn','f-long_text_mm2mxr92'],['Experience Bottoming','f-long_text_mm1zaqzq'],
+    ['Other Studios?','f-color_mm25jb44'],['Other Studios Notes','f-long_text_mm252r65'],['2nd Form Notes','f-long_text_mm252tt7'],
+  ]],
+  ['Status & Rating', [
+    ['Model Status','f-label'],['Site Compatibility','compat-section'],['Rating — Intake','f-numeric_mm1z34ca'],['Rating — Final','f-numeric_mm1zjjrp'],
+    ['Rating Notes','f-text_mm1znrfv'],['Rate Offered','f-text_mm1zb8xf'],['Date First Shot','f-date_mknb5z70'],
+  ]],
+];
 // Status index → hex colors
 const STATUS_COLORS = {5:{bg:'#c4c4c4',fg:'#111'},8:{bg:'#cab641',fg:'#111'},10:{bg:'#ff6d3b',fg:'#fff'},7:{bg:'#ffcb00',fg:'#111'},9:{bg:'#579bfc',fg:'#fff'},2:{bg:'#037f4c',fg:'#fff'},3:{bg:'#df2f4a',fg:'#fff'},4:{bg:'#9d50dd',fg:'#fff'},105:{bg:'#00c875',fg:'#fff'}};
 const STATUS_LABELS = {5:'0-APPLICANT',8:'1-SCREEN',10:'2-POTENTIAL',7:'3-INTERVIEW',9:'4-REVIEW',2:'5-APPROVED',3:'5-REJECTED',4:'00 - ALL-STAR',105:'00 - EXCLUSIVE'};
@@ -948,7 +1002,7 @@ async function init(){
 }
 
 async function fetchBoardDropdownOptions(){
-  const data=await gql(`{boards(ids:[${BOARD_ID}]){columns(ids:["dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm1by5q0","dropdown_mm1zcar6","dropdown_mknb18b7","dropdown_mm26n6qx","dropdown_mm254xed","dropdown_mkx04tbr","dropdown_mm1ztytq"]){id settings_str}}}`);
+  const data=await gql(`{boards(ids:[${BOARD_ID}]){columns(ids:["dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm1by5q0","dropdown_mm1zcar6","dropdown_mknb18b7","dropdown_mm26n6qx","dropdown_mm254xed","dropdown_mkx04tbr","dropdown_mm1ztytq","dropdown_mkncp6xy"]){id settings_str}}}`);
   data.boards[0].columns.forEach(col=>{
     try{const s=JSON.parse(col.settings_str);if(s.labels)boardDropdownOptions[col.id]=s.labels.filter(l=>!l.is_deactivated).map(l=>({id:l.id,label:l.name||l.label}));}catch{}
   });
@@ -969,6 +1023,40 @@ const FALLBACK_OPTIONS={
 function getOptions(id){return boardDropdownOptions[id]||FALLBACK_OPTIONS[id]||[]}
 
 // Build ALL dropdown instances (main, interview, new)
+// ── SITE COMPATIBILITY (dynamic color-coded channel buttons) ──
+// A palette cycled across channels so each button is visually distinct. Color is
+// cosmetic only; selection state is the yellow ring (.on).
+const COMPAT_COLORS = ['#037f4c','#579bfc','#9d50dd','#ff6d3b','#00c875','#ff7575','#fdab3d','#66ccff','#cab641','#bb3354','#7f5347','#df2f4a','#0086c0','#a25ddc','#037f4c','#ffcb00','#784bd1','#9cd326','#ff158a','#401694','#5559df','#225091','#ff642e','#fdab3d','#7e3b8a','#2b76e5','#c4c4c4','#808080','#4eccc6','#cab641'];
+
+// Render the channel buttons from the dynamically-loaded labels (so adding a tag in
+// monday automatically creates a new button on next load — no code change needed).
+function renderCompatButtons(){
+  const grid = document.getElementById('compat-grid');
+  if(!grid) return;
+  const opts = (boardDropdownOptions['dropdown_mkncp6xy'] || []);
+  const selected = new Set((multiValues['dropdown_mkncp6xy'] || []).map(Number));
+  grid.innerHTML = '';
+  if(!opts.length){ grid.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">No channels configured</span>'; return; }
+  opts.forEach((opt, i)=>{
+    const b=document.createElement('div');
+    b.className='compat-btn'+(selected.has(Number(opt.id))?' on':'');
+    b.style.background=COMPAT_COLORS[i % COMPAT_COLORS.length];
+    b.textContent=opt.label;
+    b.dataset.id=opt.id;
+    b.onclick=()=>toggleCompat(opt.id);
+    grid.appendChild(b);
+  });
+}
+function toggleCompat(id){
+  id=Number(id);
+  let arr=(multiValues['dropdown_mkncp6xy']||[]).map(Number);
+  if(arr.includes(id)) arr=arr.filter(x=>x!==id);
+  else arr.push(id);
+  multiValues['dropdown_mkncp6xy']=arr;
+  renderCompatButtons();
+  markDirty();
+}
+
 function buildAllDropdowns(){
   const prefixes=['','iv-','iv2-','ive-','new-'];
   const allIds=Object.keys(FALLBACK_OPTIONS);
@@ -1055,14 +1143,17 @@ function buildSidebarNav(type){
   const nav=document.getElementById('sidebar-nav');
   nav.innerHTML='';
   if(type==='full'){
-    const sections=[['0','Identity'],['1','Contact & Links'],['2','Casting Details'],['3','Physical'],['4','Health & Medical'],['5','Experience & Notes'],['6','Status & Rating']];
-    const label=document.createElement('div');label.className='nav-section-label';label.textContent='Sections';nav.appendChild(label);
-    sections.forEach(([i,name])=>{
-      const d=document.createElement('div');
-      d.className='nav-item'+(i==='0'?' active':'');
-      d.dataset.section=i;d.onclick=()=>goFSection(parseInt(i));
-      d.innerHTML=`<div class="nav-item-dot"></div>${name}`;
-      nav.appendChild(d);
+    // One-scroll layout: list every question; clicking scrolls the form to it.
+    FULL_QUESTION_MAP.forEach(([section, questions])=>{
+      const label=document.createElement('div');label.className='qnav-group-label';label.textContent=section;nav.appendChild(label);
+      questions.forEach(([qLabel, targetId])=>{
+        const d=document.createElement('div');
+        d.className='qnav-item';
+        d.dataset.target=targetId;
+        d.textContent=qLabel;
+        d.onclick=()=>scrollToField(targetId);
+        nav.appendChild(d);
+      });
     });
   }else if(type==='interview'){
     const label=document.createElement('div');label.className='nav-section-label';label.textContent='Interview';nav.appendChild(label);
@@ -1292,7 +1383,7 @@ async function loadCandidate(itemId){
     document.getElementById('candidate-strip').classList.add('interview-mode');
   }else{
     hide('interview-view');show('full-view');
-    goFSection(0);
+    document.getElementById('full-view').classList.add('one-scroll');
     document.getElementById('candidate-strip').classList.remove('interview-mode');
     // Photo upload available in all standard candidate modes (applicant → approved/rejected),
     // but not batch/duplicate which use their own views.
@@ -1404,6 +1495,10 @@ function populateForm(item){
       const v=val(id);multiValues[id]=v?.ids||[];
       ['','iv-','ive-'].forEach(ctx=>{renderMultiDisplay(id,ctx);updateMultiDropdownState(id,ctx);});
     });
+    // Site Compatibility uses color-coded buttons rather than the dropdown UI.
+    const compat=val('dropdown_mkncp6xy');
+    multiValues['dropdown_mkncp6xy']=compat?.ids||[];
+    renderCompatButtons();
   });
 
   // Strip meta
@@ -2437,7 +2532,7 @@ function buildColumnValues(){
 
   ['label','color_mm1zghx9','color_mm1zk5e2','color_mm1z2f56','color_mm1zzkz6','color_mm1zbze8','color_mm1zzwv8','color_mm26w6hs','color_mm25jb44','color_mm26br5p'].forEach(id=>{if(statusValues[id]!=null)cv[id]={index:statusValues[id]};});
 
-  ['dropdown_mm1zzwcg','dropdown_mknbe0p0','dropdown_mm1by5q0','dropdown_mm1zcar6','dropdown_mknb18b7','dropdown_mm26n6qx','dropdown_mm254xed','dropdown_mkx04tbr','dropdown_mm1ztytq'].forEach(id=>{if(multiValues[id]?.length)cv[id]={ids:multiValues[id]};});
+  ['dropdown_mm1zzwcg','dropdown_mknbe0p0','dropdown_mm1by5q0','dropdown_mm1zcar6','dropdown_mknb18b7','dropdown_mm26n6qx','dropdown_mm254xed','dropdown_mkx04tbr','dropdown_mm1ztytq','dropdown_mkncp6xy'].forEach(id=>{if(multiValues[id]?.length)cv[id]={ids:multiValues[id]};});
 
   return cv;
 }
@@ -2445,13 +2540,26 @@ function buildColumnValues(){
 // ── SECTION NAV (full view) ──
 let currentFSection=0;
 function goFSection(i){
-  // Target fs- prefixed sections directly so we never accidentally touch iv- sections
-  [0,1,2,3,4,5,6].forEach(idx=>{
-    const el=document.getElementById('fs-'+idx);
-    if(el) el.classList.toggle('active',idx===i);
-  });
-  document.querySelectorAll('#sidebar-nav .nav-item').forEach(item=>item.classList.toggle('active',parseInt(item.dataset.section)===i));
-  currentFSection=i;document.getElementById('form-area').scrollTop=0;
+  // Legacy section-switch: in one-scroll mode we just scroll to that section anchor.
+  const el=document.getElementById('fs-'+i);
+  if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+  currentFSection=i;
+}
+
+// Scroll the form area to a specific field/control and briefly highlight it.
+function scrollToField(targetId){
+  const el=document.getElementById(targetId);
+  if(!el) return;
+  // Scroll the nearest .field container into view (so the label is visible too).
+  const fieldBox = el.closest('.field') || el;
+  fieldBox.scrollIntoView({behavior:'smooth',block:'center'});
+  // brief flash
+  if(fieldBox.classList){
+    fieldBox.classList.add('flash');
+    setTimeout(()=>fieldBox.classList.remove('flash'), 1200);
+  }
+  // mark the clicked nav item active
+  document.querySelectorAll('#sidebar-nav .qnav-item').forEach(n=>n.classList.toggle('active', n.dataset.target===targetId));
 }
 
 // ── RESET ──
