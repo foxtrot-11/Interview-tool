@@ -831,6 +831,10 @@
             <div class="field"><div class="field-label">Neck Size</div><input type="text" id="ive-text_mm2dwvec" placeholder="" oninput="syncIvField('text_mm2dwvec',this.value)"></div>
             <div class="field"><div class="field-label">Head Circumference</div><input type="text" id="ive-text_mm2dqqdw" placeholder="" oninput="syncIvField('text_mm2dqqdw',this.value)"></div>
           </div>
+          <div class="field field-full" id="iv-compat-section" style="margin-top:8px">
+            <div class="field-label">Site Compatibility <span style="color:var(--text-dim);font-weight:400">— click each channel that fits</span></div>
+            <div class="compat-grid" id="iv-compat-grid"></div>
+          </div>
         </div><!-- /iv-extra-section -->
 
       </div>
@@ -857,6 +861,12 @@
           <div class="field"><div class="field-label">Cock Size</div><input type="text" id="new-cock" placeholder='7"' oninput="markDirty()"></div>
           <div class="field field-full"><div class="field-label">Referred By</div><textarea id="new-referred" placeholder="Who referred this model?" oninput="markDirty()"></textarea></div>
           <div class="field field-full"><div class="field-label">General Notes</div><textarea id="new-notes" placeholder="Any additional notes..." oninput="markDirty()"></textarea></div>
+
+          <!-- SITE COMPATIBILITY -->
+          <div class="field field-full" id="new-compat-section">
+            <div class="field-label">Site Compatibility <span style="color:var(--text-dim);font-weight:400">— click each channel that fits</span></div>
+            <div class="compat-grid" id="new-compat-grid"></div>
+          </div>
 
           <!-- HEADSHOT -->
           <div class="field field-full">
@@ -1049,26 +1059,29 @@ function compatTextColor(hex){
 
 // Render the channel buttons from the dynamically-loaded labels (so adding a tag in
 // monday automatically creates a new button on next load — no code change needed).
+// Renders into whichever grids exist (full-view, interview, new-model).
 function renderCompatButtons(){
-  const grid = document.getElementById('compat-grid');
-  if(!grid) return;
   const opts = (boardDropdownOptions['dropdown_mkncp6xy'] || []);
   const selected = new Set((multiValues['dropdown_mkncp6xy'] || []).map(Number));
-  grid.innerHTML = '';
-  if(!opts.length){ grid.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">No channels configured</span>'; return; }
-  opts.forEach(opt=>{
-    const color = COMPAT_COLORS[compatKey(opt.label)] || COMPAT_FALLBACK;
-    const id = Number(opt.id);
-    const isSelected = selected.has(id);
-    const isNew = isSelected && !compatSavedIds.has(id); // picked this session, not yet saved
-    const b=document.createElement('div');
-    b.className='compat-btn'+(isSelected ? (isNew ? ' new' : ' on') : '');
-    b.style.background=color;
-    b.style.color=compatTextColor(color);
-    b.textContent=opt.label;
-    b.dataset.id=opt.id;
-    b.onclick=()=>toggleCompat(opt.id);
-    grid.appendChild(b);
+  ['compat-grid','iv-compat-grid','new-compat-grid'].forEach(gridId=>{
+    const grid = document.getElementById(gridId);
+    if(!grid) return;
+    grid.innerHTML = '';
+    if(!opts.length){ grid.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">No channels configured</span>'; return; }
+    opts.forEach(opt=>{
+      const color = COMPAT_COLORS[compatKey(opt.label)] || COMPAT_FALLBACK;
+      const id = Number(opt.id);
+      const isSelected = selected.has(id);
+      const isNew = isSelected && !compatSavedIds.has(id); // picked this session, not yet saved
+      const b=document.createElement('div');
+      b.className='compat-btn'+(isSelected ? (isNew ? ' new' : ' on') : '');
+      b.style.background=color;
+      b.style.color=compatTextColor(color);
+      b.textContent=opt.label;
+      b.dataset.id=opt.id;
+      b.onclick=()=>toggleCompat(opt.id);
+      grid.appendChild(b);
+    });
   });
 }
 function toggleCompat(id){
@@ -1138,6 +1151,10 @@ async function setMode(mode){
     show('new-model-view');
     document.getElementById('sidebar-notes-pin').classList.remove('visible');
     buildSidebarNav('new');
+    // Fresh model: no compat tags yet. Clear selection + baseline and render empty buttons.
+    multiValues['dropdown_mkncp6xy']=[];
+    compatSavedIds=new Set();
+    renderCompatButtons();
     document.getElementById('save-btn').disabled=false;
     return;
   }
@@ -2288,6 +2305,7 @@ async function saveNewModel(targetMode){
     cv['label'] = {index:TARGET.index};
     if(multiValues['dropdown_mknbe0p0']?.length) cv['dropdown_mknbe0p0']={ids:multiValues['dropdown_mknbe0p0']};
     if(multiValues['dropdown_mm1by5q0']?.length) cv['dropdown_mm1by5q0']={ids:multiValues['dropdown_mm1by5q0']};
+    if(multiValues['dropdown_mkncp6xy']?.length) cv['dropdown_mkncp6xy']={ids:multiValues['dropdown_mkncp6xy']};
     if(Object.keys(cv).length){
       await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
         {i:newId, b:BOARD_ID, c:JSON.stringify(cv)});
@@ -2595,6 +2613,7 @@ function scrollToField(targetId){
 // ── RESET ──
 function resetForm(){
   currentItem=null;isDirty=false;statusValues={};selectValues={};multiValues={};
+  compatSavedIds=new Set();
   pendingHeadshotAssetId=null;rechooseMode=false;candidatePhotos=[];closeLightbox();
   const pc=document.getElementById('photo-controls');if(pc)pc.style.display='none';
   document.getElementById('unsaved-dot').classList.remove('visible');
