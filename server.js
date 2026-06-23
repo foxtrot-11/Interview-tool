@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const { parse, visit } = require('graphql');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
@@ -11,6 +12,77 @@ const MONDAY_TOKEN = process.env.MONDAY_TOKEN;
 if (!MONDAY_TOKEN) {
   console.error('FATAL: MONDAY_TOKEN environment variable is not set.');
   process.exit(1);
+}
+
+// ── /api ALLOW-LIST GUARD ────────────────────────────────────────────────────
+// The /api endpoint used to forward ANY GraphQL the browser sent, with the
+// powerful token attached — a "blank check". This guard parses each request and
+// only lets through the handful of operations this app actually performs, and
+// only against the boards it actually uses. It PARSES the query (real AST) rather
+// than string-matching, so reformatting/alias/comment tricks can't slip past.
+const ALLOWED_BOARD_IDS = new Set(['3636652411', '18416230588']); // main tracker + batch-import board
+const ALLOWED_QUERY_ROOTS = new Set(['boards', 'items', 'assets']);
+const ALLOWED_MUTATION_ROOTS = new Set([
+  'change_multiple_column_values',
+  'change_simple_column_value',
+  'create_item',
+  'create_update',
+  'delete_item',
+]);
+
+function validateGraphQL(query, variables) {
+  if (typeof query !== 'string' || !query.trim()) return { ok: false, reason: 'empty query' };
+  let ast;
+  try { ast = parse(query); } catch { return { ok: false, reason: 'unparseable query' }; }
+
+  // Only plain query/mutation operations; no fragments, no batching/smuggling.
+  if (ast.definitions.some(d => d.kind !== 'OperationDefinition'))
+    return { ok: false, reason: 'only plain query/mutation operations are allowed' };
+  const ops = ast.definitions.filter(d => d.kind === 'OperationDefinition');
+  if (ops.length !== 1) return { ok: false, reason: 'exactly one operation per request' };
+
+  const op = ops[0];
+  if (op.operation === 'subscription') return { ok: false, reason: 'subscriptions not allowed' };
+  const allowedRoots = op.operation === 'mutation' ? ALLOWED_MUTATION_ROOTS : ALLOWED_QUERY_ROOTS;
+
+  for (const sel of op.selectionSet.selections) {
+    if (sel.kind !== 'Field') return { ok: false, reason: 'unexpected selection' };
+    if (!allowedRoots.has(sel.name.value))
+      return { ok: false, reason: `operation not allowed: ${sel.name.value}` };
+  }
+
+  // Board scoping: any board_id argument, or boards(ids:[...]), must be allow-listed.
+  // Variable values are resolved against the request's variables object.
+  const vars = variables || {};
+  const resolve = (node) => {
+    if (!node) return undefined;
+    if (node.kind === 'IntValue' || node.kind === 'StringValue' || node.kind === 'FloatValue') return String(node.value);
+    if (node.kind === 'Variable') { const v = vars[node.name.value]; return v === undefined ? undefined : v; }
+    if (node.kind === 'ListValue') return node.values.map(resolve);
+    return undefined;
+  };
+  let violation = null;
+  visit(ast, {
+    Argument(node) {
+      if (node.name.value === 'board_id') {
+        const val = resolve(node.value);
+        const arr = Array.isArray(val) ? val : [val];
+        for (const v of arr) if (v !== undefined && !ALLOWED_BOARD_IDS.has(String(v))) violation = `board_id not allowed: ${v}`;
+      }
+    },
+    Field(node) {
+      if (node.name.value === 'boards') {
+        const idsArg = (node.arguments || []).find(a => a.name.value === 'ids');
+        if (idsArg) {
+          const val = resolve(idsArg.value);
+          const arr = Array.isArray(val) ? val : [val];
+          for (const v of arr) if (v !== undefined && !ALLOWED_BOARD_IDS.has(String(v))) violation = `boards(ids) not allowed: ${v}`;
+        }
+      }
+    },
+  });
+  if (violation) return { ok: false, reason: violation };
+  return { ok: true };
 }
 
 // Tell search engines not to index this app, on EVERY response (strongest signal —
@@ -32,10 +104,17 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // Relay GraphQL queries/mutations to monday, attaching the token server-side.
 // The browser never sees the token — it only ever calls this same-origin endpoint.
+// Every request is first checked against the allow-list guard above.
 app.post('/api', async (req, res) => {
   try {
     const { query, variables } = req.body || {};
     if (!query) return res.status(400).json({ error: 'missing query' });
+
+    const verdict = validateGraphQL(query, variables);
+    if (!verdict.ok) {
+      console.warn('Blocked /api request:', verdict.reason);
+      return res.status(403).json({ errors: [{ message: 'Request not permitted: ' + verdict.reason }] });
+    }
 
     const r = await fetch('https://api.monday.com/v2', {
       method: 'POST',
@@ -105,6 +184,8 @@ app.post('/rearrange-photos', async (req, res) => {
   try {
     const { itemId, boardId, headshotAssetIds = [], extraAssetIds = [] } = req.body || {};
     if (!itemId || !boardId) return res.status(400).json({ error: 'missing itemId or boardId' });
+    // Defense in depth: only operate on boards this app is allowed to touch.
+    if (!ALLOWED_BOARD_IDS.has(String(boardId))) return res.status(403).json({ error: 'board not permitted' });
 
     const HEADSHOT_COL = 'files_mkncw5nm';
     const EXTRAS_COL = 'file_mkp1n4bt';
@@ -187,7 +268,7 @@ function safeFileName(rawName, mime, assetId) {
   let base = String(rawName || ('photo_' + assetId))
     .replace(/\.(jpe?g|png|webp|gif)$/i, '')      // drop existing ext
     .replace(/[^\x20-\x7E]/g, '')                  // strip non-ASCII (incl. \u202f)
-    .replace(/[^A-Za-z0-9._-]/g, '_')              // risky chars → underscore
+    .replace(/[^A-Za-z0-9._-]/g, '_')              // risky chars -> underscore
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '')
     .slice(0, 80);
