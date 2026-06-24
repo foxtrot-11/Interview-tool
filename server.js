@@ -11,7 +11,31 @@ const app = express();
 // everyone under the proxy's IP. Set to a number (not `true`) on purpose — `true`
 // would trust a client-spoofable header.
 app.set('trust proxy', 1);
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+// Photo uploads: cap size and accept images only. The client compresses before
+// upload, so real photos are well under this; the cap just stops someone pushing
+// a huge file (which could exhaust this small instance) or a non-image into monday.
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB
+const ALLOWED_UPLOAD_MIMES = new Set([
+  'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif',
+]);
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_UPLOAD_MIMES.has((file.mimetype || '').toLowerCase())) return cb(null, true);
+    cb(new Error('UNSUPPORTED_TYPE'));
+  },
+});
+// Runs multer for a single 'file' field and turns its errors into clean JSON
+// (instead of Express's default HTML error page).
+function uploadSingle(req, res, next) {
+  upload.single('file')(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'File too large (max 25 MB).' });
+    if (err.message === 'UNSUPPORTED_TYPE') return res.status(415).json({ error: 'Only image files are allowed (jpg, png, webp, gif, heic).' });
+    return res.status(400).json({ error: 'Upload rejected.' });
+  });
+}
 
 // Token comes ONLY from Render env var MONDAY_TOKEN. No hardcoded fallback,
 // so a misconfigured deploy fails loudly instead of silently using an old token.
@@ -203,7 +227,7 @@ app.post('/api', dataLimiter, requireAuth, async (req, res) => {
 });
 
 // Relay a file upload to monday's /v2/file endpoint (which blocks browser CORS)
-app.post('/upload', dataLimiter, requireAuth, upload.single('file'), async (req, res) => {
+app.post('/upload', dataLimiter, requireAuth, uploadSingle, async (req, res) => {
   try {
     const { itemId, columnId } = req.body;
     if (!req.file || !itemId || !columnId) {
