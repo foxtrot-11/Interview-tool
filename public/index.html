@@ -1118,10 +1118,10 @@ function buildAllDropdowns(){
         const div=document.createElement('div');
         div.className='custom-option';div.dataset.id=opt.id;div.dataset.label=opt.label;
         if(isMulti){
-          div.innerHTML=`<div class="custom-check"></div><span>${opt.label}</span>`;
+          div.innerHTML=`<div class="custom-check"></div><span>${escapeHtml(opt.label)}</span>`;
           div.onclick=e=>{e.stopPropagation();const ctx=dd.id.startsWith('iv')?'iv':dd.id.startsWith('new')?'new':'main';toggleMultiOption(fieldId,opt.id,ctx);};
         }else{
-          div.innerHTML=`<span>${opt.label}</span>`;
+          div.innerHTML=`<span>${escapeHtml(opt.label)}</span>`;
           div.onclick=e=>{e.stopPropagation();const ctx=dd.id.startsWith('iv')?'iv':dd.id.startsWith('new')?'new':'main';selectSingleOption(fieldId,opt.id,opt.label,ctx);};
         }
         dd.appendChild(div);
@@ -1345,7 +1345,7 @@ function highlight(name, q){
          '<span class="combo-hl">' + escapeHtml(name.slice(i, i+q.length)) + '</span>' +
          escapeHtml(name.slice(i+q.length));
 }
-function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escapeHtml(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 function renderComboPanel(q){
   const panel = document.getElementById('combo-panel');
@@ -1463,7 +1463,7 @@ function populateForm(item){
   const stageF=document.getElementById('iv-stage-name');if(stageF)stageF.value=item.name;
   // Rebuild the avatar placeholder — the previous candidate's headshot <img> may have replaced it
   const aw=document.getElementById('candidate-avatar-wrap');
-  if(aw) aw.innerHTML='<div class="candidate-avatar-placeholder" id="avatar-initial">'+item.name.charAt(0).toUpperCase()+'</div>';
+  if(aw) aw.innerHTML='<div class="candidate-avatar-placeholder" id="avatar-initial">'+escapeHtml(item.name.charAt(0).toUpperCase())+'</div>';
   const txt=id=>cols[id]?.text||'';
   const val=id=>{try{return cols[id]?.value?JSON.parse(cols[id].value):null;}catch{return null;}};
 
@@ -1604,7 +1604,7 @@ function onDobChange(v){const a=v?calcAge(v)+' yrs':'—';['f-','iv-'].forEach(p
 function updateStatusBadge(index){
   const badge=document.getElementById('candidate-status-badge');
   const s=STATUS_COLORS[index];const l=STATUS_LABELS[index];
-  badge.innerHTML=s?`<div class="status-badge" style="background:${s.bg};color:${s.fg}"><div class="status-dot" style="background:${s.fg}"></div>${l}</div>`:'';
+  badge.innerHTML=s?`<div class="status-badge" style="background:${s.bg};color:${s.fg}"><div class="status-dot" style="background:${s.fg}"></div>${escapeHtml(l)}</div>`:'';
 }
 
 // Status pills shown right under the model name in the strip.
@@ -1632,7 +1632,7 @@ function buildStripStatusBar(){
     const opt=document.createElement('div');
     opt.className='status-dd-option';
     opt.style.background=cc.bg;opt.style.color=cc.fg;
-    opt.innerHTML=`<span class="status-dd-swatch" style="background:${cc.fg}"></span>${label}`;
+    opt.innerHTML=`<span class="status-dd-swatch" style="background:${cc.fg}"></span>${escapeHtml(label)}`;
     opt.onclick=(e)=>{e.stopPropagation();setStatusFromStrip(idx);closeStatusDD();};
     menu.appendChild(opt);
   });
@@ -1692,7 +1692,7 @@ function renderSingleDisplay(fieldId,pre){
   const id=selectValues[fieldId];
   if(!id){disp.innerHTML='<span class="custom-placeholder">Select...</span>';return;}
   const opt=getOptions(fieldId).find(o=>o.id===id);
-  disp.innerHTML=`<span class="custom-select-single">${opt?.label||id}</span>`;
+  disp.innerHTML=`<span class="custom-select-single">${escapeHtml(opt?.label||id)}</span>`;
 }
 
 function updateSingleDropdownState(fieldId,pre){
@@ -1717,7 +1717,7 @@ function renderMultiDisplay(fieldId,pre){
   const selected=multiValues[fieldId]||[];
   const options=getOptions(fieldId);
   if(!selected.length){disp.innerHTML='<span class="custom-placeholder">Select...</span>';return;}
-  disp.innerHTML=selected.map(id=>{const opt=options.find(o=>o.id===id);return`<div class="multi-tag">${opt?.label||id}<span class="multi-tag-remove" onclick="event.stopPropagation();removeMultiOption('${fieldId}',${id})">×</span></div>`;}).join('');
+  disp.innerHTML=selected.map(id=>{const opt=options.find(o=>o.id===id);return`<div class="multi-tag">${escapeHtml(opt?.label||id)}<span class="multi-tag-remove" onclick="event.stopPropagation();removeMultiOption('${fieldId}',${id})">×</span></div>`;}).join('');
 }
 
 function removeMultiOption(fieldId,optId){
@@ -1887,7 +1887,7 @@ async function loadCandidatePhotos(itemId){
   const grid = document.getElementById('strip-photo-grid');
   const avatarWrap = document.getElementById('candidate-avatar-wrap');
   grid.innerHTML = '';
-  avatarWrap.innerHTML = '<div class="candidate-avatar-placeholder" id="avatar-initial">'+((document.getElementById('strip-name').value||'?').charAt(0).toUpperCase())+'</div>';
+  avatarWrap.innerHTML = '<div class="candidate-avatar-placeholder" id="avatar-initial">'+escapeHtml((document.getElementById('strip-name').value||'?').charAt(0).toUpperCase())+'</div>';
   photoState = { headshotEntries: [], extraEntries: [] };
   candidatePhotos = [];
   document.getElementById('photo-controls').style.display = 'none';
@@ -1922,7 +1922,7 @@ async function loadCandidatePhotos(itemId){
 
     const headshot = candidatePhotos.find(p => p.isHeadshot);
     if(headshot){
-      avatarWrap.innerHTML = `<img src="${headshot.url}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">`;
+      avatarWrap.innerHTML = `<img src="${escapeHtml(headshot.url)}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">`;
     }
 
     renderPhotoGrid();
@@ -1942,7 +1942,7 @@ function renderPhotoGrid(){
     if(p.assetId === pendingHeadshotAssetId) cls += ' is-pending';
     else if(p.isHeadshot) cls += ' is-headshot';
     thumb.className = cls;
-    thumb.innerHTML = `<img src="${p.url}" title="${p.name}" loading="lazy">`;
+    thumb.innerHTML = `<img src="${escapeHtml(p.url)}" title="${escapeHtml(p.name)}" loading="lazy">`;
     thumb.onclick = () => rechooseMode ? selectPendingHeadshot(p.assetId) : openLightbox(i);
     grid.appendChild(thumb);
   });
@@ -2104,7 +2104,7 @@ function renderPreviews(containerId, files, type){
     const url = URL.createObjectURL(file);
     const thumb = document.createElement('div');
     thumb.className = 'photo-thumb';
-    thumb.innerHTML = `<img src="${url}"><div class="photo-thumb-label">${file.name.length > 10 ? file.name.slice(0,8)+'…' : file.name}</div><div class="photo-thumb-remove" onclick="removePhoto('${type}',${i})">×</div>`;
+    thumb.innerHTML = `<img src="${escapeHtml(url)}"><div class="photo-thumb-label">${escapeHtml(file.name.length > 10 ? file.name.slice(0,8)+'…' : file.name)}</div><div class="photo-thumb-remove" onclick="removePhoto('${type}',${i})">×</div>`;
     container.appendChild(thumb);
   });
 }
@@ -2246,7 +2246,7 @@ function setUploadStep(list, idx, state, text){
 function addUploadStep(list, text, state=''){
   const div = document.createElement('div');
   div.className = `upload-step ${state}`;
-  div.innerHTML = `<div class="upload-step-dot"></div><span>${text}</span>`;
+  div.innerHTML = `<div class="upload-step-dot"></div><span>${escapeHtml(text)}</span>`;
   list.appendChild(div);
   return list.children.length - 1;
 }
@@ -2785,7 +2785,7 @@ async function loadDuplicates(){
     }
     renderDupGroups();
   } catch(e){
-    container.innerHTML = `<div class="dup-empty log-err">Failed to load: ${e.message}</div>`;
+    container.innerHTML = `<div class="dup-empty log-err">Failed to load: ${escapeHtml(e.message)}</div>`;
     console.error(e);
   }
 }
@@ -2821,7 +2821,7 @@ function renderDupGroups(){
     const caseColors = {1:'dup-case-1',2:'dup-case-2',3:'dup-case-3',4:'dup-case-4'};
     div.innerHTML = `
       <div class="dup-group-header">
-        <div class="dup-group-name">${group.items[0].name}</div>
+        <div class="dup-group-name">${escapeHtml(group.items[0].name)}</div>
         <div class="dup-group-count">${group.items.length} versions</div>
         <div class="dup-case-badge ${caseColors[c]}">Case ${c}: ${label}</div>
         <div style="margin-left:auto;font-size:10px;color:var(--text-dim)">oldest: ${oldest.created_at.slice(0,10)} · id ${oldest.id}</div>
@@ -2879,24 +2879,24 @@ async function loadGroupDetails(gid){
       const imgs    = (it.assets||[]).filter(a=>['.jpg','.jpeg','.png','.webp'].includes((a.file_extension||'').toLowerCase()));
 
       card.innerHTML = `
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--text)">${it.name}</div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--text)">${escapeHtml(it.name)}</div>
         <div class="dup-item-field"><span class="dup-item-field-label">Board</span><span class="dup-item-field-val" style="color:var(--text-muted);font-size:10px">${it.board===MAIN_BOARD_ID?'Main':'Batch'}</span></div>
         <div class="dup-item-field"><span class="dup-item-field-label">Created</span><span class="dup-item-field-val">${it.created_at.slice(0,10)}</span></div>
-        <div class="dup-item-field"><span class="dup-item-field-label">Status</span><span class="dup-item-field-val">${statusText}</span></div>
-        ${legal?`<div class="dup-item-field"><span class="dup-item-field-label">Legal</span><span class="dup-item-field-val">${legal}</span></div>`:''}
-        ${loc?`<div class="dup-item-field"><span class="dup-item-field-label">Location</span><span class="dup-item-field-val">${loc}</span></div>`:''}
-        ${role?`<div class="dup-item-field"><span class="dup-item-field-label">Role</span><span class="dup-item-field-val">${role}</span></div>`:''}
-        ${dob?`<div class="dup-item-field"><span class="dup-item-field-label">DOB</span><span class="dup-item-field-val">${dob}</span></div>`:''}
-        ${notes?`<div class="dup-item-field"><span class="dup-item-field-label">Notes</span><span class="dup-item-field-val" style="font-size:10px;opacity:0.7">${notes.slice(0,80)}${notes.length>80?'…':''}</span></div>`:''}
+        <div class="dup-item-field"><span class="dup-item-field-label">Status</span><span class="dup-item-field-val">${escapeHtml(statusText)}</span></div>
+        ${legal?`<div class="dup-item-field"><span class="dup-item-field-label">Legal</span><span class="dup-item-field-val">${escapeHtml(legal)}</span></div>`:''}
+        ${loc?`<div class="dup-item-field"><span class="dup-item-field-label">Location</span><span class="dup-item-field-val">${escapeHtml(loc)}</span></div>`:''}
+        ${role?`<div class="dup-item-field"><span class="dup-item-field-label">Role</span><span class="dup-item-field-val">${escapeHtml(role)}</span></div>`:''}
+        ${dob?`<div class="dup-item-field"><span class="dup-item-field-label">DOB</span><span class="dup-item-field-val">${escapeHtml(dob)}</span></div>`:''}
+        ${notes?`<div class="dup-item-field"><span class="dup-item-field-label">Notes</span><span class="dup-item-field-val" style="font-size:10px;opacity:0.7">${escapeHtml(notes.slice(0,80))}${notes.length>80?'…':''}</span></div>`:''}
         <div class="dup-item-photos">
-          ${imgs.slice(0,6).map(img=>`<img class="dup-item-photo" src="${img.public_url}" title="${img.name}" loading="lazy">`).join('')}
+          ${imgs.slice(0,6).map(img=>`<img class="dup-item-photo" src="${escapeHtml(img.public_url)}" title="${escapeHtml(img.name)}" loading="lazy">`).join('')}
           ${imgs.length>6?`<div style="width:40px;height:40px;border-radius:3px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-muted)">+${imgs.length-6}</div>`:''}
         </div>
         <div style="margin-top:8px;font-size:10px;color:var(--text-dim)">${imgs.length} photo${imgs.length!==1?'s':''} · ${it.id}</div>`;
       container.appendChild(card);
     });
   } catch(e){
-    container.innerHTML = `<div style="padding:12px;color:var(--danger);font-size:12px">Failed to load details: ${e.message}</div>`;
+    container.innerHTML = `<div style="padding:12px;color:var(--danger);font-size:12px">Failed to load details: ${escapeHtml(e.message)}</div>`;
   }
 }
 
@@ -2917,7 +2917,7 @@ async function runMerge(gid){
   log.innerHTML = '';
 
   const addLog = (msg, cls='') => {
-    log.innerHTML += `<span class="${cls}">${msg}</span>\n`;
+    log.innerHTML += `<span class="${cls}">${escapeHtml(msg)}</span>\n`;
     log.scrollTop = log.scrollHeight;
   };
 
