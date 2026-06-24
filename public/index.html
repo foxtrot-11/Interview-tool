@@ -927,8 +927,10 @@
 </div><!-- /main -->
 
 <script>
-const MAIN_BOARD_ID  = '3636652411';
-const BATCH_BOARD_ID = '18416230588';
+// Board IDs default to the production boards but are overwritten at startup by
+// values fetched from /config — so staging can point at a test board with no code change.
+let MAIN_BOARD_ID  = '3636652411';
+let BATCH_BOARD_ID = '18416230588';
 let BOARD_ID = MAIN_BOARD_ID;        // active board — switched by the EVERNOTE tab
 const GROUP_POTENTIAL = 'group_mm202zgr';
 const API_URL  = '/api';   // same-origin proxy; the token lives only on the server
@@ -1003,6 +1005,12 @@ async function gql(q,v={}){
 // ── INIT ──
 async function init(){
   try{
+    // Load board IDs for THIS environment (production vs staging) before anything else.
+    try{
+      const cfg = await fetch('/config').then(r=>r.json());
+      if(cfg && cfg.mainBoardId){ MAIN_BOARD_ID = cfg.mainBoardId; BOARD_ID = MAIN_BOARD_ID; }
+      if(cfg && cfg.batchBoardId){ BATCH_BOARD_ID = cfg.batchBoardId; }
+    }catch(e){ console.warn('config fetch failed, using defaults', e); }
     await fetchBoardDropdownOptions();
     buildAllDropdowns();
     // Candidates load on first mode click (per-mode lazy cache)

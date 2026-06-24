@@ -20,7 +20,12 @@ if (!MONDAY_TOKEN) {
 // only lets through the handful of operations this app actually performs, and
 // only against the boards it actually uses. It PARSES the query (real AST) rather
 // than string-matching, so reformatting/alias/comment tricks can't slip past.
-const ALLOWED_BOARD_IDS = new Set(['3636652411', '18416230588']); // main tracker + batch-import board
+// Board IDs come from env vars so staging can point at a test board without any
+// code change. If unset (production), they fall back to the real production boards —
+// so production behaves identically whether or not the vars are set.
+const MAIN_BOARD_ID  = process.env.MAIN_BOARD_ID  || '3636652411';
+const BATCH_BOARD_ID = process.env.BATCH_BOARD_ID || '18416230588';
+const ALLOWED_BOARD_IDS = new Set([MAIN_BOARD_ID, BATCH_BOARD_ID]); // whichever boards this environment uses
 const ALLOWED_QUERY_ROOTS = new Set(['boards', 'items', 'assets']);
 const ALLOWED_MUTATION_ROOTS = new Set([
   'change_multiple_column_values',
@@ -101,6 +106,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '5mb' }));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+// The client is a static file and can't read env vars directly, so it fetches its
+// board IDs from here on startup. Production returns the real IDs; staging returns
+// the test board. No secrets here — just board IDs.
+app.get('/config', (_req, res) => {
+  res.json({ mainBoardId: MAIN_BOARD_ID, batchBoardId: BATCH_BOARD_ID });
+});
 
 // Relay GraphQL queries/mutations to monday, attaching the token server-side.
 // The browser never sees the token — it only ever calls this same-origin endpoint.
