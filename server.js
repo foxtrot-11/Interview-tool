@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const crypto = require('crypto');
 const { parse, visit } = require('graphql');
 
 const app = express();
@@ -12,6 +13,31 @@ const MONDAY_TOKEN = process.env.MONDAY_TOKEN;
 if (!MONDAY_TOKEN) {
   console.error('FATAL: MONDAY_TOKEN environment variable is not set.');
   process.exit(1);
+}
+
+// ── SHARED-PASSWORD GATE (server-enforced) ───────────────────────────────────
+// The browser login screen only hid the UI; the data endpoints were open to
+// anyone with the URL. This requires a shared password (stored server-side as an
+// env var, never in the page) on every data request. A request without the
+// correct password is refused before the monday token is ever attached.
+// This is interim hardening — a stepping stone to per-user Google SSO, not a
+// replacement for it. If APP_PASSWORD is unset the gate fails CLOSED (rejects
+// everything) so a misconfigured deploy is loudly broken rather than silently open.
+const APP_PASSWORD = process.env.APP_PASSWORD;
+if (!APP_PASSWORD) {
+  console.warn('WARNING: APP_PASSWORD is not set — all data endpoints will reject requests until it is configured.');
+}
+function safeEqual(a, b) {
+  const ab = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
+function requireAuth(req, res, next) {
+  if (!APP_PASSWORD) return res.status(401).json({ error: 'auth not configured' });
+  const provided = req.get('X-App-Auth') || '';
+  if (!safeEqual(provided, APP_PASSWORD)) return res.status(401).json({ error: 'unauthorized' });
+  next();
 }
 
 // ── /api ALLOW-LIST GUARD ────────────────────────────────────────────────────
@@ -117,7 +143,11 @@ app.get('/config', (_req, res) => {
 // Relay GraphQL queries/mutations to monday, attaching the token server-side.
 // The browser never sees the token — it only ever calls this same-origin endpoint.
 // Every request is first checked against the allow-list guard above.
-app.post('/api', async (req, res) => {
+// Lightweight endpoint the login screen calls to validate the password without
+// touching monday. Returns 200 if the password header is correct, 401 otherwise.
+app.get('/auth-check', requireAuth, (_req, res) => res.json({ ok: true }));
+
+app.post('/api', requireAuth, async (req, res) => {
   try {
     const { query, variables } = req.body || {};
     if (!query) return res.status(400).json({ error: 'missing query' });
@@ -145,7 +175,7 @@ app.post('/api', async (req, res) => {
 });
 
 // Relay a file upload to monday's /v2/file endpoint (which blocks browser CORS)
-app.post('/upload', upload.single('file'), async (req, res) => {
+app.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
   try {
     const { itemId, columnId } = req.body;
     if (!req.file || !itemId || !columnId) {
@@ -174,7 +204,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 // Foolproof "move/copy a photo between columns": downloads the real bytes of an
 // existing asset server-side and re-uploads them via add_file_to_column to the
 // target column — producing a genuine owned asset (never an assetId reference).
-app.post('/move-asset', async (req, res) => {
+app.post('/move-asset', requireAuth, async (req, res) => {
   try {
     const { itemId, targetColumnId, assetId } = req.body || {};
     if (!itemId || !targetColumnId || !assetId) {
@@ -192,7 +222,7 @@ app.post('/move-asset', async (req, res) => {
 // first (while originals still exist), then clears both columns, then re-uploads
 // each as a fresh owned asset in the right column. Correct ordering guaranteed,
 // so it can never orphan. Body: { itemId, boardId, headshotAssetIds:[], extraAssetIds:[] }
-app.post('/rearrange-photos', async (req, res) => {
+app.post('/rearrange-photos', requireAuth, async (req, res) => {
   try {
     const { itemId, boardId, headshotAssetIds = [], extraAssetIds = [] } = req.body || {};
     if (!itemId || !boardId) return res.status(400).json({ error: 'missing itemId or boardId' });

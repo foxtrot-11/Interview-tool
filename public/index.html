@@ -932,6 +932,7 @@
 let MAIN_BOARD_ID  = '3636652411';
 let BATCH_BOARD_ID = '18416230588';
 let BOARD_ID = MAIN_BOARD_ID;        // active board — switched by the EVERNOTE tab
+let APP_PW = '';                     // shared password; sent as X-App-Auth on every data request (set at login)
 const GROUP_POTENTIAL = 'group_mm202zgr';
 const API_URL  = '/api';   // same-origin proxy; the token lives only on the server
 
@@ -993,6 +994,7 @@ async function gql(q,v={}){
     method:'POST',
     headers:{
       'Content-Type':'application/json',
+      'X-App-Auth': APP_PW,
     },
     body:JSON.stringify({query:q,variables:v})
   });
@@ -2201,6 +2203,7 @@ async function uploadFileToMonday(itemId, columnId, file, onProgress){
     };
     xhr.onerror = () => reject(new Error('Network error'));
     xhr.open('POST', '/upload');
+    xhr.setRequestHeader('X-App-Auth', APP_PW);
     xhr.send(fd);
   });
 }
@@ -2210,7 +2213,7 @@ async function uploadFileToMonday(itemId, columnId, file, onProgress){
 async function moveAssetToColumn(itemId, targetColumnId, assetId){
   const r = await fetch('/move-asset', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-App-Auth': APP_PW },
     body: JSON.stringify({ itemId, targetColumnId, assetId })
   });
   const j = await r.json();
@@ -2223,7 +2226,7 @@ async function moveAssetToColumn(itemId, targetColumnId, assetId){
 async function rearrangePhotos(itemId, headshotAssetIds, extraAssetIds){
   const r = await fetch('/rearrange-photos', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-App-Auth': APP_PW },
     body: JSON.stringify({ itemId, boardId: BOARD_ID, headshotAssetIds, extraAssetIds })
   });
   const j = await r.json();
@@ -2663,19 +2666,24 @@ function hideToast(){
   t.className='';
 }
 
-// ── PASSWORD GATE ──
-const PW_HASH = '46ae38c27cf30a9a2c8d643b22dd09875a8c8df54bb6b6136cef21c70ae6a452'; // sha256 of "carnalmedia"
+// ── PASSWORD GATE (server-enforced) ──
+// The password is validated by the SERVER (/auth-check) and sent on every data
+// request as the X-App-Auth header — it is never stored in this page's source.
+// Kept in memory + sessionStorage so it survives reloads within a browser session
+// (cleared when the browser/tab is closed, so it's re-entered once per session).
 
-async function sha256(str){
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+async function validatePw(pw){
+  try{
+    const r = await fetch('/auth-check', { headers: { 'X-App-Auth': pw } });
+    return r.ok;
+  }catch(e){ return false; }
 }
 
 async function checkPw(){
   const val = document.getElementById('pw-input').value;
-  const hash = await sha256(val);
-  if(hash === PW_HASH){
-    localStorage.setItem('cm_auth', hash);
+  if(await validatePw(val)){
+    APP_PW = val;
+    sessionStorage.setItem('cm_pw', val);
     document.getElementById('pw-gate').style.display = 'none';
     document.getElementById('loading-screen').style.display = '';
     init();
@@ -2686,18 +2694,25 @@ async function checkPw(){
     void inp.offsetWidth;
     inp.classList.add('shake');
     inp.value = '';
+    APP_PW = '';
+    sessionStorage.removeItem('cm_pw');
     setTimeout(()=>document.getElementById('pw-error').textContent='', 2500);
   }
 }
 
 async function bootCheck(){
-  const stored = localStorage.getItem('cm_auth');
-  if(stored && stored === PW_HASH){
+  // Re-validate any password remembered from this browser session before entry.
+  const stored = sessionStorage.getItem('cm_pw') || '';
+  if(stored && await validatePw(stored)){
+    APP_PW = stored;
     document.getElementById('pw-gate').style.display = 'none';
     document.getElementById('loading-screen').style.display = '';
     init();
+  } else {
+    APP_PW = '';
+    sessionStorage.removeItem('cm_pw');
+    // pw-gate stays visible, waiting for input
   }
-  // else: pw-gate stays visible, waiting for input
 }
 
 
