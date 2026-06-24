@@ -3,8 +3,14 @@ const multer = require('multer');
 const path = require('path');
 const crypto = require('crypto');
 const { parse, visit } = require('graphql');
+const { rateLimit } = require('express-rate-limit');
 
 const app = express();
+// Render runs this app behind one proxy hop. Trust exactly that hop so the rate
+// limiter sees each visitor's real IP (via X-Forwarded-For) instead of lumping
+// everyone under the proxy's IP. Set to a number (not `true`) on purpose — `true`
+// would trust a client-spoofable header.
+app.set('trust proxy', 1);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
 // Token comes ONLY from Render env var MONDAY_TOKEN. No hardcoded fallback,
@@ -39,6 +45,28 @@ function requireAuth(req, res, next) {
   if (!safeEqual(provided, APP_PASSWORD)) return res.status(401).json({ error: 'unauthorized' });
   next();
 }
+
+// ── RATE LIMITS ──────────────────────────────────────────────────────────────
+// Two speed limits, per visitor IP. The data limiter is generous (normal use
+// never hits it) but caps a flood/scrape. The auth limiter is strict and only
+// counts FAILED password attempts, so it stops brute-forcing without ever
+// throttling a legitimate user who has the right password. Counters live in
+// memory (fine for this single free-tier instance) and reset on restart.
+const dataLimiter = rateLimit({
+  windowMs: 60 * 1000,          // 1 minute
+  max: 500,                     // generous for humans; blocks floods
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests — please slow down and try again in a minute.' },
+});
+const authLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,     // 10 minutes
+  max: 15,                      // only failed attempts count (see below)
+  skipSuccessfulRequests: true, // a correct password never counts against the limit
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many failed login attempts — please wait a few minutes and try again.' },
+});
 
 // ── /api ALLOW-LIST GUARD ────────────────────────────────────────────────────
 // The /api endpoint used to forward ANY GraphQL the browser sent, with the
@@ -145,9 +173,9 @@ app.get('/config', (_req, res) => {
 // Every request is first checked against the allow-list guard above.
 // Lightweight endpoint the login screen calls to validate the password without
 // touching monday. Returns 200 if the password header is correct, 401 otherwise.
-app.get('/auth-check', requireAuth, (_req, res) => res.json({ ok: true }));
+app.get('/auth-check', authLimiter, requireAuth, (_req, res) => res.json({ ok: true }));
 
-app.post('/api', requireAuth, async (req, res) => {
+app.post('/api', dataLimiter, requireAuth, async (req, res) => {
   try {
     const { query, variables } = req.body || {};
     if (!query) return res.status(400).json({ error: 'missing query' });
@@ -175,7 +203,7 @@ app.post('/api', requireAuth, async (req, res) => {
 });
 
 // Relay a file upload to monday's /v2/file endpoint (which blocks browser CORS)
-app.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
+app.post('/upload', dataLimiter, requireAuth, upload.single('file'), async (req, res) => {
   try {
     const { itemId, columnId } = req.body;
     if (!req.file || !itemId || !columnId) {
@@ -204,7 +232,7 @@ app.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
 // Foolproof "move/copy a photo between columns": downloads the real bytes of an
 // existing asset server-side and re-uploads them via add_file_to_column to the
 // target column — producing a genuine owned asset (never an assetId reference).
-app.post('/move-asset', requireAuth, async (req, res) => {
+app.post('/move-asset', dataLimiter, requireAuth, async (req, res) => {
   try {
     const { itemId, targetColumnId, assetId } = req.body || {};
     if (!itemId || !targetColumnId || !assetId) {
@@ -222,7 +250,7 @@ app.post('/move-asset', requireAuth, async (req, res) => {
 // first (while originals still exist), then clears both columns, then re-uploads
 // each as a fresh owned asset in the right column. Correct ordering guaranteed,
 // so it can never orphan. Body: { itemId, boardId, headshotAssetIds:[], extraAssetIds:[] }
-app.post('/rearrange-photos', requireAuth, async (req, res) => {
+app.post('/rearrange-photos', dataLimiter, requireAuth, async (req, res) => {
   try {
     const { itemId, boardId, headshotAssetIds = [], extraAssetIds = [] } = req.body || {};
     if (!itemId || !boardId) return res.status(400).json({ error: 'missing itemId or boardId' });
