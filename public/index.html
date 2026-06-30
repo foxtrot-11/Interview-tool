@@ -78,6 +78,7 @@
   .log-err{color:var(--danger)}
   .dup-empty{text-align:center;padding:60px 20px;color:var(--text-muted);font-size:13px}
   .dup-loading{text-align:center;padding:40px;color:var(--text-muted);font-size:12px;letter-spacing:0.15em;text-transform:uppercase}
+  .dup-spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
   /* DUPV2 review styles */
   .dup-type-A{background:#4ade8020;color:#4ade80;border:1px solid #4ade8040}
   .dup-type-B{background:#facc1520;color:#facc15;border:1px solid #facc1540}
@@ -2758,6 +2759,7 @@ async function bootCheck(){
    Human-in-the-loop screening tool. Nothing is auto-merged.
    v2: empty values never logged; preview values are editable;
        deletion verified by item state (+ Recycle Bin note).
+   v3: live scan progress + spinner.
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
@@ -2850,12 +2852,15 @@ function fileEntries(item, colId){
 async function loadDuplicates(){
   const container = document.getElementById('dup-groups-container');
   const summary   = document.getElementById('dup-summary');
-  container.innerHTML = '<div class="dup-loading">Scanning board(s) for duplicates…</div>';
+  container.innerHTML = '<div class="dup-loading"><span class="dup-spinner"></span><span id="dup-load-status">Connecting… (first scan can take ~30–60s on a cold start)</span></div>';
   summary.textContent = '';
+  const setLoad = t => { const el=document.getElementById('dup-load-status'); if(el) el.textContent=t; };
   try {
+    setLoad('Reading board structure…');
     await buildColMeta();
     const boards = [...new Set([String(MAIN_BOARD_ID), String(BATCH_BOARD_ID)])];
     const byId = {};
+    let loaded = 0;
     for(const boardId of boards){
       let cursor = null;
       do {
@@ -2868,9 +2873,12 @@ async function loadDuplicates(){
           try { statusIdx = JSON.parse(it.column_values[0].value)?.index ?? null; } catch {}
           byId[it.id] = { id: it.id, name: (it.name||'').trim(), created_at: it.created_at, statusIdx, board: boardId };
         });
+        loaded += page.items.length;
+        setLoad(`Scanning records… ${loaded} loaded`);
         cursor = page.cursor;
       } while(cursor);
     }
+    setLoad('Grouping duplicates…');
     const byName = {};
     Object.values(byId).forEach(it => { const k=it.name.toLowerCase(); (byName[k]=byName[k]||[]).push(it); });
     dupGroups = Object.entries(byName)
