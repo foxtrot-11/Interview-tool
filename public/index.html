@@ -108,6 +108,13 @@
   .dup-verify-box .vok{color:var(--success)}
   .dup-verify-box .vbad{color:var(--warning)}
   .dim{color:var(--text-dim)}
+  .dup-frow{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+  .dup-inc{display:flex;align-items:center;gap:5px;cursor:pointer}
+  .dup-inc input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+  .dup-edit{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 7px;font-family:var(--font-mono);font-size:11px;min-width:120px;max-width:280px}
+  .dup-edit:focus{outline:none;border-color:var(--accent)}
+  .dup-edit:disabled{opacity:0.45}
+  .dup-fixed{color:var(--text);font-size:11px}
   .dup-refresh-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:var(--radius);padding:6px 14px;font-family:var(--font-mono);font-size:11px;cursor:pointer;margin-left:auto}
   .dup-refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
 
@@ -2746,30 +2753,21 @@ async function bootCheck(){
 }
 
 
-// ════════════════════════════════════════════════════
-// DUPLICATES ENGINE
-// ════════════════════════════════════════════════════
-
-// Columns skipped during merge comparison (system/read-only/formula)
 /* ============================================================
-   DUPLICATE REVIEW ENGINE  (rework 2026-06-25)  [DUPV2]
+   DUPLICATE REVIEW ENGINE  (rework 2026-06-30)  [DUPV2]
    Human-in-the-loop screening tool. Nothing is auto-merged.
-   - groups by normalised name across the configured boards
-   - classifies each group into a TYPE (A–E) with a badge
-   - human picks the KEEPER (good record pre-selected) and
-     PREVIEWS every change before approving
-   - after merge, re-reads the kept row and VERIFIES nothing broke
+   v2: empty values never logged; preview values are editable;
+       deletion verified by item state (+ Recycle Bin note).
    ============================================================ */
 
-// Status label IDs (the numeric "index" stored inside a status column's value JSON)
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
   APPROVED:2, REJECTED:3, ALLSTAR:4, EXCLUSIVE:105, RETIRED:0,
   DELETE:6, OUTSIDE:1, EVERNOTE:11, DUPLICATE:12 };
 const STATUS_DUPLICATE = ST.DUPLICATE;
 const STATUS_EVERNOTE  = ST.EVERNOTE;
 const NOTES_COL = 'long_text_mktg36ee';
+const EDITABLE = new Set(['text','long_text','numbers','date','color','dropdown','email']);
 
-// Keeper preference — higher rank = better record to KEEP. (drives the pre-pick)
 function statusRank(idx){
   switch(idx){
     case ST.APPROVED: case ST.EXCLUSIVE: case ST.ALLSTAR: return 100;
@@ -2786,7 +2784,6 @@ function statusRank(idx){
 }
 const isGood = idx => idx !== ST.DUPLICATE && idx !== ST.EVERNOTE && idx != null;
 
-// Pure placeholder names that stand in for DIFFERENT people — never group/merge these.
 function isPlaceholderName(name){
   const n = (name||'').trim().toLowerCase();
   if(!n) return true;
@@ -2795,24 +2792,47 @@ function isPlaceholderName(name){
   return false;
 }
 
-// App-specific columns we never copy (status of keeper is sacrosanct; auto/biopic cols; dup trigger; system dates)
+// True when a column value is effectively empty (covers empty dropdown {"ids":[]},
+// empty status null, empty arrays/objects, blank strings).
+function isEmptyVal(v){
+  if(v==null) return true;
+  const s=String(v).trim();
+  if(!s || s==='null' || s==='{}' || s==='[]' || s==='""') return true;
+  try {
+    const o=JSON.parse(s);
+    if(o && Array.isArray(o.ids) && o.ids.length===0) return true;
+    if(o && Array.isArray(o.labels) && o.labels.length===0) return true;
+    if(o && typeof o==='object' && !Array.isArray(o) && Object.keys(o).length===0) return true;
+  } catch {}
+  return false;
+}
+const hasVal = c => !!(c && (((c.text||'').trim()!=='') || !isEmptyVal(c.value)));
+
 const SKIP_COLS = new Set(['name','label','sous__l_ments','color_mm26br5p',
   'status0','dup__of_biopic_selector','dup__of_bio_pic_status','dup__of_biopic_status',
   'date_mm2cq4tj','date_mm2n67q2']);
-// Column TYPES that are read-only / derived / relational / handled elsewhere (files via photo merge)
 const SKIP_TYPES = new Set(['formula','mirror','button','subtasks','people','board_relation',
   'auto_number','creation_log','last_updated','progress','item_id','dependency','time_tracking','doc','file']);
 
-let dupGroups = [];     // [{gid,name,placeholder,items:[{id,name,created_at,statusIdx,board}],keeperId,done}]
+let dupGroups = [];
 let dupFilter = 'ALL';
-let COL_META = null;    // {type:{colId:type}, title:{colId:title}}
+let COL_META = null;   // {type, title, labels}
 
 async function buildColMeta(){
   if(COL_META) return COL_META;
-  const d = await gql(`{boards(ids:[${MAIN_BOARD_ID}]){columns{id title type}}}`);
-  const type={}, title={};
-  (d.boards[0].columns||[]).forEach(c => { type[c.id]=c.type; title[c.id]=c.title; });
-  COL_META = {type,title};
+  const d = await gql(`{boards(ids:[${MAIN_BOARD_ID}]){columns{id title type settings_str}}}`);
+  const type={}, title={}, labels={};
+  (d.boards[0].columns||[]).forEach(c => {
+    type[c.id]=c.type; title[c.id]=c.title;
+    if(c.type==='color' || c.type==='dropdown'){
+      try {
+        const s=JSON.parse(c.settings_str||'{}');
+        if(c.type==='color' && s.labels)      labels[c.id]=Object.values(s.labels).filter(Boolean);
+        else if(c.type==='dropdown' && Array.isArray(s.labels)) labels[c.id]=s.labels.map(l=>l.name).filter(Boolean);
+      } catch {}
+    }
+  });
+  COL_META = {type,title,labels};
   return COL_META;
 }
 
@@ -2827,7 +2847,6 @@ function fileEntries(item, colId){
   try { return JSON.parse(cv.value).files || []; } catch { return []; }
 }
 
-// ── Load & group ──
 async function loadDuplicates(){
   const container = document.getElementById('dup-groups-container');
   const summary   = document.getElementById('dup-summary');
@@ -2835,7 +2854,7 @@ async function loadDuplicates(){
   summary.textContent = '';
   try {
     await buildColMeta();
-    const boards = [...new Set([String(MAIN_BOARD_ID), String(BATCH_BOARD_ID)])]; // de-dupe identical board ids
+    const boards = [...new Set([String(MAIN_BOARD_ID), String(BATCH_BOARD_ID)])];
     const byId = {};
     for(const boardId of boards){
       let cursor = null;
@@ -2844,7 +2863,7 @@ async function loadDuplicates(){
         const data = await gql(`{boards(ids:[${boardId}]){items_page(${cp}){cursor items{id name created_at column_values(ids:["label"]){value}}}}}`);
         const page = data.boards[0].items_page;
         page.items.forEach(it => {
-          if(byId[it.id]) return; // de-dupe by item id (same board listed twice / overlap)
+          if(byId[it.id]) return;
           let statusIdx = null;
           try { statusIdx = JSON.parse(it.column_values[0].value)?.index ?? null; } catch {}
           byId[it.id] = { id: it.id, name: (it.name||'').trim(), created_at: it.created_at, statusIdx, board: boardId };
@@ -2852,28 +2871,15 @@ async function loadDuplicates(){
         cursor = page.cursor;
       } while(cursor);
     }
-
-    // group by normalised name
     const byName = {};
-    Object.values(byId).forEach(it => {
-      const key = it.name.toLowerCase();
-      (byName[key] = byName[key] || []).push(it);
-    });
-
+    Object.values(byId).forEach(it => { const k=it.name.toLowerCase(); (byName[k]=byName[k]||[]).push(it); });
     dupGroups = Object.entries(byName)
-      .filter(([,g]) => g.length > 1)               // any name shared by 2+ records
+      .filter(([,g]) => g.length > 1)
       .map(([key,g], i) => {
         const items = g.sort((a,b)=> new Date(a.created_at)-new Date(b.created_at));
-        return { gid:'g'+i+'_'+items[0].id, name: items[0].name, placeholder: isPlaceholderName(items[0].name),
-                 items, keeperId: null, done:false };
+        return { gid:'g'+i+'_'+items[0].id, name: items[0].name, placeholder: isPlaceholderName(items[0].name), items, keeperId:null, done:false };
       });
-
-    if(!dupGroups.length){
-      container.innerHTML = '<div class="dup-empty">✓ No duplicate name-groups found</div>';
-      summary.innerHTML = '';
-      return;
-    }
-    // default keeper for each group
+    if(!dupGroups.length){ container.innerHTML = '<div class="dup-empty">✓ No duplicate name-groups found</div>'; summary.innerHTML=''; return; }
     dupGroups.forEach(g => { if(!g.placeholder) g.keeperId = defaultKeeperId(g); });
     renderDupGroups();
   } catch(e){
@@ -2907,20 +2913,14 @@ function setDupFilter(f){ dupFilter=f; renderDupGroups(); }
 function renderDupGroups(){
   const container = document.getElementById('dup-groups-container');
   const summary   = document.getElementById('dup-summary');
-  // tally by type
   const tally = {A:0,B:0,C:0,D:0,E:0};
   dupGroups.forEach(g => { if(!g.done) tally[classifyType(g).type]++; });
   const total = Object.values(tally).reduce((a,b)=>a+b,0);
   const fbtn = (key,label) => `<button class="dup-filter-btn ${dupFilter===key?'active':''}" onclick="setDupFilter('${key}')">${label}</button>`;
   summary.innerHTML =
     `<span style="margin-right:8px">${total} to review</span>`+
-    fbtn('ALL','All')+
-    fbtn('B','⚠ Confirm '+tally.B)+
-    fbtn('C','All-dup '+tally.C)+
-    fbtn('A','Clean '+tally.A)+
-    fbtn('E','Clash '+tally.E)+
-    fbtn('D','Locked '+tally.D);
-
+    fbtn('ALL','All')+ fbtn('B','⚠ Confirm '+tally.B)+ fbtn('C','All-dup '+tally.C)+
+    fbtn('A','Clean '+tally.A)+ fbtn('E','Clash '+tally.E)+ fbtn('D','Locked '+tally.D);
   container.innerHTML = '';
   let shown = 0;
   dupGroups.forEach(group => {
@@ -2930,8 +2930,7 @@ function renderDupGroups(){
     shown++;
     const gid = group.gid;
     const div = document.createElement('div');
-    div.className = 'dup-group';
-    div.id = `dup-group-${gid}`;
+    div.className = 'dup-group'; div.id = `dup-group-${gid}`;
     const oldest = group.items[0];
     div.innerHTML = `
       <div class="dup-group-header">
@@ -2953,9 +2952,7 @@ function renderDupGroups(){
     container.appendChild(div);
     loadGroupDetails(gid);
   });
-  if(!shown){
-    container.innerHTML = `<div class="dup-empty">No groups in this filter.</div>`;
-  }
+  if(!shown) container.innerHTML = `<div class="dup-empty">No groups in this filter.</div>`;
 }
 
 async function loadGroupDetails(gid){
@@ -2967,8 +2964,7 @@ async function loadGroupDetails(gid){
     const ids = group.items.map(it=>it.id).join(',');
     const data = await gql(`{items(ids:[${ids}]){id name created_at group{id title} assets{id name file_extension public_url} column_values(ids:["label","text_mknceqty","text_mkncbdr1","dropdown_mknbe0p0","date_of_birth_mkncwsrj","${NOTES_COL}","files_mkncw5nm","file_mkp1n4bt"]){id text value}}}`);
     const byId={}; data.items.forEach(it=>byId[it.id]=it);
-    group.items.forEach(it=>{ if(byId[it.id]){ it.detail=byId[it.id]; } });
-
+    group.items.forEach(it=>{ if(byId[it.id]) it.detail=byId[it.id]; });
     wrap.innerHTML = '';
     group.items.forEach(it => {
       const d = it.detail || {};
@@ -3010,19 +3006,12 @@ async function loadGroupDetails(gid){
 }
 
 function selectKeeper(gid, itemId){
-  const group = getDupGroup(gid);
-  if(!group) return;
-  group.keeperId = itemId;
-  group._plan = null; // invalidate any prior preview
-  group.items.forEach(it=>{
-    const c = document.getElementById(`dup-card-${gid}-${it.id}`);
-    if(c) c.classList.toggle('is-keeper', it.id===itemId);
-  });
-  const pv = document.getElementById(`dup-preview-${gid}`);
-  if(pv){ pv.classList.remove('visible'); pv.innerHTML=''; }
+  const group = getDupGroup(gid); if(!group) return;
+  group.keeperId = itemId; group._plan = null;
+  group.items.forEach(it=>{ const c=document.getElementById(`dup-card-${gid}-${it.id}`); if(c) c.classList.toggle('is-keeper', it.id===itemId); });
+  const pv=document.getElementById(`dup-preview-${gid}`); if(pv){ pv.classList.remove('visible'); pv.innerHTML=''; }
 }
 
-// ── Build a merge PLAN (no writes) ──
 async function computePlan(group){
   const meta = await buildColMeta();
   const ids  = group.items.map(i=>i.id).join(',');
@@ -3034,16 +3023,15 @@ async function computePlan(group){
   const sources = group.items.filter(i=>i.id!==keeperId).map(i=>byId[i.id]).filter(Boolean)
                     .sort((a,b)=> new Date(a.created_at)-new Date(b.created_at));
   const kmap={}; keeper.column_values.forEach(c=>kmap[c.id]=c);
-  const hasVal = c => c && ((c.text||'').trim() || (c.value && c.value!=='null' && c.value!=='{}'));
 
   const fills=[], conflicts=[], filled={};
   for(const s of sources){
     s.column_values.forEach(sc=>{
       const type = meta.type[sc.id];
-      if(sc.id===NOTES_COL) return;            // notes handled separately
+      if(sc.id===NOTES_COL) return;
       if(SKIP_COLS.has(sc.id) || SKIP_TYPES.has(type)) return;
+      if(!hasVal(sc)) return;                     // empty source never fills or logs
       const sText=(sc.text||'').trim();
-      if(!hasVal(sc)) return;
       const kc=kmap[sc.id];
       if(!hasVal(kc) && filled[sc.id]===undefined){
         filled[sc.id]=sText;
@@ -3051,52 +3039,32 @@ async function computePlan(group){
       } else {
         const keeperText = hasVal(kc) ? (kc.text||'').trim() : filled[sc.id];
         if(keeperText !== sText)
-          conflicts.push({colId:sc.id, title:meta.title[sc.id]||sc.id, keeperText, sourceText:sText, fromId:s.id});
+          conflicts.push({colId:sc.id, title:meta.title[sc.id]||sc.id, keeperText, sourceText:sText, sourceValue:sc.value, type, fromId:s.id});
       }
     });
   }
 
-  // notes merge
+  // general-notes text differences (kept separately; always appended as audit)
   let notesBase = (kmap[NOTES_COL]?.text || '').trim();
   let notesFilledFrom = null;
   const notesConflictLines = [];
   for(const s of sources){
-    const sc = s.column_values.find(c=>c.id===NOTES_COL);
-    const sText = (sc?.text||'').trim();
+    const sText = (s.column_values.find(c=>c.id===NOTES_COL)?.text || '').trim();
     if(!sText) continue;
     if(!notesBase){ notesBase = sText; notesFilledFrom = s.id; }
     else if(sText !== notesBase) notesConflictLines.push(`[DUPLICATE INFO — General Notes (from id ${s.id})]: ${sText}`);
   }
-  const fieldConflictLines = conflicts.map(c=>`[DUPLICATE INFO — ${c.title}: ${c.sourceText} (from id ${c.fromId})]`);
-  const allConflictLines = [...fieldConflictLines, ...notesConflictLines];
-  let notesWrite = null;
-  if(allConflictLines.length){
-    const stamp = `[DUPLICATE MERGE ${new Date().toISOString().slice(0,10)}]`;
-    notesWrite = (notesBase ? notesBase + '\n\n' : '') + stamp + '\n' + allConflictLines.join('\n');
-  } else if(notesFilledFrom){
-    notesWrite = notesBase;
-  }
 
-  // photo plan (dry)
   const photo = photoPlanDry(keeper, sources);
-
-  // pre-snapshot of keeper for verification
-  const nonEmpty = keeper.column_values.filter(c=>{
-    const t=meta.type[c.id];
-    if(SKIP_TYPES.has(t)) return false;
-    return hasVal(c);
-  }).map(c=>c.id);
+  const nonEmpty = keeper.column_values.filter(c=>{ const t=meta.type[c.id]; if(SKIP_TYPES.has(t)) return false; return hasVal(c); }).map(c=>c.id);
   const preSnapshot = {
-    statusIdx: statusIdxOf(keeper),
-    statusText: (kmap['label']?.text||''),
+    statusIdx: statusIdxOf(keeper), statusText: (kmap['label']?.text||''),
     groupId: keeper.group?.id || null,
     headCount: fileEntries(keeper,'files_mkncw5nm').length,
-    extraCount: fileEntries(keeper,'file_mkp1n4bt').length,
-    nonEmpty
+    extraCount: fileEntries(keeper,'file_mkp1n4bt').length, nonEmpty
   };
-
   return {keeperId, keeperName:keeper.name, sources:sources.map(s=>({id:s.id,name:s.name,created_at:s.created_at})),
-          fills, conflicts, notesWrite, notesConflictLines, photo, preSnapshot};
+          fills, conflicts, notesBase, notesFilledFrom, notesConflictLines, photo, preSnapshot};
 }
 
 function assetMap(item){ const m={}; (item.assets||[]).forEach(a=>m[String(a.id)]=a); return m; }
@@ -3104,134 +3072,189 @@ function dedupKey(entry, amap){ const a=amap[String(entry.assetId)]; if(a&&a.fil
 
 function photoPlanDry(keeper, sources){
   const kAssets=assetMap(keeper);
-  const kHead=fileEntries(keeper,'files_mkncw5nm');
-  const kExtra=fileEntries(keeper,'file_mkp1n4bt');
-  const seen=new Set([...kHead,...kExtra].map(e=>dedupKey(e,kAssets)));
-  let portHeadshot=false, headFromId=null, add=0, orphan=0, headFilled=kHead.length>0;
+  const seen=new Set([...fileEntries(keeper,'files_mkncw5nm'),...fileEntries(keeper,'file_mkp1n4bt')].map(e=>dedupKey(e,kAssets)));
+  let portHeadshot=false, headFromId=null, add=0, orphan=0, headFilled=fileEntries(keeper,'files_mkncw5nm').length>0;
   for(const s of sources){
-    const sA=assetMap(s);
-    const live=e=>sA[String(e.assetId)]!==undefined;
-    const sHead=fileEntries(s,'files_mkncw5nm');
-    const sExtra=fileEntries(s,'file_mkp1n4bt');
+    const sA=assetMap(s); const live=e=>sA[String(e.assetId)]!==undefined;
     let toExtras=[];
-    for(const h of sHead){
+    for(const h of fileEntries(s,'files_mkncw5nm')){
       if(!live(h)){orphan++; continue;}
       if(!headFilled && !portHeadshot){ const k=dedupKey(h,sA); if(!seen.has(k)){ portHeadshot=true; headFromId=s.id; headFilled=true; seen.add(k); add++; } }
       else toExtras.push(h);
     }
-    toExtras=toExtras.concat(sExtra);
+    toExtras=toExtras.concat(fileEntries(s,'file_mkp1n4bt'));
     for(const e of toExtras){ if(!live(e)){orphan++; continue;} const k=dedupKey(e,sA); if(seen.has(k))continue; seen.add(k); add++; }
   }
   return {portHeadshot, headFromId, addCount:add, orphan};
 }
 
+// ── editable preview controls ──
+function editControl(prefix, gid, colId, type, text, labels){
+  const idAttr=`id="${prefix}-${gid}-${colId}"`; const v=escapeHtml(text||'');
+  if(type==='color'){
+    const opts=(labels||[]).map(l=>`<option value="${escapeHtml(l)}" ${l===text?'selected':''}>${escapeHtml(l)}</option>`).join('');
+    return `<select class="dup-edit" ${idAttr}><option value="">(blank)</option>${opts}</select>`;
+  }
+  if(type==='date')     return `<input class="dup-edit" type="date" ${idAttr} value="${v}">`;
+  if(type==='numbers')  return `<input class="dup-edit" type="number" step="any" ${idAttr} value="${v}">`;
+  if(type==='dropdown') return `<input class="dup-edit" type="text" ${idAttr} value="${v}" title="comma-separated labels">`;
+  return `<input class="dup-edit" type="text" ${idAttr} value="${v}">`;
+}
+function cfToggle(gid, colId){
+  const sel=document.getElementById(`cf-choice-${gid}-${colId}`); const inp=document.getElementById(`cf-val-${gid}-${colId}`);
+  if(sel && inp) inp.disabled = (sel.value==='keep');
+}
+function buildApiValue(type, text, rawValue, validLabels){
+  text=(text||'').trim();
+  if(type==='color')    return text ? {label:text} : null;
+  if(type==='dropdown'){ const labs=text.split(',').map(s=>s.trim()).filter(Boolean).filter(l=>!validLabels||validLabels.includes(l)); return labs.length?{labels:labs}:null; }
+  if(type==='date')     return text ? {date:text} : null;
+  if(type==='numbers')  return text!=='' ? text : null;
+  if(type==='email')    return text ? {email:text, text:text} : null;
+  if(type==='long_text')return text!=='' ? {text:text} : null;
+  if(type==='text')     return text!=='' ? text : null;
+  try { return rawValue ? JSON.parse(rawValue) : null; } catch { return null; }
+}
+
+// Read the (possibly human-edited) preview controls and build the writes + notes
+function readPreviewEdits(gid, plan, meta){
+  const writeVals={}; const notesLines=[];
+  plan.fills.forEach(f=>{
+    const inc=document.getElementById(`fx-inc-${gid}-${f.colId}`);
+    if(inc && !inc.checked) return;                       // human unchecked → skip
+    let val;
+    if(EDITABLE.has(f.type)){ const ctl=document.getElementById(`fx-val-${gid}-${f.colId}`); val=buildApiValue(f.type, ctl?ctl.value:f.text, f.value, meta.labels?.[f.colId]); }
+    else { try{ val=JSON.parse(f.value);}catch{ val=f.text; } }
+    if(val!==null && val!==undefined) writeVals[f.colId]=val;
+  });
+  plan.conflicts.forEach(c=>{
+    const sel=document.getElementById(`cf-choice-${gid}-${c.colId}`);
+    const choice = sel ? sel.value : 'keep';
+    if(choice==='keep'){
+      notesLines.push(`[DUPLICATE INFO — ${c.title}: ${c.sourceText} (from id ${c.fromId})]`);
+    } else {
+      const ctl=document.getElementById(`cf-val-${gid}-${c.colId}`);
+      const text = ctl ? ctl.value : c.sourceText;
+      let val = EDITABLE.has(c.type) ? buildApiValue(c.type, text, c.sourceValue, meta.labels?.[c.colId])
+                                     : (()=>{ try{return JSON.parse(c.sourceValue);}catch{return text;} })();
+      if(val!==null && val!==undefined){ writeVals[c.colId]=val; notesLines.push(`[DUPLICATE INFO — ${c.title}: ${c.keeperText} (replaced on keeper)]`); }
+      else notesLines.push(`[DUPLICATE INFO — ${c.title}: ${c.sourceText} (from id ${c.fromId})]`);
+    }
+  });
+  const extra=[...(plan.notesConflictLines||[]), ...notesLines];
+  let notesText=null;
+  if(extra.length){ const stamp=`[DUPLICATE MERGE ${new Date().toISOString().slice(0,10)}]`; notesText=(plan.notesBase?plan.notesBase+'\n\n':'')+stamp+'\n'+extra.join('\n'); }
+  else if(plan.notesFilledFrom) notesText=plan.notesBase;
+  return {writeVals, notesText};
+}
+
 function previewMerge(gid){
   const group = getDupGroup(gid);
-  const pv = document.getElementById(`dup-preview-${gid}`);
+  const pv  = document.getElementById(`dup-preview-${gid}`);
   const btn = document.getElementById(`merge-btn-${gid}`);
+  const log = document.getElementById(`dup-log-${gid}`);
   if(!group || !pv) return;
   pv.classList.add('visible');
   pv.innerHTML = '<div style="padding:10px;color:var(--text-muted);font-size:12px">Computing preview…</div>';
-  btn.disabled = true;
-  computePlan(group).then(plan=>{
+  if(log){ log.className='dup-merge-log visible'; log.innerHTML='<span class="log-warn">Computing preview… reading all columns for each record.</span>\n'; }
+  btn.disabled = true; btn.textContent = 'Computing…';
+  buildColMeta().then(meta => computePlan(group).then(plan=>{
     group._plan = plan;
-    const keeperRec = group.items.find(i=>i.id===plan.keeperId);
     const fillsHtml = plan.fills.length
-      ? plan.fills.map(f=>`<li><b>${escapeHtml(f.title)}</b> ← "${escapeHtml(f.text.slice(0,80))}" <span class="dim">(from id ${f.fromId})</span></li>`).join('')
+      ? plan.fills.map(f=>{
+          const editable=EDITABLE.has(f.type);
+          const ctl = editable ? editControl('fx-val',gid,f.colId,f.type,f.text,meta.labels?.[f.colId])
+                               : `<span class="dup-fixed">"${escapeHtml(f.text.slice(0,80))}"</span>`;
+          return `<li class="dup-frow"><label class="dup-inc"><input type="checkbox" id="fx-inc-${gid}-${f.colId}" checked><b>${escapeHtml(f.title)}</b></label>${ctl}<span class="dim">from ${f.fromId}${editable?'':' · applied as-is'}</span></li>`;
+        }).join('')
       : '<li class="dim">No empty fields to fill.</li>';
     const confHtml = plan.conflicts.length
-      ? plan.conflicts.map(c=>`<li><b>${escapeHtml(c.title)}</b>: keep "${escapeHtml(c.keeperText.slice(0,40))}" · log "${escapeHtml(c.sourceText.slice(0,40))}" <span class="dim">(id ${c.fromId})</span></li>`).join('')
+      ? plan.conflicts.map(c=>{
+          const editable=EDITABLE.has(c.type);
+          const sel=`<select class="dup-edit" id="cf-choice-${gid}-${c.colId}" onchange="cfToggle('${gid}','${c.colId}')">`+
+                    `<option value="keep" selected>Keep: "${escapeHtml(c.keeperText.slice(0,40))}"</option>`+
+                    `<option value="use">Use dup: "${escapeHtml(c.sourceText.slice(0,40))}"</option>`+
+                    `${editable?'<option value="custom">Custom…</option>':''}</select>`;
+          const input = editable ? `<input class="dup-edit" type="text" id="cf-val-${gid}-${c.colId}" value="${escapeHtml(c.sourceText)}" disabled>` : '';
+          return `<li class="dup-frow"><b>${escapeHtml(c.title)}</b>${sel}${input}<span class="dim">losing value → Notes</span></li>`;
+        }).join('')
       : '<li class="dim">None.</li>';
     const photoLine = `${plan.photo.portHeadshot?`Port headshot from id ${plan.photo.headFromId}; `:'Keep keeper\'s headshot; '}add ${plan.photo.addCount} extra photo(s)`+(plan.photo.orphan?`; ${plan.photo.orphan} orphaned skipped`:'');
     const delHtml = plan.sources.map(s=>`${escapeHtml(s.name)} <span class="dim">(id ${s.id})</span>`).join(', ');
     pv.innerHTML = `
       <div class="dup-preview-box">
-        <div class="dup-preview-h">Preview — review before approving</div>
-        <div class="dup-preview-row"><span class="k">KEEP</span> ${escapeHtml(plan.keeperName)} <span class="dim">(id ${plan.keeperId}, status ${escapeHtml(keeperRec? (keeperRec.detail?.column_values?.find(c=>c.id==='label')?.text||'') : '')})</span></div>
+        <div class="dup-preview-h">Preview — edit anything below, then approve</div>
+        <div class="dup-preview-row"><span class="k">KEEP</span> ${escapeHtml(plan.keeperName)} <span class="dim">(id ${plan.keeperId})</span></div>
         <div class="dup-preview-row"><span class="k">DELETE</span> ${delHtml}</div>
-        <div class="dup-preview-sec">Fill empty fields (${plan.fills.length})<ul>${fillsHtml}</ul></div>
-        <div class="dup-preview-sec">Conflicts → logged to General Notes (${plan.conflicts.length+plan.notesConflictLines.length})<ul>${confHtml}</ul></div>
+        <div class="dup-preview-sec">Fill empty fields (${plan.fills.length}) — uncheck to skip, or edit the value<ul>${fillsHtml}</ul></div>
+        <div class="dup-preview-sec">Conflicts (${plan.conflicts.length}) — choose which value the kept record gets<ul>${confHtml}</ul></div>
         <div class="dup-preview-sec">Photos<ul><li>${escapeHtml(photoLine)}</li></ul></div>
         <div class="dup-preview-actions">
           <button class="merge-btn" onclick="executeMerge('${gid}')">✓ Confirm &amp; merge</button>
           <button class="skip-btn" onclick="cancelPreview('${gid}')">Cancel</button>
         </div>
       </div>`;
-    btn.disabled = false;
-  }).catch(e=>{
+    btn.disabled=false; btn.textContent='Preview changes →';
+    if(log){ log.innerHTML+='<span class="log-ok">Preview ready — review and edit above.</span>\n'; }
+  })).catch(e=>{
     pv.innerHTML = `<div class="log-err" style="padding:10px;font-size:12px">Preview failed: ${escapeHtml(e.message)}</div>`;
-    btn.disabled = false;
+    btn.disabled=false; btn.textContent='Preview changes →';
   });
 }
-function cancelPreview(gid){
-  const pv=document.getElementById(`dup-preview-${gid}`);
-  if(pv){ pv.classList.remove('visible'); pv.innerHTML=''; }
-}
+function cancelPreview(gid){ const pv=document.getElementById(`dup-preview-${gid}`); if(pv){ pv.classList.remove('visible'); pv.innerHTML=''; } }
 
-// ── Execute the approved plan, then verify ──
 async function executeMerge(gid){
   const group = getDupGroup(gid);
   const plan  = group && group._plan;
   const log   = document.getElementById(`dup-log-${gid}`);
   const pv    = document.getElementById(`dup-preview-${gid}`);
   if(!group || !plan){ alert('Please run Preview again.'); return; }
-  // safety: keeper + sources must all share the normalised name (placeholders already excluded)
   const names = new Set(group.items.map(it=>it.name.trim().toLowerCase()));
   if(names.size!==1){ alert('Safety stop: names differ ('+[...names].join(', ')+'). Aborted.'); return; }
-  if(pv){ pv.querySelectorAll('button').forEach(b=>b.disabled=true); }
+  if(pv){ pv.querySelectorAll('button,select,input').forEach(b=>b.disabled=true); }
   log.className='dup-merge-log visible'; log.innerHTML='';
   const addLog=(m,c='')=>{ log.innerHTML+=`<span class="${c}">${escapeHtml(m)}</span>\n`; log.scrollTop=log.scrollHeight; };
-
   try {
     const meta = await buildColMeta();
     const keeperRec = group.items.find(i=>i.id===plan.keeperId);
     const keeperBoard = keeperRec.board;
     addLog(`KEEP id ${plan.keeperId} (${plan.keeperName}). Deleting ${plan.sources.length} record(s) after merge.`);
 
-    // 1) field writes (fill-empty-only), status/dropdown by label, create_labels_if_missing:false
-    const writeVals={};
-    plan.fills.forEach(f=>{
-      if(f.type==='color')        writeVals[f.colId]={label:f.text};
-      else if(f.type==='dropdown')writeVals[f.colId]={labels:f.text.split(',').map(s=>s.trim()).filter(Boolean)};
-      else { try{ writeVals[f.colId]=JSON.parse(f.value); }catch{ writeVals[f.colId]=f.text; } }
-    });
-    if(plan.notesWrite!=null) writeVals[NOTES_COL]={text:plan.notesWrite};
+    const {writeVals, notesText} = readPreviewEdits(gid, plan, meta);   // honours human edits
+    if(notesText!=null) writeVals[NOTES_COL]={text:notesText};
 
     if(Object.keys(writeVals).length){
       addLog(`Writing ${Object.keys(writeVals).length} field(s) to keeper…`);
       await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
         {i:plan.keeperId, b:keeperBoard, c:JSON.stringify(writeVals)});
       addLog('  ✓ Fields written','log-ok');
-    } else addLog('  No empty fields to fill.');
+    } else addLog('  No field changes to write.');
 
-    // 2) photos
     addLog('Merging photos…');
     const sourceRecs = plan.sources.map(s=>group.items.find(i=>i.id===s.id));
     const pr = await mergePhotosExecute(plan.keeperId, sourceRecs, addLog);
     addLog(`  ✓ ${pr.added} photo(s) added${pr.skippedDead?`, ${pr.skippedDead} orphaned skipped`:''}`, 'log-ok');
 
-    // 3) comment + delete each source
     for(const s of plan.sources){
       const body=`MERGED INTO ${plan.keeperId} (${plan.keeperName}) on ${new Date().toISOString().slice(0,10)}. Conflicts logged in the kept record's General Notes.`;
       try { await gql(`mutation($i:ID!,$b:String!){create_update(item_id:$i,body:$b){id}}`,{i:s.id,b:body}); }
       catch(e){ addLog(`  (comment on ${s.id} failed: ${e.message})`,'log-warn'); }
       await gql(`mutation{delete_item(item_id:${s.id}){id}}`);
-      addLog(`  ✓ Deleted ${s.name} (${s.id})`,'log-ok');
+      addLog(`  ✓ Deleted ${s.name} (${s.id}) — recoverable in monday's Recycle Bin`,'log-ok');
     }
 
-    // 4) verify
     addLog('Verifying kept record…');
     const checks = await verifyMerge(plan);
     const ok = checks.every(c=>c[1]);
     renderVerify(gid, checks, ok);
-    addLog(ok?'✓ Verification passed':'⚠ Verification flagged something — see panel', ok?'log-ok':'log-warn');
+    addLog(ok?'✓ Verification passed — kept record looks good.':'⚠ One check needs a look — see panel above.', ok?'log-ok':'log-warn');
 
     group.done = true;
     const card=document.getElementById(`dup-group-${gid}`);
-    if(card){ card.style.opacity='0.6'; card.querySelectorAll('.dup-actions button,.dup-preview button,.dup-keeper-pick input').forEach(b=>b.disabled=true); }
+    if(card){ card.style.opacity='0.6'; card.querySelectorAll('.dup-actions button,.dup-keeper-pick input').forEach(b=>b.disabled=true); }
   } catch(e){
     addLog(`✗ Error: ${e.message}`,'log-err');
-    if(pv){ pv.querySelectorAll('button').forEach(b=>b.disabled=false); }
+    if(pv){ pv.querySelectorAll('button,select,input').forEach(b=>b.disabled=false); }
     console.error(e);
   }
 }
@@ -3240,19 +3263,19 @@ async function mergePhotosExecute(keeperId, sources, addLog){
   const kd = await gql(`{items(ids:[${keeperId}]){assets{id name file_size file_extension} column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
   const ki=kd.items[0]; const kA=assetMap(ki);
   const ent=colId=>{const cv=ki.column_values.find(c=>c.id===colId); if(!cv||!cv.value)return[]; try{return JSON.parse(cv.value).files||[];}catch{return[];}};
-  let keeperHead=ent('files_mkncw5nm'); const keeperExtra=ent('file_mkp1n4bt');
-  const seen=new Set([...keeperHead,...keeperExtra].map(e=>dedupKey(e,kA)));
+  let keeperHead=ent('files_mkncw5nm');
+  const seen=new Set([...keeperHead,...ent('file_mkp1n4bt')].map(e=>dedupKey(e,kA)));
   let added=0, skippedDead=0, headFilled=keeperHead.length>0;
   for(const s of sources){
     const sd=await gql(`{items(ids:[${s.id}]){assets{id name file_size file_extension} column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
     const si=sd.items[0]; const sA=assetMap(si);
     const sEnt=colId=>{const cv=si.column_values.find(c=>c.id===colId); if(!cv||!cv.value)return[]; try{return JSON.parse(cv.value).files||[];}catch{return[];}};
     const live=e=>sA[String(e.assetId)]!==undefined;
-    const sHead=sEnt('files_mkncw5nm'); let toExtras=[];
-    for(const h of sHead){
+    let toExtras=[];
+    for(const h of sEnt('files_mkncw5nm')){
       if(!live(h)){skippedDead++; addLog(`  ~ orphaned headshot on ${s.id} skipped`,'log-warn'); continue;}
       if(!headFilled){ const k=dedupKey(h,sA); if(!seen.has(k)){ await moveAssetToColumn(keeperId,'files_mkncw5nm',h.assetId); seen.add(k); headFilled=true; added++; addLog(`  + headshot ported from ${s.id} (${sA[String(h.assetId)].name})`,'log-ok'); } }
-      else toExtras.push(h);  // keeper already has a headshot → dup's headshot becomes an extra
+      else toExtras.push(h);
     }
     toExtras=toExtras.concat(sEnt('file_mkp1n4bt'));
     for(const e of toExtras){
@@ -3266,13 +3289,10 @@ async function mergePhotosExecute(keeperId, sources, addLog){
 
 async function verifyMerge(plan){
   const meta = await buildColMeta();
-  const d = await gql(`{items(ids:[${plan.keeperId}]){id group{id} assets{id} column_values{id text value}}}`);
-  const post = d.items[0];
-  const pmap={}; post.column_values.forEach(c=>pmap[c.id]=c);
-  const hasVal=c=>c&&((c.text||'').trim()||(c.value&&c.value!=='null'&&c.value!=='{}'));
+  const d = await gql(`{items(ids:[${plan.keeperId}]){id group{id} column_values{id text value}}}`);
+  const post = d.items[0]; const pmap={}; post.column_values.forEach(c=>pmap[c.id]=c);
   const checks=[];
-  const postStatus=statusIdxOf(post);
-  checks.push(['Keeper status unchanged', postStatus===plan.preSnapshot.statusIdx, plan.preSnapshot.statusText]);
+  checks.push(['Keeper status unchanged', statusIdxOf(post)===plan.preSnapshot.statusIdx, plan.preSnapshot.statusText]);
   checks.push(['Keeper still in its group', (post.group?.id||null)===plan.preSnapshot.groupId, '']);
   const lost=[];
   plan.preSnapshot.nonEmpty.forEach(cid=>{ if(cid===NOTES_COL) return; if(!hasVal(pmap[cid])) lost.push(meta.title[cid]||cid); });
@@ -3283,25 +3303,26 @@ async function verifyMerge(plan){
   const postExtra=fileEntries(post,'file_mkp1n4bt').length;
   checks.push(['Extra photos not lost', postExtra>=plan.preSnapshot.extraCount, postExtra+' extra(s) (was '+plan.preSnapshot.extraCount+')']);
   if(plan.conflicts.length || plan.notesConflictLines.length){
-    const notes=(pmap[NOTES_COL]?.text||'');
-    checks.push(['Conflicts logged to Notes', notes.includes('[DUPLICATE'), 'stamp present']);
+    checks.push(['Conflicts logged to Notes', (pmap[NOTES_COL]?.text||'').includes('[DUPLICATE'), 'stamp present']);
   }
   if(plan.sources.length){
-    const dd=await gql(`{items(ids:[${plan.sources.map(s=>s.id).join(',')}]){id}}`);
-    const present=new Set((dd.items||[]).map(i=>i.id));
-    const still=plan.sources.filter(s=>present.has(s.id)).map(s=>s.id);
-    checks.push(['Duplicate(s) deleted', still.length===0, still.length?('still present: '+still.join(', ')):plan.sources.length+' deleted']);
+    const ids=plan.sources.map(s=>s.id);
+    const dd=await gql(`{items(ids:[${ids.join(',')}]){id state}}`);
+    const active=new Set((dd.items||[]).filter(i=>i.state==='active').map(i=>i.id));
+    const still=ids.filter(id=>active.has(id));
+    checks.push(['Duplicate(s) removed', still.length===0,
+      still.length ? ('STILL ACTIVE: '+still.join(', '))
+                   : `deleted — recover in monday's Recycle Bin if needed (id ${ids.join(', ')})`]);
   }
   return checks;
 }
 
 function renderVerify(gid, checks, ok){
-  const pv=document.getElementById(`dup-preview-${gid}`);
-  if(!pv) return;
+  const pv=document.getElementById(`dup-preview-${gid}`); if(!pv) return;
   pv.classList.add('visible');
   pv.innerHTML = `
     <div class="dup-verify-box ${ok?'pass':'fail'}">
-      <div class="dup-preview-h">${ok?'✓ Verified — kept record looks good':'⚠ Review — something needs a look'}</div>
+      <div class="dup-preview-h">${ok?'✓ Done — duplicate removed, kept record verified':'⚠ Done, but one check needs a look'}</div>
       <ul>${checks.map(c=>`<li class="${c[1]?'vok':'vbad'}">${c[1]?'✓':'✗'} ${escapeHtml(c[0])}${c[2]?` <span class="dim">— ${escapeHtml(String(c[2]))}</span>`:''}</li>`).join('')}</ul>
     </div>`;
 }
