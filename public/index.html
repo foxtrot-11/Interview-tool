@@ -78,6 +78,36 @@
   .log-err{color:var(--danger)}
   .dup-empty{text-align:center;padding:60px 20px;color:var(--text-muted);font-size:13px}
   .dup-loading{text-align:center;padding:40px;color:var(--text-muted);font-size:12px;letter-spacing:0.15em;text-transform:uppercase}
+  /* DUPV2 review styles */
+  .dup-type-A{background:#4ade8020;color:#4ade80;border:1px solid #4ade8040}
+  .dup-type-B{background:#facc1520;color:#facc15;border:1px solid #facc1540}
+  .dup-type-C{background:#fb923c20;color:#fb923c;border:1px solid #fb923c40}
+  .dup-type-D{background:#94a3b820;color:#94a3b8;border:1px solid #94a3b840}
+  .dup-type-E{background:#60a5fa20;color:#60a5fa;border:1px solid #60a5fa40}
+  .dup-filter-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:4px;padding:3px 9px;font-family:var(--font-mono);font-size:10px;letter-spacing:0.04em;cursor:pointer;margin-left:4px}
+  .dup-filter-btn.active{border-color:var(--accent);color:var(--text);background:var(--surface)}
+  .dup-keeper-pick{display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:0.1em;color:var(--text-muted);cursor:pointer;margin-bottom:4px}
+  .dup-keeper-pick input{accent-color:#4ade80;width:15px;height:15px;cursor:pointer}
+  .dup-item-card.is-keeper{border-color:#4ade80;box-shadow:0 0 0 1px #4ade8060}
+  .dup-item-card.is-keeper .dup-keeper-pick{color:#4ade80}
+  .dup-item-card.locked{border-color:#94a3b8;cursor:default;opacity:0.85}
+  .dup-item-card.locked:hover{border-color:#94a3b8}
+  .dup-locked-note{font-size:11px;color:#94a3b8;flex:1;min-width:200px}
+  .dup-preview{display:none;padding:0 14px}
+  .dup-preview.visible{display:block;padding:0 14px 6px}
+  .dup-preview-box,.dup-verify-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-size:12px}
+  .dup-preview-h{font-family:var(--font-display);font-weight:700;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;color:var(--text)}
+  .dup-preview-row{margin-bottom:4px}
+  .dup-preview-row .k{display:inline-block;min-width:54px;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:0.08em;color:var(--text-muted)}
+  .dup-preview-sec{margin-top:8px;color:var(--text-muted)}
+  .dup-preview-sec ul,.dup-verify-box ul{margin:4px 0 0;padding-left:16px;color:var(--text)}
+  .dup-preview-sec li,.dup-verify-box li{margin-bottom:3px;font-size:11px;line-height:1.5}
+  .dup-preview-actions{margin-top:12px;display:flex;gap:8px}
+  .dup-verify-box.pass{border-color:#4ade8060}
+  .dup-verify-box.fail{border-color:#facc1560}
+  .dup-verify-box .vok{color:var(--success)}
+  .dup-verify-box .vbad{color:var(--warning)}
+  .dim{color:var(--text-dim)}
   .dup-refresh-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:var(--radius);padding:6px 14px;font-family:var(--font-mono);font-size:11px;cursor:pointer;margin-left:auto}
   .dup-refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
 
@@ -2721,68 +2751,130 @@ async function bootCheck(){
 // ════════════════════════════════════════════════════
 
 // Columns skipped during merge comparison (system/read-only/formula)
-const SKIP_COLS = new Set(['name','sous__l_ments','formula_mkncvm1n','multiple_person_mm1znj7j',
-  'people','people7','people8','status0','dup__of_biopic_selector','dup__of_bio_pic_status',
-  'dup__of_biopic_status','color_mm26br5p','date_mm2cq4tj','date_mm2n67q2']);
+/* ============================================================
+   DUPLICATE REVIEW ENGINE  (rework 2026-06-25)  [DUPV2]
+   Human-in-the-loop screening tool. Nothing is auto-merged.
+   - groups by normalised name across the configured boards
+   - classifies each group into a TYPE (A–E) with a badge
+   - human picks the KEEPER (good record pre-selected) and
+     PREVIEWS every change before approving
+   - after merge, re-reads the kept row and VERIFIES nothing broke
+   ============================================================ */
 
-// Columns that are "high stakes" — never overwrite with import value in Case 1/4
-const PRESERVE_COLS = new Set(['label','numeric_mm1z34ca','numeric_mm1zjjrp','text_mm1znrfv',
-  'text_mm1zb8xf','date_mknb5z70','long_text_mktg36ee']);
+// Status label IDs (the numeric "index" stored inside a status column's value JSON)
+const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
+  APPROVED:2, REJECTED:3, ALLSTAR:4, EXCLUSIVE:105, RETIRED:0,
+  DELETE:6, OUTSIDE:1, EVERNOTE:11, DUPLICATE:12 };
+const STATUS_DUPLICATE = ST.DUPLICATE;
+const STATUS_EVERNOTE  = ST.EVERNOTE;
+const NOTES_COL = 'long_text_mktg36ee';
 
-// DUPLICATE status index = 12; EVERNOTE IMPORT = 11
-const STATUS_DUPLICATE = 12;
-const STATUS_EVERNOTE  = 11;
+// Keeper preference — higher rank = better record to KEEP. (drives the pre-pick)
+function statusRank(idx){
+  switch(idx){
+    case ST.APPROVED: case ST.EXCLUSIVE: case ST.ALLSTAR: return 100;
+    case ST.INTERVIEW: case ST.REVIEW: return 80;
+    case ST.POTENTIAL: case ST.SCREEN: case ST.APPLICANT: return 60;
+    case ST.OUTSIDE: return 55;
+    case ST.RETIRED: return 40;
+    case ST.EVERNOTE: return 20;
+    case ST.DUPLICATE: return 10;
+    case ST.REJECTED: return 8;
+    case ST.DELETE: return 1;
+    default: return 15;
+  }
+}
+const isGood = idx => idx !== ST.DUPLICATE && idx !== ST.EVERNOTE && idx != null;
 
-// Production statuses — extra caution (Case 4)
-const PRODUCTION_STATUSES = new Set([7,9,2,4,105]); // INTERVIEW,REVIEW,APPROVED,ALL-STAR,EXCLUSIVE
+// Pure placeholder names that stand in for DIFFERENT people — never group/merge these.
+function isPlaceholderName(name){
+  const n = (name||'').trim().toLowerCase();
+  if(!n) return true;
+  if(n === '(no name found)') return true;
+  if(/^\(needs (stage name|info|real)\)$/.test(n)) return true;
+  return false;
+}
 
-let dupGroups = []; // [{name, items:[{id,name,created_at,statusIdx,cols,assets,board}]}]
+// App-specific columns we never copy (status of keeper is sacrosanct; auto/biopic cols; dup trigger; system dates)
+const SKIP_COLS = new Set(['name','label','sous__l_ments','color_mm26br5p',
+  'status0','dup__of_biopic_selector','dup__of_bio_pic_status','dup__of_biopic_status',
+  'date_mm2cq4tj','date_mm2n67q2']);
+// Column TYPES that are read-only / derived / relational / handled elsewhere (files via photo merge)
+const SKIP_TYPES = new Set(['formula','mirror','button','subtasks','people','board_relation',
+  'auto_number','creation_log','last_updated','progress','item_id','dependency','time_tracking','doc','file']);
 
-// ── Load all duplicates from both boards ──
+let dupGroups = [];     // [{gid,name,placeholder,items:[{id,name,created_at,statusIdx,board}],keeperId,done}]
+let dupFilter = 'ALL';
+let COL_META = null;    // {type:{colId:type}, title:{colId:title}}
+
+async function buildColMeta(){
+  if(COL_META) return COL_META;
+  const d = await gql(`{boards(ids:[${MAIN_BOARD_ID}]){columns{id title type}}}`);
+  const type={}, title={};
+  (d.boards[0].columns||[]).forEach(c => { type[c.id]=c.type; title[c.id]=c.title; });
+  COL_META = {type,title};
+  return COL_META;
+}
+
+function statusIdxOf(item){
+  const cv = (item.column_values||[]).find(c=>c.id==='label');
+  if(!cv || !cv.value) return null;
+  try { return JSON.parse(cv.value)?.index ?? null; } catch { return null; }
+}
+function fileEntries(item, colId){
+  const cv = (item.column_values||[]).find(c=>c.id===colId);
+  if(!cv || !cv.value) return [];
+  try { return JSON.parse(cv.value).files || []; } catch { return []; }
+}
+
+// ── Load & group ──
 async function loadDuplicates(){
   const container = document.getElementById('dup-groups-container');
   const summary   = document.getElementById('dup-summary');
-  container.innerHTML = '<div class="dup-loading">Scanning both boards...</div>';
+  container.innerHTML = '<div class="dup-loading">Scanning board(s) for duplicates…</div>';
   summary.textContent = '';
-
   try {
-    // Fetch all items from both boards (name + status + created_at only for grouping)
-    const allItems = [];
-    for(const boardId of [MAIN_BOARD_ID, BATCH_BOARD_ID]){
+    await buildColMeta();
+    const boards = [...new Set([String(MAIN_BOARD_ID), String(BATCH_BOARD_ID)])]; // de-dupe identical board ids
+    const byId = {};
+    for(const boardId of boards){
       let cursor = null;
       do {
         const cp = cursor ? `cursor:"${cursor}"` : 'limit:200';
         const data = await gql(`{boards(ids:[${boardId}]){items_page(${cp}){cursor items{id name created_at column_values(ids:["label"]){value}}}}}`);
         const page = data.boards[0].items_page;
         page.items.forEach(it => {
+          if(byId[it.id]) return; // de-dupe by item id (same board listed twice / overlap)
           let statusIdx = null;
           try { statusIdx = JSON.parse(it.column_values[0].value)?.index ?? null; } catch {}
-          allItems.push({ id: it.id, name: it.name.trim(), created_at: it.created_at, statusIdx, board: boardId });
+          byId[it.id] = { id: it.id, name: (it.name||'').trim(), created_at: it.created_at, statusIdx, board: boardId };
         });
         cursor = page.cursor;
       } while(cursor);
     }
 
-    // Group by normalised name (lowercase, trimmed)
+    // group by normalised name
     const byName = {};
-    allItems.forEach(it => {
+    Object.values(byId).forEach(it => {
       const key = it.name.toLowerCase();
       (byName[key] = byName[key] || []).push(it);
     });
 
-    // Keep only groups that have at least one DUPLICATE-status item
-    dupGroups = Object.values(byName)
-      .filter(g => g.some(it => it.statusIdx === STATUS_DUPLICATE))
-      .map((g, i) => ({ gid: 'g'+i+'_'+g[0].id, name: g[0].name, done: false, items: g.sort((a,b) => new Date(a.created_at)-new Date(b.created_at)) }));
-
-    summary.textContent = dupGroups.length
-      ? `${dupGroups.length} group${dupGroups.length>1?'s':''} found`
-      : '';
+    dupGroups = Object.entries(byName)
+      .filter(([,g]) => g.length > 1)               // any name shared by 2+ records
+      .map(([key,g], i) => {
+        const items = g.sort((a,b)=> new Date(a.created_at)-new Date(b.created_at));
+        return { gid:'g'+i+'_'+items[0].id, name: items[0].name, placeholder: isPlaceholderName(items[0].name),
+                 items, keeperId: null, done:false };
+      });
 
     if(!dupGroups.length){
-      container.innerHTML = '<div class="dup-empty">✓ No duplicates found on either board</div>';
+      container.innerHTML = '<div class="dup-empty">✓ No duplicate name-groups found</div>';
+      summary.innerHTML = '';
       return;
     }
+    // default keeper for each group
+    dupGroups.forEach(g => { if(!g.placeholder) g.keeperId = defaultKeeperId(g); });
     renderDupGroups();
   } catch(e){
     container.innerHTML = `<div class="dup-empty log-err">Failed to load: ${escapeHtml(e.message)}</div>`;
@@ -2790,99 +2882,116 @@ async function loadDuplicates(){
   }
 }
 
-function classifyCase(group){
-  const items = group.items;
-  const hasDup  = items.some(it => it.statusIdx === STATUS_DUPLICATE);
-  const hasEv   = items.some(it => it.statusIdx === STATUS_EVERNOTE);
-  const hasProd = items.some(it => PRODUCTION_STATUSES.has(it.statusIdx));
-  if(items.length === 2 && !hasProd && items.every(it => it.statusIdx === STATUS_DUPLICATE || it.statusIdx === STATUS_EVERNOTE))
-    return {case:2, label:'Identical imports'};
-  if(hasProd && items.length === 2)
-    return {case:1, label:'Existing + new import'};
-  if(hasProd && items.length > 2)
-    return {case:3, label:'Multi-version cascade'};
-  if(hasProd)
-    return {case:4, label:'Production + import'};
-  return {case:2, label:'Duplicate imports'};
+function defaultKeeperId(group){
+  const sorted = [...group.items].sort((a,b) =>
+    statusRank(b.statusIdx)-statusRank(a.statusIdx) || (new Date(a.created_at)-new Date(b.created_at)));
+  return sorted[0].id;
 }
+
+function classifyType(group){
+  if(group.placeholder) return {type:'D', label:'Locked · placeholder name', cls:'dup-type-D'};
+  const its = group.items;
+  const hasDup = its.some(i=>i.statusIdx===STATUS_DUPLICATE);
+  const goods  = its.filter(i=>isGood(i.statusIdx));
+  if(!hasDup)            return {type:'E', label:'Name clash · none flagged', cls:'dup-type-E'};
+  if(goods.length===0)  return {type:'C', label:'All duplicates', cls:'dup-type-C'};
+  const oldest = [...its].sort((a,b)=> new Date(a.created_at)-new Date(b.created_at))[0];
+  const keeperId = defaultKeeperId(group);
+  if(goods.length===1 && oldest.id===keeperId) return {type:'A', label:'Clean pair', cls:'dup-type-A'};
+  return {type:'B', label:'Conflict · confirm keeper', cls:'dup-type-B'};
+}
+
+function getDupGroup(gid){ return dupGroups.find(g=>g.gid===gid); }
+function setDupFilter(f){ dupFilter=f; renderDupGroups(); }
 
 function renderDupGroups(){
   const container = document.getElementById('dup-groups-container');
+  const summary   = document.getElementById('dup-summary');
+  // tally by type
+  const tally = {A:0,B:0,C:0,D:0,E:0};
+  dupGroups.forEach(g => { if(!g.done) tally[classifyType(g).type]++; });
+  const total = Object.values(tally).reduce((a,b)=>a+b,0);
+  const fbtn = (key,label) => `<button class="dup-filter-btn ${dupFilter===key?'active':''}" onclick="setDupFilter('${key}')">${label}</button>`;
+  summary.innerHTML =
+    `<span style="margin-right:8px">${total} to review</span>`+
+    fbtn('ALL','All')+
+    fbtn('B','⚠ Confirm '+tally.B)+
+    fbtn('C','All-dup '+tally.C)+
+    fbtn('A','Clean '+tally.A)+
+    fbtn('E','Clash '+tally.E)+
+    fbtn('D','Locked '+tally.D);
+
   container.innerHTML = '';
-  dupGroups.forEach((group) => {
+  let shown = 0;
+  dupGroups.forEach(group => {
     if(group.done) return;
+    const info = classifyType(group);
+    if(dupFilter!=='ALL' && dupFilter!==info.type) return;
+    shown++;
     const gid = group.gid;
-    const {case:c, label} = classifyCase(group);
-    const oldest = group.items[0];
     const div = document.createElement('div');
     div.className = 'dup-group';
     div.id = `dup-group-${gid}`;
-
-    const caseColors = {1:'dup-case-1',2:'dup-case-2',3:'dup-case-3',4:'dup-case-4'};
+    const oldest = group.items[0];
     div.innerHTML = `
       <div class="dup-group-header">
-        <div class="dup-group-name">${escapeHtml(group.items[0].name)}</div>
-        <div class="dup-group-count">${group.items.length} versions</div>
-        <div class="dup-case-badge ${caseColors[c]}">Case ${c}: ${label}</div>
-        <div style="margin-left:auto;font-size:10px;color:var(--text-dim)">oldest: ${oldest.created_at.slice(0,10)} · id ${oldest.id}</div>
+        <div class="dup-group-name">${escapeHtml(group.name)}</div>
+        <div class="dup-group-count">${group.items.length} records</div>
+        <div class="dup-case-badge ${info.cls}">Type ${info.type}: ${info.label}</div>
+        <div style="margin-left:auto;font-size:10px;color:var(--text-dim)">oldest ${oldest.created_at.slice(0,10)} · id ${oldest.id}</div>
       </div>
-      <div class="dup-items" id="dup-items-${gid}">
-        <div style="padding:12px;color:var(--text-muted);font-size:12px">Loading details...</div>
-      </div>
+      <div class="dup-items" id="dup-items-${gid}"><div style="padding:12px;color:var(--text-muted);font-size:12px">Loading details…</div></div>
+      <div class="dup-preview" id="dup-preview-${gid}"></div>
       <div class="dup-actions">
-        <button class="merge-btn" onclick="runMerge('${gid}')" id="merge-btn-${gid}">
-          ${c===2?'Keep Oldest & Delete Others':'Merge All → Oldest'}
-        </button>
-        <button class="skip-btn" onclick="skipGroup('${gid}')">Skip</button>
+        ${info.type==='D'
+          ? `<div class="dup-locked-note">🔒 Placeholder name — these are different people. Merge is disabled. Use Dismiss to hide.</div>
+             <button class="skip-btn" onclick="skipGroup('${gid}')">Dismiss</button>`
+          : `<button class="merge-btn" onclick="previewMerge('${gid}')" id="merge-btn-${gid}">Preview changes →</button>
+             <button class="skip-btn" onclick="skipGroup('${gid}')">Skip</button>`}
         <div id="dup-log-${gid}" class="dup-merge-log"></div>
       </div>`;
     container.appendChild(div);
     loadGroupDetails(gid);
   });
+  if(!shown){
+    container.innerHTML = `<div class="dup-empty">No groups in this filter.</div>`;
+  }
 }
-
-// Look up a group by its stable gid (never by array index)
-function getDupGroup(gid){ return dupGroups.find(g => g.gid === gid); }
 
 async function loadGroupDetails(gid){
   const group = getDupGroup(gid);
-  const container = document.getElementById(`dup-items-${gid}`);
-  if(!group || !container) return;
+  const wrap  = document.getElementById(`dup-items-${gid}`);
+  if(!group || !wrap) return;
+  const locked = group.placeholder;
   try {
-    // Fetch full column values + assets for each item in the group
     const ids = group.items.map(it=>it.id).join(',');
-    const data = await gql(`{items(ids:[${ids}]){id name created_at assets{id name file_size file_extension public_url} column_values(ids:["label","text_mknceqty","text_mkncbdr1","dropdown_mknbe0p0","date_of_birth_mkncwsrj","long_text_mktg36ee","files_mkncw5nm","file_mkp1n4bt"]){id text value}}}`);
+    const data = await gql(`{items(ids:[${ids}]){id name created_at group{id title} assets{id name file_extension public_url} column_values(ids:["label","text_mknceqty","text_mkncbdr1","dropdown_mknbe0p0","date_of_birth_mkncwsrj","${NOTES_COL}","files_mkncw5nm","file_mkp1n4bt"]){id text value}}}`);
+    const byId={}; data.items.forEach(it=>byId[it.id]=it);
+    group.items.forEach(it=>{ if(byId[it.id]){ it.detail=byId[it.id]; } });
 
-    // Merge fetched details back into dupGroups
-    const byId = {};
-    data.items.forEach(it => byId[it.id] = it);
+    wrap.innerHTML = '';
     group.items.forEach(it => {
-      if(byId[it.id]){
-        it.fullCols = byId[it.id].column_values;
-        it.assets   = byId[it.id].assets;
-      }
-    });
-
-    container.innerHTML = '';
-    group.items.forEach((it, idx) => {
-      const isOldest = idx === 0;
-      const card = document.createElement('div');
-      card.className = 'dup-item-card' + (isOldest?' oldest':' will-delete');
-
-      const getCol = id => (it.fullCols||[]).find(c=>c.id===id);
+      const d = it.detail || {};
+      const getCol = id => (d.column_values||[]).find(c=>c.id===id);
       const statusText = getCol('label')?.text || '—';
-      const legal   = getCol('text_mknceqty')?.text || '';
-      const loc     = getCol('text_mkncbdr1')?.text || '';
-      const role    = getCol('dropdown_mknbe0p0')?.text || '';
-      const dob     = getCol('date_of_birth_mkncwsrj')?.text || '';
-      const notes   = getCol('long_text_mktg36ee')?.text || '';
-      const imgs    = (it.assets||[]).filter(a=>['.jpg','.jpeg','.png','.webp'].includes((a.file_extension||'').toLowerCase()));
-
+      const legal = getCol('text_mknceqty')?.text || '';
+      const loc   = getCol('text_mkncbdr1')?.text || '';
+      const role  = getCol('dropdown_mknbe0p0')?.text || '';
+      const dob   = getCol('date_of_birth_mkncwsrj')?.text || '';
+      const notes = getCol(NOTES_COL)?.text || '';
+      const imgs  = (d.assets||[]).filter(a=>['.jpg','.jpeg','.png','.webp','.gif','.heic'].includes((a.file_extension||'').toLowerCase()));
+      const checked = it.id===group.keeperId;
+      const card = document.createElement('div');
+      card.className = 'dup-item-card' + (checked?' is-keeper':'') + (locked?' locked':'');
+      card.id = `dup-card-${gid}-${it.id}`;
       card.innerHTML = `
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--text)">${escapeHtml(it.name)}</div>
-        <div class="dup-item-field"><span class="dup-item-field-label">Board</span><span class="dup-item-field-val" style="color:var(--text-muted);font-size:10px">${it.board===MAIN_BOARD_ID?'Main':'Batch'}</span></div>
-        <div class="dup-item-field"><span class="dup-item-field-label">Created</span><span class="dup-item-field-val">${it.created_at.slice(0,10)}</span></div>
+        ${locked ? '' : `<label class="dup-keeper-pick">
+          <input type="radio" name="keeper-${gid}" value="${it.id}" ${checked?'checked':''} onchange="selectKeeper('${gid}','${it.id}')">
+          <span>KEEPER</span></label>`}
+        <div style="font-weight:700;font-size:13px;margin:${locked?'0':'2px'} 0 8px;color:var(--text)">${escapeHtml(it.name)}</div>
         <div class="dup-item-field"><span class="dup-item-field-label">Status</span><span class="dup-item-field-val">${escapeHtml(statusText)}</span></div>
+        <div class="dup-item-field"><span class="dup-item-field-label">Created</span><span class="dup-item-field-val">${it.created_at.slice(0,10)}</span></div>
+        <div class="dup-item-field"><span class="dup-item-field-label">Group</span><span class="dup-item-field-val" style="font-size:10px;color:var(--text-muted)">${escapeHtml(d.group?.title||'')}</span></div>
         ${legal?`<div class="dup-item-field"><span class="dup-item-field-label">Legal</span><span class="dup-item-field-val">${escapeHtml(legal)}</span></div>`:''}
         ${loc?`<div class="dup-item-field"><span class="dup-item-field-label">Location</span><span class="dup-item-field-val">${escapeHtml(loc)}</span></div>`:''}
         ${role?`<div class="dup-item-field"><span class="dup-item-field-label">Role</span><span class="dup-item-field-val">${escapeHtml(role)}</span></div>`:''}
@@ -2892,298 +3001,314 @@ async function loadGroupDetails(gid){
           ${imgs.slice(0,6).map(img=>`<img class="dup-item-photo" src="${escapeHtml(img.public_url)}" title="${escapeHtml(img.name)}" loading="lazy">`).join('')}
           ${imgs.length>6?`<div style="width:40px;height:40px;border-radius:3px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-muted)">+${imgs.length-6}</div>`:''}
         </div>
-        <div style="margin-top:8px;font-size:10px;color:var(--text-dim)">${imgs.length} photo${imgs.length!==1?'s':''} · ${it.id}</div>`;
-      container.appendChild(card);
+        <div style="margin-top:8px;font-size:10px;color:var(--text-dim)">${imgs.length} photo${imgs.length!==1?'s':''} · id ${it.id} · ${it.board===String(MAIN_BOARD_ID)?'Main':'Batch'}</div>`;
+      wrap.appendChild(card);
     });
   } catch(e){
-    container.innerHTML = `<div style="padding:12px;color:var(--danger);font-size:12px">Failed to load details: ${escapeHtml(e.message)}</div>`;
+    wrap.innerHTML = `<div style="padding:12px;color:var(--danger);font-size:12px">Failed to load details: ${escapeHtml(e.message)}</div>`;
   }
 }
 
-// ── MERGE ENGINE ──
-async function runMerge(gid){
+function selectKeeper(gid, itemId){
   const group = getDupGroup(gid);
-  const btn   = document.getElementById(`merge-btn-${gid}`);
-  const log   = document.getElementById(`dup-log-${gid}`);
-  if(!group){ console.error('Merge: group not found for gid', gid); return; }
-  // Cross-wiring guard: every item in the group must share the same normalised name
-  const names = new Set(group.items.map(it => it.name.trim().toLowerCase()));
-  if(names.size !== 1){
-    alert('Safety stop: this group contains mismatched names ('+[...names].join(', ')+'). Merge aborted.');
-    return;
-  }
-  btn.disabled = true;
-  log.className = 'dup-merge-log visible';
-  log.innerHTML = '';
+  if(!group) return;
+  group.keeperId = itemId;
+  group._plan = null; // invalidate any prior preview
+  group.items.forEach(it=>{
+    const c = document.getElementById(`dup-card-${gid}-${it.id}`);
+    if(c) c.classList.toggle('is-keeper', it.id===itemId);
+  });
+  const pv = document.getElementById(`dup-preview-${gid}`);
+  if(pv){ pv.classList.remove('visible'); pv.innerHTML=''; }
+}
 
-  const addLog = (msg, cls='') => {
-    log.innerHTML += `<span class="${cls}">${escapeHtml(msg)}</span>\n`;
-    log.scrollTop = log.scrollHeight;
+// ── Build a merge PLAN (no writes) ──
+async function computePlan(group){
+  const meta = await buildColMeta();
+  const ids  = group.items.map(i=>i.id).join(',');
+  const d = await gql(`{items(ids:[${ids}]){id name created_at group{id title} assets{id name file_size file_extension} column_values{id text value}}}`);
+  const byId={}; d.items.forEach(it=>byId[it.id]=it);
+  const keeperId = group.keeperId || defaultKeeperId(group);
+  const keeper = byId[keeperId];
+  if(!keeper) throw new Error('keeper not found');
+  const sources = group.items.filter(i=>i.id!==keeperId).map(i=>byId[i.id]).filter(Boolean)
+                    .sort((a,b)=> new Date(a.created_at)-new Date(b.created_at));
+  const kmap={}; keeper.column_values.forEach(c=>kmap[c.id]=c);
+  const hasVal = c => c && ((c.text||'').trim() || (c.value && c.value!=='null' && c.value!=='{}'));
+
+  const fills=[], conflicts=[], filled={};
+  for(const s of sources){
+    s.column_values.forEach(sc=>{
+      const type = meta.type[sc.id];
+      if(sc.id===NOTES_COL) return;            // notes handled separately
+      if(SKIP_COLS.has(sc.id) || SKIP_TYPES.has(type)) return;
+      const sText=(sc.text||'').trim();
+      if(!hasVal(sc)) return;
+      const kc=kmap[sc.id];
+      if(!hasVal(kc) && filled[sc.id]===undefined){
+        filled[sc.id]=sText;
+        fills.push({colId:sc.id, title:meta.title[sc.id]||sc.id, text:sText, value:sc.value, type, fromId:s.id});
+      } else {
+        const keeperText = hasVal(kc) ? (kc.text||'').trim() : filled[sc.id];
+        if(keeperText !== sText)
+          conflicts.push({colId:sc.id, title:meta.title[sc.id]||sc.id, keeperText, sourceText:sText, fromId:s.id});
+      }
+    });
+  }
+
+  // notes merge
+  let notesBase = (kmap[NOTES_COL]?.text || '').trim();
+  let notesFilledFrom = null;
+  const notesConflictLines = [];
+  for(const s of sources){
+    const sc = s.column_values.find(c=>c.id===NOTES_COL);
+    const sText = (sc?.text||'').trim();
+    if(!sText) continue;
+    if(!notesBase){ notesBase = sText; notesFilledFrom = s.id; }
+    else if(sText !== notesBase) notesConflictLines.push(`[DUPLICATE INFO — General Notes (from id ${s.id})]: ${sText}`);
+  }
+  const fieldConflictLines = conflicts.map(c=>`[DUPLICATE INFO — ${c.title}: ${c.sourceText} (from id ${c.fromId})]`);
+  const allConflictLines = [...fieldConflictLines, ...notesConflictLines];
+  let notesWrite = null;
+  if(allConflictLines.length){
+    const stamp = `[DUPLICATE MERGE ${new Date().toISOString().slice(0,10)}]`;
+    notesWrite = (notesBase ? notesBase + '\n\n' : '') + stamp + '\n' + allConflictLines.join('\n');
+  } else if(notesFilledFrom){
+    notesWrite = notesBase;
+  }
+
+  // photo plan (dry)
+  const photo = photoPlanDry(keeper, sources);
+
+  // pre-snapshot of keeper for verification
+  const nonEmpty = keeper.column_values.filter(c=>{
+    const t=meta.type[c.id];
+    if(SKIP_TYPES.has(t)) return false;
+    return hasVal(c);
+  }).map(c=>c.id);
+  const preSnapshot = {
+    statusIdx: statusIdxOf(keeper),
+    statusText: (kmap['label']?.text||''),
+    groupId: keeper.group?.id || null,
+    headCount: fileEntries(keeper,'files_mkncw5nm').length,
+    extraCount: fileEntries(keeper,'file_mkp1n4bt').length,
+    nonEmpty
   };
 
-  try {
-    // Make sure all items have full data loaded
-    const missing = group.items.filter(it => !it.fullCols);
-    if(missing.length){
-      addLog('Loading full data...');
-      const ids = missing.map(it=>it.id).join(',');
-      const d = await gql(`{items(ids:[${ids}]){id assets{id name file_size file_extension public_url} column_values{id text value}}}`);
-      d.items.forEach(it => {
-        const target = group.items.find(x=>x.id===it.id);
-        if(target){ target.fullCols=it.column_values; target.assets=it.assets; }
-      });
+  return {keeperId, keeperName:keeper.name, sources:sources.map(s=>({id:s.id,name:s.name,created_at:s.created_at})),
+          fills, conflicts, notesWrite, notesConflictLines, photo, preSnapshot};
+}
+
+function assetMap(item){ const m={}; (item.assets||[]).forEach(a=>m[String(a.id)]=a); return m; }
+function dedupKey(entry, amap){ const a=amap[String(entry.assetId)]; if(a&&a.file_size!=null) return a.name+'|'+a.file_size; if(a) return a.name+'|noSize'; return (entry.name||'')+'|missing|'+entry.assetId; }
+
+function photoPlanDry(keeper, sources){
+  const kAssets=assetMap(keeper);
+  const kHead=fileEntries(keeper,'files_mkncw5nm');
+  const kExtra=fileEntries(keeper,'file_mkp1n4bt');
+  const seen=new Set([...kHead,...kExtra].map(e=>dedupKey(e,kAssets)));
+  let portHeadshot=false, headFromId=null, add=0, orphan=0, headFilled=kHead.length>0;
+  for(const s of sources){
+    const sA=assetMap(s);
+    const live=e=>sA[String(e.assetId)]!==undefined;
+    const sHead=fileEntries(s,'files_mkncw5nm');
+    const sExtra=fileEntries(s,'file_mkp1n4bt');
+    let toExtras=[];
+    for(const h of sHead){
+      if(!live(h)){orphan++; continue;}
+      if(!headFilled && !portHeadshot){ const k=dedupKey(h,sA); if(!seen.has(k)){ portHeadshot=true; headFromId=s.id; headFilled=true; seen.add(k); add++; } }
+      else toExtras.push(h);
     }
+    toExtras=toExtras.concat(sExtra);
+    for(const e of toExtras){ if(!live(e)){orphan++; continue;} const k=dedupKey(e,sA); if(seen.has(k))continue; seen.add(k); add++; }
+  }
+  return {portHeadshot, headFromId, addCount:add, orphan};
+}
 
-    const {case:c} = classifyCase(group);
-    const oldest = group.items[0];
-    const rest   = group.items.slice(1);
-
-    // SAFETY CONFIRMATION — show exactly what will happen with names + IDs
-    const keepLine = `KEEP: ${oldest.name} (id ${oldest.id}, ${oldest.created_at.slice(0,10)})`;
-    const delLines = rest.map(r => `DELETE: ${r.name} (id ${r.id}, ${r.created_at.slice(0,10)})`).join('\n');
-    const confirmMsg = `Confirm merge for "${group.name}":\n\n${keepLine}\n${delLines}\n\nData from the deleted item(s) merges into the kept item. Proceed?`;
-    if(!confirm(confirmMsg)){
-      addLog('Merge cancelled by user', 'log-warn');
-      btn.disabled = false;
-      return;
-    }
-    addLog(`Merge strategy: Case ${c} — ${rest.length} item(s) → oldest (${oldest.id})`);
-
-    // ── CASE 2: identical imports — just delete all but oldest ──
-    if(c === 2){
-      addLog('Case 2: verifying similarity then deleting newer copies...');
-      for(const dup of rest){
-        addLog(`  Deleting ${dup.name} (${dup.id}) from ${dup.board===MAIN_BOARD_ID?'main':'batch'} board...`);
-        await gql(`mutation{delete_item(item_id:${dup.id}){id}}`);
-        addLog(`  ✓ Deleted ${dup.id}`, 'log-ok');
-      }
-      addLog('✓ Done — oldest record kept', 'log-ok');
-      btn.textContent = '✓ Merged';
-      group.done = true;
-      const card2 = document.getElementById(`dup-group-${gid}`);
-      if(card2){ card2.style.opacity='0.5'; card2.querySelectorAll('button').forEach(b=>b.disabled=true); }
-      return;
-    }
-
-    // ── CASES 1, 3, 4: cascade merge newest→...→oldest ──
-    // Build merge order: process items newest→second-newest, then result→oldest
-    // We merge in pairs: always merge NEWER into OLDER
-    addLog('Building merged column values...');
-
-    // Load ALL column values for oldest (we need every field)
-    const fullOldestData = await gql(`{items(ids:[${oldest.id}]){column_values{id text value}}}`);
-    const oldestColMap = {};
-    fullOldestData.items[0].column_values.forEach(c => oldestColMap[c.id] = c);
-
-    const mergeNotes = []; // conflicts logged here
-    const newColValues = {}; // fields to write to oldest
-
-    // Process each newer item, oldest-first among the "rest" (so last one wins for missing fields)
-    for(const newer of rest){
-      addLog(`Processing ${newer.name} (${newer.id})...`);
-
-      // Load full cols for this item if not already loaded
-      let newerCols = newer.fullCols;
-      if(!newerCols || newerCols.length < 50){
-        const nd = await gql(`{items(ids:[${newer.id}]){column_values{id text value}}}`);
-        newerCols = nd.items[0].column_values;
-      }
-
-      newerCols.forEach(nc => {
-        if(SKIP_COLS.has(nc.id)) return;
-        if(!nc.value && !nc.text) return; // newer has nothing — skip
-        const oc = oldestColMap[nc.id];
-        const oldHasValue = oc && (oc.value || oc.text);
-
-        if(PRESERVE_COLS.has(nc.id)){
-          // Never overwrite preserve cols — but log conflict if both have values and they differ
-          if(oldHasValue && oc.text !== nc.text && nc.id !== 'long_text_mktg36ee'){
-            mergeNotes.push(`${nc.id}: new="${nc.text}" (kept original: "${oc.text}")`);
-          }
-          return; // don't write
-        }
-
-        if(!oldHasValue){
-          // Oldest is empty — port from newer
-          newColValues[nc.id] = nc.value;
-          addLog(`  + Porting ${nc.id}: "${(nc.text||'').slice(0,40)}"`, 'log-ok');
-        } else if(oc.text !== nc.text){
-          // Both have values but they differ — keep oldest, note the conflict
-          mergeNotes.push(`${nc.id}: new="${(nc.text||'').slice(0,60)}" (kept original: "${(oc.text||'').slice(0,60)}")`);
-          addLog(`  ~ Conflict ${nc.id}: keeping original, logging new value`, 'log-warn');
-        }
-        // If identical — nothing to do
-      });
-    }
-
-    // ── Port general notes ──
-    const oldNotes = (oldestColMap['long_text_mktg36ee']?.text || '').trim();
-    let newNotes = oldNotes;
-    if(mergeNotes.length){
-      const stamp = `\n\n[MERGE ${new Date().toISOString().slice(0,10)} — conflicting values from duplicate(s)]`;
-      newNotes = oldNotes + stamp + '\n' + mergeNotes.map(n=>`• ${n}`).join('\n');
-      addLog(`  ~ Appended ${mergeNotes.length} conflict(s) to General Notes`, 'log-warn');
-    }
-    if(newNotes !== oldNotes) newColValues['long_text_mktg36ee'] = {text: newNotes};
-
-    // ── Write merged cols to oldest ──
-    if(Object.keys(newColValues).length){
-      addLog(`Writing ${Object.keys(newColValues).length} ported fields to oldest item...`);
-      // Filter out values that are JSON strings we can pass directly
-      const writeVals = {};
-      Object.entries(newColValues).forEach(([k,v]) => {
-        if(v === null || v === undefined) return;
-        writeVals[k] = typeof v === 'string' ? JSON.parse(v) : v;
-      });
-      if(Object.keys(writeVals).length){
-        await gql(
-          `mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:true){id}}`,
-          {i: oldest.id, b: oldest.board, c: JSON.stringify(writeVals)}
-        );
-        addLog('  ✓ Fields written', 'log-ok');
-      }
-    } else {
-      addLog('  No new fields to port (oldest already has all values)');
-    }
-
-    // ── Merge photos ──
-    addLog('Merging photos...');
-    await mergePhotos(oldest, rest, addLog);
-
-    // ── Post merge comment then delete each newer item ──
-    for(const newer of rest){
-      const comment = `MERGED INTO ${oldest.id} (${oldest.name}) on ${new Date().toISOString().slice(0,10)}. ${mergeNotes.length} conflicting fields logged in General Notes of the kept record.`;
-      try {
-        await gql(`mutation($i:ID!,$b:String!){create_update(item_id:$i,body:$b){id}}`,
-          {i: newer.id, b: comment});
-        addLog(`  Comment posted on ${newer.id} before deletion`);
-      } catch(e){ addLog(`  (Comment post failed: ${e.message})`, 'log-warn'); }
-
-      addLog(`Deleting ${newer.name} (${newer.id})...`);
-      await gql(`mutation{delete_item(item_id:${newer.id}){id}}`);
-      addLog(`  ✓ Deleted`, 'log-ok');
-    }
-
-    addLog('✓ Merge complete', 'log-ok');
-    btn.textContent = '✓ Merged';
-    group.done = true;  // mark complete; never splice (would shift indices)
-    const cardC = document.getElementById(`dup-group-${gid}`);
-    if(cardC){ cardC.style.opacity='0.5'; cardC.querySelectorAll('button').forEach(b=>b.disabled=true); }
-
-  } catch(e){
-    addLog(`✗ Error: ${e.message}`, 'log-err');
+function previewMerge(gid){
+  const group = getDupGroup(gid);
+  const pv = document.getElementById(`dup-preview-${gid}`);
+  const btn = document.getElementById(`merge-btn-${gid}`);
+  if(!group || !pv) return;
+  pv.classList.add('visible');
+  pv.innerHTML = '<div style="padding:10px;color:var(--text-muted);font-size:12px">Computing preview…</div>';
+  btn.disabled = true;
+  computePlan(group).then(plan=>{
+    group._plan = plan;
+    const keeperRec = group.items.find(i=>i.id===plan.keeperId);
+    const fillsHtml = plan.fills.length
+      ? plan.fills.map(f=>`<li><b>${escapeHtml(f.title)}</b> ← "${escapeHtml(f.text.slice(0,80))}" <span class="dim">(from id ${f.fromId})</span></li>`).join('')
+      : '<li class="dim">No empty fields to fill.</li>';
+    const confHtml = plan.conflicts.length
+      ? plan.conflicts.map(c=>`<li><b>${escapeHtml(c.title)}</b>: keep "${escapeHtml(c.keeperText.slice(0,40))}" · log "${escapeHtml(c.sourceText.slice(0,40))}" <span class="dim">(id ${c.fromId})</span></li>`).join('')
+      : '<li class="dim">None.</li>';
+    const photoLine = `${plan.photo.portHeadshot?`Port headshot from id ${plan.photo.headFromId}; `:'Keep keeper\'s headshot; '}add ${plan.photo.addCount} extra photo(s)`+(plan.photo.orphan?`; ${plan.photo.orphan} orphaned skipped`:'');
+    const delHtml = plan.sources.map(s=>`${escapeHtml(s.name)} <span class="dim">(id ${s.id})</span>`).join(', ');
+    pv.innerHTML = `
+      <div class="dup-preview-box">
+        <div class="dup-preview-h">Preview — review before approving</div>
+        <div class="dup-preview-row"><span class="k">KEEP</span> ${escapeHtml(plan.keeperName)} <span class="dim">(id ${plan.keeperId}, status ${escapeHtml(keeperRec? (keeperRec.detail?.column_values?.find(c=>c.id==='label')?.text||'') : '')})</span></div>
+        <div class="dup-preview-row"><span class="k">DELETE</span> ${delHtml}</div>
+        <div class="dup-preview-sec">Fill empty fields (${plan.fills.length})<ul>${fillsHtml}</ul></div>
+        <div class="dup-preview-sec">Conflicts → logged to General Notes (${plan.conflicts.length+plan.notesConflictLines.length})<ul>${confHtml}</ul></div>
+        <div class="dup-preview-sec">Photos<ul><li>${escapeHtml(photoLine)}</li></ul></div>
+        <div class="dup-preview-actions">
+          <button class="merge-btn" onclick="executeMerge('${gid}')">✓ Confirm &amp; merge</button>
+          <button class="skip-btn" onclick="cancelPreview('${gid}')">Cancel</button>
+        </div>
+      </div>`;
     btn.disabled = false;
+  }).catch(e=>{
+    pv.innerHTML = `<div class="log-err" style="padding:10px;font-size:12px">Preview failed: ${escapeHtml(e.message)}</div>`;
+    btn.disabled = false;
+  });
+}
+function cancelPreview(gid){
+  const pv=document.getElementById(`dup-preview-${gid}`);
+  if(pv){ pv.classList.remove('visible'); pv.innerHTML=''; }
+}
+
+// ── Execute the approved plan, then verify ──
+async function executeMerge(gid){
+  const group = getDupGroup(gid);
+  const plan  = group && group._plan;
+  const log   = document.getElementById(`dup-log-${gid}`);
+  const pv    = document.getElementById(`dup-preview-${gid}`);
+  if(!group || !plan){ alert('Please run Preview again.'); return; }
+  // safety: keeper + sources must all share the normalised name (placeholders already excluded)
+  const names = new Set(group.items.map(it=>it.name.trim().toLowerCase()));
+  if(names.size!==1){ alert('Safety stop: names differ ('+[...names].join(', ')+'). Aborted.'); return; }
+  if(pv){ pv.querySelectorAll('button').forEach(b=>b.disabled=true); }
+  log.className='dup-merge-log visible'; log.innerHTML='';
+  const addLog=(m,c='')=>{ log.innerHTML+=`<span class="${c}">${escapeHtml(m)}</span>\n`; log.scrollTop=log.scrollHeight; };
+
+  try {
+    const meta = await buildColMeta();
+    const keeperRec = group.items.find(i=>i.id===plan.keeperId);
+    const keeperBoard = keeperRec.board;
+    addLog(`KEEP id ${plan.keeperId} (${plan.keeperName}). Deleting ${plan.sources.length} record(s) after merge.`);
+
+    // 1) field writes (fill-empty-only), status/dropdown by label, create_labels_if_missing:false
+    const writeVals={};
+    plan.fills.forEach(f=>{
+      if(f.type==='color')        writeVals[f.colId]={label:f.text};
+      else if(f.type==='dropdown')writeVals[f.colId]={labels:f.text.split(',').map(s=>s.trim()).filter(Boolean)};
+      else { try{ writeVals[f.colId]=JSON.parse(f.value); }catch{ writeVals[f.colId]=f.text; } }
+    });
+    if(plan.notesWrite!=null) writeVals[NOTES_COL]={text:plan.notesWrite};
+
+    if(Object.keys(writeVals).length){
+      addLog(`Writing ${Object.keys(writeVals).length} field(s) to keeper…`);
+      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
+        {i:plan.keeperId, b:keeperBoard, c:JSON.stringify(writeVals)});
+      addLog('  ✓ Fields written','log-ok');
+    } else addLog('  No empty fields to fill.');
+
+    // 2) photos
+    addLog('Merging photos…');
+    const sourceRecs = plan.sources.map(s=>group.items.find(i=>i.id===s.id));
+    const pr = await mergePhotosExecute(plan.keeperId, sourceRecs, addLog);
+    addLog(`  ✓ ${pr.added} photo(s) added${pr.skippedDead?`, ${pr.skippedDead} orphaned skipped`:''}`, 'log-ok');
+
+    // 3) comment + delete each source
+    for(const s of plan.sources){
+      const body=`MERGED INTO ${plan.keeperId} (${plan.keeperName}) on ${new Date().toISOString().slice(0,10)}. Conflicts logged in the kept record's General Notes.`;
+      try { await gql(`mutation($i:ID!,$b:String!){create_update(item_id:$i,body:$b){id}}`,{i:s.id,b:body}); }
+      catch(e){ addLog(`  (comment on ${s.id} failed: ${e.message})`,'log-warn'); }
+      await gql(`mutation{delete_item(item_id:${s.id}){id}}`);
+      addLog(`  ✓ Deleted ${s.name} (${s.id})`,'log-ok');
+    }
+
+    // 4) verify
+    addLog('Verifying kept record…');
+    const checks = await verifyMerge(plan);
+    const ok = checks.every(c=>c[1]);
+    renderVerify(gid, checks, ok);
+    addLog(ok?'✓ Verification passed':'⚠ Verification flagged something — see panel', ok?'log-ok':'log-warn');
+
+    group.done = true;
+    const card=document.getElementById(`dup-group-${gid}`);
+    if(card){ card.style.opacity='0.6'; card.querySelectorAll('.dup-actions button,.dup-preview button,.dup-keeper-pick input').forEach(b=>b.disabled=true); }
+  } catch(e){
+    addLog(`✗ Error: ${e.message}`,'log-err');
+    if(pv){ pv.querySelectorAll('button').forEach(b=>b.disabled=false); }
     console.error(e);
   }
 }
 
-async function mergePhotos(oldest, rest, addLog){
-  // Build the current file entries for oldest (headshot + extras)
-  const fullData = await gql(`{items(ids:[${oldest.id}]){
-    assets{id name file_size file_extension}
-    column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}
-  }}`);
-  const item = fullData.items[0];
-  const assetById = {};
-  item.assets.forEach(a => assetById[String(a.id)] = a);
-
-  const colEntries = colId => {
-    const cv = item.column_values.find(c=>c.id===colId);
-    if(!cv?.value) return [];
-    try { return JSON.parse(cv.value).files || []; } catch { return []; }
-  };
-  const existingHeadshot = colEntries('files_mkncw5nm');
-  const existingExtras   = colEntries('file_mkp1n4bt');
-
-  // Dedup keys: prefer name+size (robust across items), fall back to name+assetId
-  const dedupKey = (entry, lookup) => {
-    const a = lookup[String(entry.assetId)];
-    if(a && a.file_size != null) return `${a.name}|${a.file_size}`;
-    if(a) return `${a.name}|noSize`;
-    return `${entry.name}|missingAsset|${entry.assetId}`;
-  };
-  const seenKeys = new Set([...existingHeadshot, ...existingExtras].map(e => dedupKey(e, assetById)));
-
-  let newHeadshot = [...existingHeadshot];
-  let added = 0;
-  let skippedDead = 0;
-
-  for(const newer of rest){
-    const nd = await gql(`{items(ids:[${newer.id}]){
-      assets{id name file_size file_extension}
-      column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}
-    }}`);
-    const ni = nd.items[0];
-    const naById = {};
-    ni.assets.forEach(a => naById[String(a.id)] = a);
-
-    const nColEntries = colId => {
-      const cv = ni.column_values.find(c=>c.id===colId);
-      if(!cv?.value) return [];
-      try { return JSON.parse(cv.value).files||[]; } catch { return []; }
-    };
-
-    // SAFETY: only port entries whose asset actually exists on the source item.
-    // Restored-from-recycle-bin items can have column refs to orphaned assetIds —
-    // copying those would write dead references that monday can't render.
-    const isLive = entry => naById[String(entry.assetId)] !== undefined;
-
-    // Try to port headshot if oldest has none
-    if(!newHeadshot.length){
-      const nh = nColEntries('files_mkncw5nm');
-      if(nh.length){
-        if(!isLive(nh[0])){
-          addLog(`  ~ Skipping headshot from ${newer.id} (asset ${nh[0].assetId} orphaned — re-upload manually)`, 'log-warn');
-          skippedDead++;
-        } else {
-          const key = dedupKey(nh[0], naById);
-          if(!seenKeys.has(key)){
-            // Foolproof: re-upload the real bytes onto the oldest item (owned asset)
-            await moveAssetToColumn(oldest.id, 'files_mkncw5nm', nh[0].assetId);
-            newHeadshot = [nh[0]]; // mark as filled so we don't port another headshot
-            seenKeys.add(key);
-            addLog(`  + Ported headshot from ${newer.id} (${naById[String(nh[0].assetId)].name})`, 'log-ok');
-            added++;
-          }
-        }
-      }
+async function mergePhotosExecute(keeperId, sources, addLog){
+  const kd = await gql(`{items(ids:[${keeperId}]){assets{id name file_size file_extension} column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
+  const ki=kd.items[0]; const kA=assetMap(ki);
+  const ent=colId=>{const cv=ki.column_values.find(c=>c.id===colId); if(!cv||!cv.value)return[]; try{return JSON.parse(cv.value).files||[];}catch{return[];}};
+  let keeperHead=ent('files_mkncw5nm'); const keeperExtra=ent('file_mkp1n4bt');
+  const seen=new Set([...keeperHead,...keeperExtra].map(e=>dedupKey(e,kA)));
+  let added=0, skippedDead=0, headFilled=keeperHead.length>0;
+  for(const s of sources){
+    const sd=await gql(`{items(ids:[${s.id}]){assets{id name file_size file_extension} column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
+    const si=sd.items[0]; const sA=assetMap(si);
+    const sEnt=colId=>{const cv=si.column_values.find(c=>c.id===colId); if(!cv||!cv.value)return[]; try{return JSON.parse(cv.value).files||[];}catch{return[];}};
+    const live=e=>sA[String(e.assetId)]!==undefined;
+    const sHead=sEnt('files_mkncw5nm'); let toExtras=[];
+    for(const h of sHead){
+      if(!live(h)){skippedDead++; addLog(`  ~ orphaned headshot on ${s.id} skipped`,'log-warn'); continue;}
+      if(!headFilled){ const k=dedupKey(h,sA); if(!seen.has(k)){ await moveAssetToColumn(keeperId,'files_mkncw5nm',h.assetId); seen.add(k); headFilled=true; added++; addLog(`  + headshot ported from ${s.id} (${sA[String(h.assetId)].name})`,'log-ok'); } }
+      else toExtras.push(h);  // keeper already has a headshot → dup's headshot becomes an extra
     }
-
-    // Port extra photos (dedup by name+size, skip orphaned) — re-upload real bytes
-    const ne = [...nColEntries('files_mkncw5nm').slice(newHeadshot.length?1:0), ...nColEntries('file_mkp1n4bt')];
-    for(const entry of ne){
-      if(!isLive(entry)){
-        addLog(`  ~ Skipping extra "${entry.name}" from ${newer.id} (asset ${entry.assetId} orphaned)`, 'log-warn');
-        skippedDead++;
-        continue;
-      }
-      const a = naById[String(entry.assetId)];
-      const key = dedupKey(entry, naById);
-      if(seenKeys.has(key)){
-        addLog(`  ~ Skipping duplicate photo: ${a.name}`);
-        continue;
-      }
-      seenKeys.add(key);
-      // Foolproof: re-upload the real bytes onto the oldest item (owned asset)
-      await moveAssetToColumn(oldest.id, 'file_mkp1n4bt', entry.assetId);
-      added++;
-      addLog(`  + Added photo: ${a.name}`, 'log-ok');
+    toExtras=toExtras.concat(sEnt('file_mkp1n4bt'));
+    for(const e of toExtras){
+      if(!live(e)){skippedDead++; addLog(`  ~ orphaned photo on ${s.id} skipped`,'log-warn'); continue;}
+      const k=dedupKey(e,sA); if(seen.has(k)){ addLog(`  ~ duplicate photo skipped: ${sA[String(e.assetId)].name}`); continue; }
+      seen.add(k); await moveAssetToColumn(keeperId,'file_mkp1n4bt',e.assetId); added++; addLog(`  + photo added: ${sA[String(e.assetId)].name}`,'log-ok');
     }
   }
+  return {added, skippedDead};
+}
 
-  if(skippedDead > 0){
-    addLog(`  ⚠ ${skippedDead} photo(s) had orphaned asset refs and were skipped — re-upload manually if needed`, 'log-warn');
+async function verifyMerge(plan){
+  const meta = await buildColMeta();
+  const d = await gql(`{items(ids:[${plan.keeperId}]){id group{id} assets{id} column_values{id text value}}}`);
+  const post = d.items[0];
+  const pmap={}; post.column_values.forEach(c=>pmap[c.id]=c);
+  const hasVal=c=>c&&((c.text||'').trim()||(c.value&&c.value!=='null'&&c.value!=='{}'));
+  const checks=[];
+  const postStatus=statusIdxOf(post);
+  checks.push(['Keeper status unchanged', postStatus===plan.preSnapshot.statusIdx, plan.preSnapshot.statusText]);
+  checks.push(['Keeper still in its group', (post.group?.id||null)===plan.preSnapshot.groupId, '']);
+  const lost=[];
+  plan.preSnapshot.nonEmpty.forEach(cid=>{ if(cid===NOTES_COL) return; if(!hasVal(pmap[cid])) lost.push(meta.title[cid]||cid); });
+  checks.push(['No existing field lost', lost.length===0, lost.length?('lost: '+lost.join(', ')):'all retained']);
+  const postHead=fileEntries(post,'files_mkncw5nm').length;
+  const expectHead = plan.preSnapshot.headCount>0 || plan.photo.portHeadshot;
+  checks.push(['Headshot present', !expectHead || postHead>0, postHead+' headshot file(s)']);
+  const postExtra=fileEntries(post,'file_mkp1n4bt').length;
+  checks.push(['Extra photos not lost', postExtra>=plan.preSnapshot.extraCount, postExtra+' extra(s) (was '+plan.preSnapshot.extraCount+')']);
+  if(plan.conflicts.length || plan.notesConflictLines.length){
+    const notes=(pmap[NOTES_COL]?.text||'');
+    checks.push(['Conflicts logged to Notes', notes.includes('[DUPLICATE'), 'stamp present']);
   }
-  if(added === 0){
-    addLog('  No new photos to add');
-    return;
+  if(plan.sources.length){
+    const dd=await gql(`{items(ids:[${plan.sources.map(s=>s.id).join(',')}]){id}}`);
+    const present=new Set((dd.items||[]).map(i=>i.id));
+    const still=plan.sources.filter(s=>present.has(s.id)).map(s=>s.id);
+    checks.push(['Duplicate(s) deleted', still.length===0, still.length?('still present: '+still.join(', ')):plan.sources.length+' deleted']);
   }
-  // All ported photos were uploaded as real owned assets above — no reference write needed.
-  addLog(`  ✓ Merged ${added} new photo(s)`, 'log-ok');
+  return checks;
+}
+
+function renderVerify(gid, checks, ok){
+  const pv=document.getElementById(`dup-preview-${gid}`);
+  if(!pv) return;
+  pv.classList.add('visible');
+  pv.innerHTML = `
+    <div class="dup-verify-box ${ok?'pass':'fail'}">
+      <div class="dup-preview-h">${ok?'✓ Verified — kept record looks good':'⚠ Review — something needs a look'}</div>
+      <ul>${checks.map(c=>`<li class="${c[1]?'vok':'vbad'}">${c[1]?'✓':'✗'} ${escapeHtml(c[0])}${c[2]?` <span class="dim">— ${escapeHtml(String(c[2]))}</span>`:''}</li>`).join('')}</ul>
+    </div>`;
 }
 
 function skipGroup(gid){
-  const el = document.getElementById(`dup-group-${gid}`);
+  const g=getDupGroup(gid); if(g) g.done=true;
+  const el=document.getElementById(`dup-group-${gid}`);
   if(el){ el.style.opacity='0.4'; el.style.pointerEvents='none'; }
 }
 
