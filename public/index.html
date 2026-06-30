@@ -109,6 +109,7 @@
   .dup-verify-box .vok{color:var(--success)}
   .dup-verify-box .vbad{color:var(--warning)}
   .dim{color:var(--text-dim)}
+  .dup-keeper-warn{background:#facc1518;border:1px solid #facc1550;color:#facc15;border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.5;margin:6px 0}
   .dup-frow{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
   .dup-inc{display:flex;align-items:center;gap:5px;cursor:pointer}
   .dup-inc input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
@@ -2760,6 +2761,7 @@ async function bootCheck(){
    v2: empty values never logged; preview values are editable;
        deletion verified by item state (+ Recycle Bin note).
    v3: live scan progress + spinner.
+   v4: resilient deletes (retry) + keeper guardrail.
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
@@ -2770,6 +2772,8 @@ const STATUS_EVERNOTE  = ST.EVERNOTE;
 const NOTES_COL = 'long_text_mktg36ee';
 const EDITABLE = new Set(['text','long_text','numbers','date','color','dropdown','email']);
 
+const STATUS_NAME = {2:'5-APPROVED',105:'00-EXCLUSIVE',4:'00-ALL-STAR',7:'3-INTERVIEW',9:'4-REVIEW',10:'2-POTENTIAL',8:'1-SCREEN',5:'0-APPLICANT',1:'Outside Exclusive',0:'00-RETIRED',11:'EVERNOTE IMPORT',12:'DUPLICATE',3:'5-REJECTED',6:'00-DELETE'};
+function statusName(idx){ return STATUS_NAME[idx] || ('status '+idx); }
 function statusRank(idx){
   switch(idx){
     case ST.APPROVED: case ST.EXCLUSIVE: case ST.ALLSTAR: return 100;
@@ -3168,6 +3172,11 @@ function previewMerge(gid){
   btn.disabled = true; btn.textContent = 'Computing…';
   buildColMeta().then(meta => computePlan(group).then(plan=>{
     group._plan = plan;
+    const keeperItem = group.items.find(i=>i.id===plan.keeperId);
+    const best = group.items.reduce((a,b)=> statusRank(b.statusIdx)>statusRank(a.statusIdx)?b:a, group.items[0]);
+    const keeperWarn = (keeperItem && statusRank(keeperItem.statusIdx) < statusRank(best.statusIdx))
+      ? `<div class="dup-keeper-warn">⚠ You're keeping a <b>${escapeHtml(statusName(keeperItem.statusIdx))}</b> record and will DELETE a higher-status <b>${escapeHtml(statusName(best.statusIdx))}</b> record. Usually you keep the higher-status one — re-check the keeper above if that's not intended.</div>`
+      : '';
     const fillsHtml = plan.fills.length
       ? plan.fills.map(f=>{
           const editable=EDITABLE.has(f.type);
@@ -3194,6 +3203,7 @@ function previewMerge(gid){
         <div class="dup-preview-h">Preview — edit anything below, then approve</div>
         <div class="dup-preview-row"><span class="k">KEEP</span> ${escapeHtml(plan.keeperName)} <span class="dim">(id ${plan.keeperId})</span></div>
         <div class="dup-preview-row"><span class="k">DELETE</span> ${delHtml}</div>
+        ${keeperWarn}
         <div class="dup-preview-sec">Fill empty fields (${plan.fills.length}) — uncheck to skip, or edit the value<ul>${fillsHtml}</ul></div>
         <div class="dup-preview-sec">Conflicts (${plan.conflicts.length}) — choose which value the kept record gets<ul>${confHtml}</ul></div>
         <div class="dup-preview-sec">Photos<ul><li>${escapeHtml(photoLine)}</li></ul></div>
@@ -3210,6 +3220,34 @@ function previewMerge(gid){
   });
 }
 function cancelPreview(gid){ const pv=document.getElementById(`dup-preview-${gid}`); if(pv){ pv.classList.remove('visible'); pv.innerHTML=''; } }
+
+async function gqlRetry(q, vars, tries=3){
+  let lastErr;
+  for(let i=0;i<tries;i++){
+    try { return await gql(q, vars); }
+    catch(e){ lastErr=e; if(i<tries-1) await new Promise(r=>setTimeout(r, 700*(i+1))); }
+  }
+  throw lastErr;
+}
+
+async function retryFailedDeletes(gid){
+  const group=getDupGroup(gid); if(!group||!group._failedDeletes||!group._failedDeletes.length) return;
+  const log=document.getElementById(`dup-log-${gid}`);
+  const addLog=(m,c='')=>{ if(log){ log.className='dup-merge-log visible'; log.innerHTML+=`<span class="${c}">${escapeHtml(m)}</span>\n`; log.scrollTop=log.scrollHeight; } };
+  const still=[];
+  for(const s of group._failedDeletes){
+    try { await gqlRetry(`mutation{delete_item(item_id:${s.id}){id}}`,{}); addLog(`  ✓ Deleted ${s.name} (${s.id})`,'log-ok'); }
+    catch(e){ still.push(s); addLog(`  ✗ Still could not delete ${s.name} (${s.id}): ${e.message}`,'log-err'); }
+  }
+  group._failedDeletes = still;
+  if(group._plan){ const checks=await verifyMerge(group._plan); renderVerify(gid, checks, checks.every(c=>c[1])); }
+  if(!still.length){
+    const rb=document.getElementById(`retry-del-${gid}`); if(rb) rb.remove();
+    group.done=true;
+    const card=document.getElementById(`dup-group-${gid}`);
+    if(card){ card.style.opacity='0.6'; card.querySelectorAll('.dup-actions button,.dup-keeper-pick input').forEach(b=>b.disabled=true); }
+  }
+}
 
 async function executeMerge(gid){
   const group = getDupGroup(gid);
@@ -3233,7 +3271,7 @@ async function executeMerge(gid){
 
     if(Object.keys(writeVals).length){
       addLog(`Writing ${Object.keys(writeVals).length} field(s) to keeper…`);
-      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
+      await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
         {i:plan.keeperId, b:keeperBoard, c:JSON.stringify(writeVals)});
       addLog('  ✓ Fields written','log-ok');
     } else addLog('  No field changes to write.');
@@ -3243,18 +3281,35 @@ async function executeMerge(gid){
     const pr = await mergePhotosExecute(plan.keeperId, sourceRecs, addLog);
     addLog(`  ✓ ${pr.added} photo(s) added${pr.skippedDead?`, ${pr.skippedDead} orphaned skipped`:''}`, 'log-ok');
 
+    const failedDeletes=[];
     for(const s of plan.sources){
       const body=`MERGED INTO ${plan.keeperId} (${plan.keeperName}) on ${new Date().toISOString().slice(0,10)}. Conflicts logged in the kept record's General Notes.`;
-      try { await gql(`mutation($i:ID!,$b:String!){create_update(item_id:$i,body:$b){id}}`,{i:s.id,b:body}); }
+      try { await gqlRetry(`mutation($i:ID!,$b:String!){create_update(item_id:$i,body:$b){id}}`,{i:s.id,b:body}); }
       catch(e){ addLog(`  (comment on ${s.id} failed: ${e.message})`,'log-warn'); }
-      await gql(`mutation{delete_item(item_id:${s.id}){id}}`);
-      addLog(`  ✓ Deleted ${s.name} (${s.id}) — recoverable in monday's Recycle Bin`,'log-ok');
+      try {
+        await gqlRetry(`mutation{delete_item(item_id:${s.id}){id}}`,{});
+        addLog(`  ✓ Deleted ${s.name} (${s.id}) — recoverable in monday's Recycle Bin`,'log-ok');
+      } catch(e){
+        failedDeletes.push(s);
+        addLog(`  ✗ Could not delete ${s.name} (${s.id}) after retries: ${e.message}`,'log-err');
+      }
     }
+    group._failedDeletes = failedDeletes;
 
     addLog('Verifying kept record…');
     const checks = await verifyMerge(plan);
     const ok = checks.every(c=>c[1]);
     renderVerify(gid, checks, ok);
+    if(failedDeletes.length){
+      addLog(`⚠ ${failedDeletes.length} record(s) could not be deleted — nothing was lost. Use "Retry delete" to finish.`,'log-warn');
+      const acts=document.querySelector(`#dup-group-${gid} .dup-actions`);
+      if(acts && !document.getElementById(`retry-del-${gid}`)){
+        const b=document.createElement('button'); b.className='merge-btn'; b.id=`retry-del-${gid}`;
+        b.textContent='↻ Retry delete'; b.onclick=()=>retryFailedDeletes(gid);
+        acts.insertBefore(b, acts.firstChild);
+      }
+      return;
+    }
     addLog(ok?'✓ Verification passed — kept record looks good.':'⚠ One check needs a look — see panel above.', ok?'log-ok':'log-warn');
 
     group.done = true;
