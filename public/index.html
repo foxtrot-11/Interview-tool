@@ -419,7 +419,29 @@
   .upload-step.error{color:var(--danger)}
   .upload-step-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
 
-  @media(max-width:768px){.main{grid-template-columns:1fr}.sidebar{display:none}.form-area{padding:18px 14px}.field-grid{grid-template-columns:1fr}.field-grid.triple{grid-template-columns:1fr 1fr}header{padding:0 14px}.selector-bar{padding:10px 14px}}
+  /* ── MOBILE: class-driven so the Desktop/Mobile toggle works both ways ── */
+  .hamburger{display:none;background:transparent;border:1px solid var(--border);color:var(--text);font-size:18px;line-height:1;padding:5px 11px;border-radius:var(--radius);cursor:pointer}
+  .drawer-head{display:none}
+  .mode-btn.view-toggle{display:none}
+  .drawer-overlay{display:none}
+  body.narrow .hamburger{display:inline-flex;align-items:center;justify-content:center}
+  body.narrow header{padding:0 14px;justify-content:flex-start;gap:12px}
+  body.narrow .mode-selector{position:fixed;top:0;left:0;bottom:0;width:80%;max-width:300px;display:flex;flex-direction:column;align-items:stretch;gap:0;border:none;border-right:1px solid var(--border);border-radius:0;background:var(--surface);z-index:120;transform:translateX(-100%);transition:transform 0.25s ease;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  body.narrow .mode-selector.open{transform:translateX(0)}
+  body.narrow .mode-btn{border-right:none;border-bottom:1px solid var(--border);padding:15px 18px;font-size:13px;text-align:left;min-height:50px}
+  body.narrow .mode-btn:last-child{border-bottom:none}
+  body.narrow .drawer-head{display:block;padding:16px 18px 12px;font-family:var(--font-mono);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border)}
+  body.narrow .mode-btn.view-toggle{display:block;color:var(--accent);margin-top:auto;border-top:1px solid var(--border);border-bottom:none}
+  body.narrow .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:115}
+  body.narrow .drawer-overlay.open{display:block}
+  body.is-mobile .main{grid-template-columns:1fr}
+  body.is-mobile .sidebar{display:none}
+  body.is-mobile .form-area{padding:18px 14px}
+  body.is-mobile .field-grid{grid-template-columns:1fr}
+  body.is-mobile .field-grid.triple{grid-template-columns:1fr 1fr}
+  body.is-mobile .selector-bar{padding:10px 14px}
+  body.is-mobile .candidate-strip{flex-direction:column}
+  body.force-desktop{overflow-x:auto}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js" defer></script>
 </head>
@@ -453,10 +475,12 @@
 
 <!-- HEADER -->
 <header>
+  <button class="hamburger" id="hamburger" onclick="toggleDrawer()" aria-label="Menu">☰</button>
   <div class="logo">Carnal <span>Media</span></div>
 
   <!-- MODE SELECTOR -->
   <div class="mode-selector" id="mode-selector">
+    <div class="drawer-head">Menu</div>
     <button class="mode-btn" data-mode="new" onclick="setMode('new')">+ NEW MODEL</button>
     <button class="mode-btn active" data-mode="0" onclick="setMode('0')">0-APPLICANT</button>
     <button class="mode-btn" data-mode="1" onclick="setMode('1')">1-SCREEN</button>
@@ -467,6 +491,7 @@
     <button class="mode-btn" data-mode="5r" onclick="setMode('5r')">5-REJECTED</button>
     <button class="mode-btn batch-btn" data-mode="batch" onclick="setMode('batch')">EVERNOTE BATCH IMPORT</button>
     <button class="mode-btn dup-btn" data-mode="dup" onclick="setMode('dup')">DUPLICATES</button>
+    <button class="mode-btn view-toggle" id="view-toggle-btn" onclick="toggleViewMode()">Switch to desktop view</button>
   </div>
 
   <div class="save-area">
@@ -474,6 +499,7 @@
     <div class="save-status" id="save-status"></div>
   </div>
 </header>
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
 
 <!-- SELECTOR BAR (hidden in new model mode) -->
 <div class="selector-bar" id="selector-bar">
@@ -1057,6 +1083,36 @@ async function gql(q,v={}){
 }
 
 // ── INIT ──
+// ── MOBILE VIEW MODE + DRAWER ──
+// Layout is driven by body classes (not a bare media query) so the manual
+// Desktop/Mobile toggle can override the width-based default in either direction.
+function refreshViewMode(){
+  const pref = localStorage.getItem('viewPref') || 'auto';   // 'auto' | 'desktop'
+  const narrow = window.innerWidth <= 820;
+  const mobileLayout = pref==='desktop' ? false : narrow;
+  document.body.classList.toggle('narrow', narrow);            // controls hamburger/drawer availability
+  document.body.classList.toggle('is-mobile', mobileLayout);   // controls single-column layout
+  document.body.classList.toggle('force-desktop', pref==='desktop' && narrow);
+  const vt=document.getElementById('view-toggle-btn');
+  if(vt) vt.textContent = mobileLayout ? 'Switch to desktop view' : 'Switch to mobile view';
+}
+function toggleViewMode(){
+  const isMobileNow = document.body.classList.contains('is-mobile');
+  localStorage.setItem('viewPref', isMobileNow ? 'desktop' : 'auto');
+  refreshViewMode();
+  closeDrawer();
+}
+function toggleDrawer(){
+  const ms=document.getElementById('mode-selector'); const ov=document.getElementById('drawer-overlay');
+  const open=ms.classList.toggle('open'); if(ov) ov.classList.toggle('open', open);
+}
+function closeDrawer(){
+  document.getElementById('mode-selector')?.classList.remove('open');
+  document.getElementById('drawer-overlay')?.classList.remove('open');
+}
+window.addEventListener('resize', refreshViewMode);
+refreshViewMode();
+
 async function init(){
   try{
     // Load board IDs for THIS environment (production vs staging) before anything else.
@@ -1184,6 +1240,7 @@ function buildAllDropdowns(){
 
 // ── MODE ──
 async function setMode(mode){
+  closeDrawer();
   // Switch active board: batch tab → batch board, everything else → main board.
   const wantBoard = (mode === 'batch') ? BATCH_BOARD_ID : MAIN_BOARD_ID;
   if(wantBoard !== BOARD_ID){
@@ -2839,6 +2896,7 @@ async function bootCheck(){
    v3: live scan progress + spinner.
    v4: resilient deletes (retry) + keeper guardrail.
    v5: dup search + lazy per-group load, local draft autosave, contrast, search-focus.
+   v6: mobile skeleton — responsive layout + hamburger drawer + view toggle.
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
