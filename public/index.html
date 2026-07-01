@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 <title>Carnal Media — Model Tool</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -26,7 +29,10 @@
   .logo span{color:var(--text-muted);font-weight:400}
 
   /* MODE SELECTOR */
-  .mode-selector{display:flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;flex-shrink:0}
+  .mode-selector{display:flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;overflow-y:hidden;flex-shrink:1;min-width:0;scrollbar-width:thin}
+  .mode-selector::-webkit-scrollbar{height:6px}
+  .mode-selector::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+  .mode-selector .mode-btn{flex:0 0 auto;white-space:nowrap}
   .mode-btn{padding:6px 14px;font-family:var(--font-mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;border:none;background:transparent;color:var(--text-muted);transition:all 0.15s;white-space:nowrap;border-right:1px solid var(--border)}
   .mode-btn:last-child{border-right:none}
   .mode-btn:hover{color:var(--text);background:var(--surface2)}
@@ -94,6 +100,9 @@
   .kb-thumb img{width:56px;height:56px;object-fit:cover;display:block}
   .kb-name{flex:1 1 auto;min-width:0;font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .kb-caret{flex:0 0 auto;color:var(--text-muted);font-size:12px;padding-left:2px}
+  .kb-mono{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:var(--font-display);font-weight:700;font-size:20px;color:var(--text-muted)}
+  .kb-loadphotos{display:block;margin:8px 8px 0;padding:8px;background:var(--surface);border:1px dashed var(--border-active);color:var(--text-muted);border-radius:6px;font-family:var(--font-mono);font-size:11px;cursor:pointer;text-align:center}
+  .kb-loadphotos:hover{border-color:var(--accent);color:var(--accent)}
   .kb-mini{padding:0 8px 8px;font-size:11px}
   .kb-notes{color:var(--text-muted);line-height:1.4}
   .kb-empty{color:var(--text-dim)}
@@ -1229,6 +1238,9 @@ const KANBAN_COLOR = {'0':'#c4c4c4','1':'#cab641','2':'#ff6d3b','3':'#ffcb00','4
 const KB_STATUS_ORDER = [5,8,10,7,9,2,105,4,1,0,6,3,11,12]; // dropdown order (incl. Evernote/Duplicate so a card can be moved out)
 let kanbanItems = [];
 let kbHeadCache = {};
+const KB_AUTO_THRESHOLD = 60;   // columns bigger than this load photos only on demand
+let kbBuckets = [];
+let kbColLoaded = {};           // colIndex -> true once photos requested
 function kbIdxToCol(){ const m={}; KANBAN_COLS.forEach((c,i)=>c.ids.forEach(id=>m[id]=i)); return m; }
 function kbStatusToMode(idx){ for(const c of KANBAN_COLS){ if(c.ids.includes(idx)) return c.mode; } return 'all'; }
 
@@ -1258,9 +1270,9 @@ async function loadKanban(){
       setLoad(`Loading models… ${items.length} loaded`);
     } while(cursor && pages<8);
     kanbanItems=items;
+    kbColLoaded={};
     loading.style.display='none';
     renderKanban();
-    fetchKanbanHeadshots();
   }catch(e){
     loading.innerHTML='<span style="color:var(--danger)">Failed to load: '+escapeHtml(e.message)+'</span>';
   }
@@ -1405,7 +1417,8 @@ function kanbanCardHtml(m){
   const notes = m.notes ? escapeHtml(m.notes.length>90 ? m.notes.slice(0,88)+'…' : m.notes) : '<span class="kb-empty">— no notes —</span>';
   const tw = m.twUrl ? `<a class="kb-tw" href="${escapeHtml(m.twUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Twitter ↗</a>` : '';
   const cached = m.head ? kbHeadCache[m.head] : null;
-  const thumb = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : '';
+  const initial = escapeHtml((m.name||'?').trim().charAt(0).toUpperCase()||'?');
+  const thumb = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : `<span class="kb-mono">${initial}</span>`;
   return `<div class="kb-card" data-id="${m.id}">
     <div class="kb-card-top" onclick="openKanbanModal('${m.id}')">
       <div class="kb-thumb" id="kbthumb-${m.id}">${thumb}</div>
@@ -1431,16 +1444,29 @@ function renderKanban(){
     buckets[ci].push(m);
   });
   buckets.forEach(b=>b.sort((a,b2)=>(b2.updated_at||'').localeCompare(a.updated_at||'')));
-  board.innerHTML = KANBAN_COLS.map((c,i)=>`
+  kbBuckets = buckets;
+  board.innerHTML = KANBAN_COLS.map((c,i)=>{
+    const big = buckets[i].length > KB_AUTO_THRESHOLD && !kbColLoaded[i];
+    const loadBtn = big ? `<button class="kb-loadphotos" onclick="loadKanbanColumnPhotos(${i})">⬇ Load ${buckets[i].length} photos</button>` : '';
+    return `
     <div class="kb-col">
       <div class="kb-col-head" style="background:${KANBAN_COLOR[c.mode]}">${escapeHtml(c.label)}<span class="kb-count">${buckets[i].length}</span></div>
+      ${loadBtn}
       <div class="kb-col-body" id="kbcol-${i}">${buckets[i].map(kanbanCardHtml).join('')}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   document.getElementById('kanban-summary').textContent = `${kanbanItems.length} models`;
+  // Auto-load headshots for small columns (and any column the user asked to load); skip big ones.
+  buckets.forEach((b,i)=>{ if(b.length<=KB_AUTO_THRESHOLD || kbColLoaded[i]) fetchKanbanHeadshotsForModels(b); });
 }
 
-async function fetchKanbanHeadshots(){
-  const need = kanbanItems.filter(m=>m.head && !kbHeadCache[m.head]);
+async function loadKanbanColumnPhotos(i){
+  kbColLoaded[i]=true;
+  renderKanban();               // drops the button, then auto-loads this column
+}
+
+async function fetchKanbanHeadshotsForModels(models){
+  const need = (models||[]).filter(m=>m.head && !kbHeadCache[m.head]);
   for(let i=0;i<need.length;i+=40){
     const chunk=need.slice(i,i+40);
     const ids=chunk.map(m=>m.head).join(',');
@@ -3350,6 +3376,7 @@ async function bootCheck(){
    v7: ALL MODELS tab + KANBAN board (status columns, expandable inline-edit cards).
    v7.1: kanban — wider columns, full-screen modal editor on card click.
    v7.2: kanban — full field set in scrolling modal, bulletproof cards, removed 'open full editor'.
+   v7.3: kanban — scrollable header tabs, Approved loads on-demand (Load photos button), no-cache headers.
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
