@@ -438,6 +438,13 @@
   body.is-mobile .field-grid.triple{grid-template-columns:1fr 1fr}
   body.is-mobile .selector-bar{padding:10px 14px}
   body.is-mobile .candidate-strip{flex-direction:column}
+  body.is-mobile .strip-photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+  body.is-mobile .strip-photo-thumb{width:100%;height:auto;aspect-ratio:1}
+  body.is-mobile #lightbox-img{max-width:96vw;max-height:80vh}
+  body.is-mobile .lightbox-nav{width:52px;height:52px;font-size:22px}
+  body.is-mobile #lightbox-prev{left:10px}
+  body.is-mobile #lightbox-next{right:10px}
+  body.is-mobile #lightbox-close{width:46px;height:46px;top:14px;right:14px}
   body.force-desktop{overflow-x:auto}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js" defer></script>
@@ -1122,6 +1129,17 @@ function closeDrawer(){
   document.getElementById('drawer-overlay')?.classList.remove('open');
 }
 window.addEventListener('resize', refreshViewMode);
+// Lightbox: swipe left/right to flip through photos on touch devices
+(function(){
+  const lb=document.getElementById('lightbox'); if(!lb) return;
+  let x0=null;
+  lb.addEventListener('touchstart',e=>{ x0=e.changedTouches[0].clientX; },{passive:true});
+  lb.addEventListener('touchend',e=>{
+    if(x0===null) return;
+    const dx=e.changedTouches[0].clientX-x0; x0=null;
+    if(Math.abs(dx)>50 && typeof lightboxNav==='function') lightboxNav(dx<0?1:-1);
+  },{passive:true});
+})();
 refreshViewMode();
 
 async function init(){
@@ -2911,6 +2929,7 @@ async function bootCheck(){
    v6: mobile skeleton — responsive layout + hamburger drawer + view toggle.
    v6.1: drawer stacking fix — drawer now sits above the overlay (was tap-blocked).
    v6.2: mobile — replaced hamburger drawer with a native status dropdown above search.
+   v6.3: mobile photos — 3-across grid, roomier lightbox + bigger tap targets, swipe to flip.
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
