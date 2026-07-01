@@ -84,24 +84,32 @@
   .mode-btn.active[data-mode="all"]{background:#e8e8f0;color:#111}
   .mode-btn.active[data-mode="kanban"]{background:#9d50dd;color:#fff}
   .kanban-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
-  .kb-col{flex:0 0 320px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;max-height:calc(100vh - 230px)}
+  .kb-col{flex:0 0 360px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;max-height:calc(100vh - 230px)}
   .kb-col-head{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:0.04em;color:#111;padding:10px 12px;border-radius:7px 7px 0 0}
   .kb-count{opacity:0.65;margin-left:4px}
   .kb-col-body{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
   .kb-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
   .kb-card-top{display:flex;align-items:center;gap:8px;padding:8px;cursor:pointer}
-  .kb-thumb{width:54px;height:54px;border-radius:4px;background:var(--surface2);flex-shrink:0;overflow:hidden}
-  .kb-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-  .kb-name{flex:1;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .kb-caret{color:var(--text-muted);font-size:12px}
+  .kb-thumb{width:56px;height:56px;min-width:56px;flex:0 0 56px;border-radius:5px;background:var(--surface2);overflow:hidden}
+  .kb-thumb img{width:56px;height:56px;object-fit:cover;display:block}
+  .kb-name{flex:1 1 auto;min-width:0;font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kb-caret{flex:0 0 auto;color:var(--text-muted);font-size:12px;padding-left:2px}
   .kb-mini{padding:0 8px 8px;font-size:11px}
   .kb-notes{color:var(--text-muted);line-height:1.4}
   .kb-empty{color:var(--text-dim)}
   .kb-tw{display:inline-block;margin-top:5px;color:var(--accent);font-size:11px;text-decoration:none}
   .kb-full{border-top:1px solid var(--border);padding:10px 8px;display:flex;flex-direction:column;gap:8px;background:var(--surface2)}
-  .kb-modal{position:fixed;inset:0;background:rgba(8,8,10,0.82);z-index:9000;display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto}
+  .kb-modal{position:fixed;inset:0;background:rgba(8,8,10,0.82);z-index:9000;display:none;align-items:flex-start;justify-content:center;padding:32px 20px;overflow-y:auto}
   .kb-modal.open{display:flex}
-  .kb-modal-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:920px;padding:24px 28px 28px;position:relative;box-shadow:0 24px 90px rgba(0,0,0,0.65)}
+  .kb-modal-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:940px;position:relative;box-shadow:0 24px 90px rgba(0,0,0,0.65);max-height:calc(100vh - 64px);display:flex;flex-direction:column;overflow:hidden}
+  #kb-modal-body{overflow-y:auto;padding:26px 28px 0}
+  .kb-sec{margin-top:22px}
+  .kb-sec:first-of-type{margin-top:2px}
+  .kb-sec-title{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:0.08em;color:var(--accent);text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  .kb-checks{display:flex;flex-wrap:wrap;gap:6px}
+  .kb-chk{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:6px 10px;font-size:11px;color:var(--text);cursor:pointer;text-transform:none;letter-spacing:normal}
+  .kb-chk input{margin:0}
+  .kb-savebar{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--border);margin-top:24px;padding:14px 0;display:flex;align-items:center;gap:12px}
   .kb-modal-close{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:16px;cursor:pointer}
   .kb-modal-close:hover{border-color:var(--danger);color:var(--danger)}
   .kb-modal-head{display:flex;align-items:center;gap:16px;margin-bottom:22px}
@@ -1258,6 +1266,141 @@ async function loadKanban(){
   }
 }
 
+// Full field set for the kanban modal editor (data-driven). kind ∈ status|dropdown|longtext|text|number|link|date|phone
+const KB_STATUS_LABELS = {
+  label:{5:'0 - APPLICANT',8:'1 - SCREEN',10:'2 - POTENTIAL',7:'3 - INTERVIEW',9:'4 - REVIEW',2:'5 - APPROVED',105:'00 - EXCLUSIVE',4:'00 - ALL-STAR',1:'Outside Exclusive',0:'00 - RETIRED',6:'00 - DELETE',3:'5 - REJECTED',11:'EVERNOTE IMPORT',12:'DUPLICATE'},
+  color_mm1zghx9:{0:'TINY',4:'YES',5:'NONE',16:'A LOT'},
+  color_mm1zk5e2:{0:'YES',4:'WILL FILM',5:'NO'},
+  color_mm1zzkz6:{0:'Non-detectable',4:'YES',5:'NONE'},
+  color_mm1zbze8:{0:'PAST INFECTION',5:'NONE'},
+  color_mm1zzwv8:{4:'YES',5:'NONE',16:'A LITTLE'},
+  color_mm1z2f56:{0:'YES',4:'MAYBE',5:'NO'},
+  color_mm26w6hs:{0:'NO',4:'YES',5:'N/A'},
+  color_mm25jb44:{0:'NO PREV EXP',2:'OF only',4:'OCCASSIONAL',5:'N/A',6:'MIX of Everything',16:'REGULARLY'},
+};
+const KB_STATUS_ORDER_BY_COL = { label:[5,8,10,7,9,2,105,4,1,0,6,3,11,12] };
+const KB_SECTIONS = [
+  {title:'Status & Rating', fields:[
+    ['label','MODEL STATUS','status'],
+    ['text_mm1zb8xf','Rate Offered','text'],
+    ['numeric_mm1z34ca','Rating — Intake','number'],
+    ['numeric_mm1zjjrp','Rating — Final','number'],
+  ]},
+  {title:'Casting', fields:[
+    ['dropdown_mm1zzwcg','Type','dropdown',true],
+    ['dropdown_mknbe0p0','Role','dropdown',true],
+    ['dropdown_mm1by5q0','Sexuality (on camera)','dropdown'],
+    ['dropdown_mm1zcar6','Ethnicity','dropdown'],
+    ['color_mm1zk5e2','FTM?','status'],
+    ['long_text_mm1zbe1t','FTM Notes','longtext'],
+    ['color_mm1zghx9','Tattoos','status'],
+    ['long_text_mm1zsdyv','Tattoo Notes','longtext'],
+    ['color_mm1zzwv8','Haircut?','status'],
+    ['long_text_mm1zshaw','Haircut Notes','longtext'],
+    ['dropdown_mm1ztytq','Dick Enhancement','dropdown'],
+    ['color_mm1zzkz6','HIV','status'],
+    ['color_mm1zbze8','Syphillis','status'],
+    ['color_mm1z2f56','Collab House?','status'],
+    ['color_mm25jb44','Other Studios?','status'],
+    ['long_text_mm252r65','Other Studios Notes','longtext'],
+    ['dropdown_mkx04tbr','Cut vs Uncut','dropdown'],
+    ['dropdown_mkncp6xy','Site Compatibility','dropdown',true],
+  ]},
+  {title:'Identity', fields:[
+    ['text_mknceqty','Legal Name','text'],
+    ['date_of_birth_mkncwsrj','Date of Birth','date'],
+    ['dropdown_mknb18b7','Language(s)','dropdown',true],
+    ['dropdown_mm26n6qx','Citizenship','dropdown'],
+    ['color_mm26w6hs','Passport','status'],
+    ['text_mm1z66yj','State ID','text'],
+    ['text_mknct7cn','Address','text'],
+    ['text_mkncbdr1','Location (specific)','text'],
+    ['dropdown_mm254xed','Location (general)','dropdown'],
+  ]},
+  {title:'Contact & Links', fields:[
+    ['text_mknk1txg','Email','text'],
+    ['phone9ouk2t6x','Phone','phone'],
+    ['lien_internet','Twitter / X','link'],
+    ['lien_internet9','Instagram','link'],
+    ['dup__of_facebook','Bluesky','link'],
+    ['text_mkncy7gf','OnlyFans','text'],
+    ['text_mknc3aty','JustForFans','text'],
+  ]},
+  {title:'Measurements & Details', fields:[
+    ['text_mknc1sps','Height','text'],
+    ['text_mm1yx2wg','Weight','text'],
+    ['text_mm1y2znz','Cock Size','text'],
+    ['text_mknc62rg','Shirt Size','text'],
+    ['text_mknc2t7g','Shoe Size','text'],
+    ['text_mknc808t','Pant Size','text'],
+    ['text_mm1yf8cd','Suit Size','text'],
+    ['text_mm2dwvec','Neck Size','text'],
+    ['text_mkncsqaq','Eye Color','text'],
+    ['text_mkncjzx8','Hair Color','text'],
+    ['text_mkncgkwk','Medical Allergies','text'],
+    ['text_mkncht8f','Food Restrictions','text'],
+  ]},
+  {title:'Notes', fields:[
+    ['long_text_mktg36ee','General Notes','longtext'],
+    ['long_text_mm1z9aeg','Availability Notes','longtext'],
+    ['long_text_mknct6wd','Model Input Notes','longtext'],
+    ['long_text_mm1zhkyq','Referred By','longtext'],
+    ['long_text_mm2mxr92','Experience in Porn','longtext'],
+    ['long_text_mm1zaqzq','Experience Bottoming','longtext'],
+  ]},
+];
+const KB_ALL_FIELD_IDS = KB_SECTIONS.flatMap(s=>s.fields.map(f=>f[0]));
+
+function kbStatusOptions(colId, cur){
+  const labels = KB_STATUS_LABELS[colId]||{};
+  const order = KB_STATUS_ORDER_BY_COL[colId] || Object.keys(labels).map(Number);
+  const blank = (colId==='label') ? '' : `<option value="" ${cur==null?'selected':''}>—</option>`;
+  return blank + order.map(idx=>`<option value="${idx}" ${idx===cur?'selected':''}>${escapeHtml(labels[idx]||('status '+idx))}</option>`).join('');
+}
+function kbReadCV(cv, field){
+  const [colId,,kind] = field;
+  const c = cv[colId]; const val = c && c.value; const text = (c && c.text) || '';
+  if(kind==='status'){ try{ const i=JSON.parse(val)?.index; return (i===undefined||i===null)?null:i; }catch{ return null; } }
+  if(kind==='dropdown'){ try{ const ids=JSON.parse(val)?.ids||[]; return ids.map(Number).sort((a,b)=>a-b); }catch{ return []; } }
+  if(kind==='link'){ try{ return JSON.parse(val)?.url||''; }catch{ return ''; } }
+  if(kind==='date'){ try{ return JSON.parse(val)?.date||''; }catch{ return ''; } }
+  if(kind==='phone'){ try{ const p=JSON.parse(val); return {phone:p?.phone||'', country:p?.countryShortName||''}; }catch{ return {phone:'',country:''}; } }
+  return text;
+}
+function kbFieldControlHtml(field, cur){
+  const [colId,label,kind,multi] = field;
+  let inner;
+  if(kind==='status'){ inner=`<select id="kbf_${colId}">${kbStatusOptions(colId, cur)}</select>`; }
+  else if(kind==='dropdown'){
+    const opts=getOptions(colId);
+    if(multi){ const set=new Set(cur||[]); inner=`<div class="kb-checks" id="kbf_${colId}">`+opts.map(o=>`<label class="kb-chk"><input type="checkbox" value="${o.id}" ${set.has(Number(o.id))?'checked':''}>${escapeHtml(o.label)}</label>`).join('')+`</div>`; }
+    else { const curId=(cur&&cur.length)?cur[0]:''; inner=`<select id="kbf_${colId}"><option value="">—</option>`+opts.map(o=>`<option value="${o.id}" ${Number(o.id)===Number(curId)?'selected':''}>${escapeHtml(o.label)}</option>`).join('')+`</select>`; }
+  }
+  else if(kind==='longtext'){ inner=`<textarea id="kbf_${colId}">${escapeHtml(cur||'')}</textarea>`; }
+  else if(kind==='date'){ inner=`<input type="date" id="kbf_${colId}" value="${escapeHtml(cur||'')}">`; }
+  else if(kind==='phone'){ inner=`<input id="kbf_${colId}" value="${escapeHtml((cur&&cur.phone)||'')}" placeholder="+1…">`; }
+  else { inner=`<input id="kbf_${colId}" value="${escapeHtml(cur||'')}">`; }
+  const full=(kind==='longtext'||multi||kind==='link')?' full':'';
+  return `<label class="kb-f${full}">${escapeHtml(label)}${inner}</label>`;
+}
+function kbReadControl(field){
+  const [colId,,kind,multi]=field;
+  const el=document.getElementById('kbf_'+colId); if(!el) return undefined;
+  if(kind==='status'){ const v=el.value; return v===''?null:parseInt(v,10); }
+  if(kind==='dropdown'){ if(multi){ return Array.from(el.querySelectorAll('input:checked')).map(i=>Number(i.value)).sort((a,b)=>a-b); } const v=el.value; return v===''?[]:[Number(v)]; }
+  if(kind==='phone'){ return el.value.trim(); }
+  return el.value;
+}
+function kbBuildColVal(field, val){
+  const kind=field[2];
+  if(kind==='status'){ return val==null?null:{index:val}; }
+  if(kind==='dropdown'){ return {ids: val||[]}; }
+  if(kind==='longtext'){ return {text: val||''}; }
+  if(kind==='link'){ const u=(val||'').trim(); return u?{url:u,text:u}:{url:'',text:''}; }
+  if(kind==='date'){ return {date: val||''}; }
+  return val==null?'':String(val);
+}
+
 function kanbanCardHtml(m){
   const notes = m.notes ? escapeHtml(m.notes.length>90 ? m.notes.slice(0,88)+'…' : m.notes) : '<span class="kb-empty">— no notes —</span>';
   const tw = m.twUrl ? `<a class="kb-tw" href="${escapeHtml(m.twUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Twitter ↗</a>` : '';
@@ -1322,68 +1465,76 @@ async function openKanbanModal(id){
 }
 
 async function renderKanbanEditor(id, full){
+  const idsList = ['label','files_mkncw5nm'].concat(KB_ALL_FIELD_IDS).filter((v,i,a)=>a.indexOf(v)===i);
   let data;
-  try{ data=await gql(`{items(ids:[${id}]){id name column_values(ids:["label","long_text_mktg36ee","long_text_mm1z9aeg","long_text_mm1zsdyv","lien_internet","text_mm1zb8xf"]){id text value}}}`); }
+  try{ data=await gqlRetry(`{items(ids:[${id}]){id name column_values(ids:${JSON.stringify(idsList)}){id text value}}}`); }
   catch(e){ full.innerHTML='<div class="kb-loading-sm" style="color:var(--danger)">Load failed: '+escapeHtml(e.message)+'</div>'; return; }
   const it=data.items&&data.items[0]; if(!it){ full.innerHTML='<div class="kb-loading-sm">Not found</div>'; return; }
   const cv={}; (it.column_values||[]).forEach(c=>cv[c.id]=c);
   let curIdx=null; try{ curIdx=JSON.parse(cv['label'].value)?.index ?? null; }catch{}
-  let twUrl=''; try{ twUrl=JSON.parse(cv['lien_internet'].value)?.url || ''; }catch{}
-  const gen=cv['long_text_mktg36ee']?.text||'', av=cv['long_text_mm1z9aeg']?.text||'', tat=cv['long_text_mm1zsdyv']?.text||'', rate=cv['text_mm1zb8xf']?.text||'';
-  const statusOpts = KB_STATUS_ORDER.map(idx=>`<option value="${idx}" ${idx===curIdx?'selected':''}>${escapeHtml(STATUS_NAME[idx]||('status '+idx))}</option>`).join('');
   const m = kanbanItems.find(x=>x.id===id);
   const headUrl = (m && m.head && kbHeadCache[m.head]) ? kbHeadCache[m.head] : '';
   const headImg = headUrl ? `<img src="${escapeHtml(headUrl)}" alt="">` : '';
+  const init = {}, phoneCountry = {};
+  const sectionsHtml = KB_SECTIONS.map(sec=>{
+    const fieldsHtml = sec.fields.map(f=>{
+      const cur = kbReadCV(cv, f);
+      if(f[2]==='dropdown') init[f[0]] = JSON.stringify(cur);
+      else if(f[2]==='phone'){ init[f[0]] = cur.phone; phoneCountry[f[0]] = cur.country; }
+      else init[f[0]] = cur;
+      return kbFieldControlHtml(f, cur);
+    }).join('');
+    return `<div class="kb-sec"><div class="kb-sec-title">${escapeHtml(sec.title)}</div><div class="kb-modal-grid">${fieldsHtml}</div></div>`;
+  }).join('');
   full.innerHTML = `
     <div class="kb-modal-head">
       <div class="kb-modal-thumb">${headImg}</div>
       <div>
         <div class="kb-modal-name">${escapeHtml((m&&m.name)||it.name||'(no name)')}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Currently: ${escapeHtml(STATUS_NAME[curIdx]||'—')}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Currently: ${escapeHtml(KB_STATUS_LABELS.label[curIdx]||'—')}</div>
       </div>
     </div>
-    <div class="kb-modal-grid">
-      <label class="kb-f">MODEL STATUS<select id="kbe-status-${id}">${statusOpts}</select></label>
-      <label class="kb-f">Rate Offered<input id="kbe-rate-${id}" value="${escapeHtml(rate)}"></label>
-      <label class="kb-f full">Twitter<input id="kbe-tw-${id}" value="${escapeHtml(twUrl)}"></label>
-      <label class="kb-f full">General Notes<textarea id="kbe-gen-${id}">${escapeHtml(gen)}</textarea></label>
-      <label class="kb-f full">Availability Notes<textarea id="kbe-av-${id}">${escapeHtml(av)}</textarea></label>
-      <label class="kb-f full">Tattoos Notes<textarea id="kbe-tat-${id}">${escapeHtml(tat)}</textarea></label>
-    </div>
-    <div class="kb-actions" style="margin-top:18px">
-      <button class="kb-save" onclick="saveKanbanCard('${id}')">Save</button>
-      <button class="kb-open" onclick="openKanbanFull('${id}',${curIdx})">Open full editor ↗</button>
+    ${sectionsHtml}
+    <div class="kb-savebar">
+      <button class="kb-save" onclick="saveKanbanCard('${id}')">Save changes</button>
       <span class="kb-save-status" id="kbe-msg-${id}"></span>
-    </div>
-    <div style="font-size:10px;color:var(--text-dim);margin-top:8px">Full editor covers photos, type, role &amp; every other field.</div>`;
-  full._init={status:curIdx, gen, av, tat, tw:twUrl, rate};
+    </div>`;
+  full._init = init;
+  full._phoneCountry = phoneCountry;
 }
 
 async function saveKanbanCard(id){
   const full=document.getElementById('kb-modal-body'); if(!full||!full._init) return;
-  const init=full._init, g=x=>document.getElementById(x);
-  const msg=document.getElementById('kbe-msg-'+id);
-  const newStatus=parseInt(g('kbe-status-'+id).value,10);
-  const newGen=g('kbe-gen-'+id).value, newAv=g('kbe-av-'+id).value, newTat=g('kbe-tat-'+id).value;
-  const newTw=g('kbe-tw-'+id).value.trim(), newRate=g('kbe-rate-'+id).value;
+  const init=full._init, msg=document.getElementById('kbe-msg-'+id);
   const cols={};
-  if(newStatus!==init.status) cols['label']={index:newStatus};
-  if(newGen!==init.gen) cols['long_text_mktg36ee']={text:newGen};
-  if(newAv!==init.av) cols['long_text_mm1z9aeg']={text:newAv};
-  if(newTat!==init.tat) cols['long_text_mm1zsdyv']={text:newTat};
-  if(newTw!==init.tw) cols['lien_internet']= newTw ? {url:newTw,text:newTw} : {url:'',text:''};
-  if(newRate!==init.rate) cols['text_mm1zb8xf']=newRate;
-  if(Object.keys(cols).length===0){ if(msg) msg.textContent='No changes'; return; }
+  let statusChanged=false, newStatusIdx=null, newGen=null, newTw=null;
+  for(const sec of KB_SECTIONS){
+    for(const f of sec.fields){
+      const [colId,,kind,multi]=f;
+      const cur=kbReadControl(f); if(cur===undefined) continue;
+      let changed;
+      if(kind==='dropdown') changed = JSON.stringify(cur)!==init[colId];
+      else if(kind==='status') changed = (cur!==init[colId]);
+      else changed = (String(cur)!==String(init[colId]==null?'':init[colId]));
+      if(!changed) continue;
+      if(kind==='phone'){ const country=(full._phoneCountry&&full._phoneCountry[colId])||'US'; cols[colId]={phone:cur||'',countryShortName:country}; }
+      else cols[colId]=kbBuildColVal(f,cur);
+      if(colId==='label'){ statusChanged=true; newStatusIdx=cur; }
+      if(colId==='long_text_mktg36ee') newGen=cur;
+      if(colId==='lien_internet') newTw=(cur||'').trim();
+    }
+  }
+  if(Object.keys(cols).length===0){ if(msg) msg.textContent='No changes to save'; return; }
   if(msg) msg.textContent='Saving…';
   try{
     await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
       {i:id, b:String(MAIN_BOARD_ID), c:JSON.stringify(cols)});
     if(msg) msg.textContent='Saved ✓';
     const m=kanbanItems.find(x=>x.id===id);
-    const statusChanged = ('label' in cols);
-    if(m){ m.notes=newGen; m.twUrl=newTw; m.updated_at=new Date().toISOString(); if(statusChanged) m.statusIdx=newStatus; }
-    full._init={status:newStatus, gen:newGen, av:newAv, tat:newTat, tw:newTw, rate:newRate};
-    if(statusChanged) renderKanban(); // re-bucket → card moves to new column (top, since updated now)
+    if(m){ if(newGen!==null) m.notes=newGen; if(newTw!==null) m.twUrl=newTw; m.updated_at=new Date().toISOString(); if(statusChanged) m.statusIdx=newStatusIdx; }
+    // refresh baseline so a second Save won't resend unchanged fields
+    for(const sec of KB_SECTIONS) for(const f of sec.fields){ const cur=kbReadControl(f); if(cur===undefined) continue; init[f[0]] = (f[2]==='dropdown')?JSON.stringify(cur):cur; }
+    if(statusChanged){ renderKanban(); if(newStatusIdx==null || !(newStatusIdx in kbIdxToCol())) closeKanbanModal(); }
   }catch(e){ if(msg) msg.textContent='Error: '+escapeHtml(e.message); }
 }
 
@@ -3198,6 +3349,7 @@ async function bootCheck(){
    v6.3: mobile photos — 3-across grid, roomier lightbox + bigger tap targets, swipe to flip.
    v7: ALL MODELS tab + KANBAN board (status columns, expandable inline-edit cards).
    v7.1: kanban — wider columns, full-screen modal editor on card click.
+   v7.2: kanban — full field set in scrolling modal, bulletproof cards, removed 'open full editor'.
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
