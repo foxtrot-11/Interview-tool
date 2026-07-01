@@ -84,13 +84,13 @@
   .mode-btn.active[data-mode="all"]{background:#e8e8f0;color:#111}
   .mode-btn.active[data-mode="kanban"]{background:#9d50dd;color:#fff}
   .kanban-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
-  .kb-col{flex:0 0 262px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;max-height:calc(100vh - 230px)}
+  .kb-col{flex:0 0 320px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;max-height:calc(100vh - 230px)}
   .kb-col-head{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:0.04em;color:#111;padding:10px 12px;border-radius:7px 7px 0 0}
   .kb-count{opacity:0.65;margin-left:4px}
   .kb-col-body{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
   .kb-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
   .kb-card-top{display:flex;align-items:center;gap:8px;padding:8px;cursor:pointer}
-  .kb-thumb{width:42px;height:42px;border-radius:4px;background:var(--surface2);flex-shrink:0;overflow:hidden}
+  .kb-thumb{width:54px;height:54px;border-radius:4px;background:var(--surface2);flex-shrink:0;overflow:hidden}
   .kb-thumb img{width:100%;height:100%;object-fit:cover;display:block}
   .kb-name{flex:1;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .kb-caret{color:var(--text-muted);font-size:12px}
@@ -99,6 +99,18 @@
   .kb-empty{color:var(--text-dim)}
   .kb-tw{display:inline-block;margin-top:5px;color:var(--accent);font-size:11px;text-decoration:none}
   .kb-full{border-top:1px solid var(--border);padding:10px 8px;display:flex;flex-direction:column;gap:8px;background:var(--surface2)}
+  .kb-modal{position:fixed;inset:0;background:rgba(8,8,10,0.82);z-index:9000;display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto}
+  .kb-modal.open{display:flex}
+  .kb-modal-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:920px;padding:24px 28px 28px;position:relative;box-shadow:0 24px 90px rgba(0,0,0,0.65)}
+  .kb-modal-close{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:16px;cursor:pointer}
+  .kb-modal-close:hover{border-color:var(--danger);color:var(--danger)}
+  .kb-modal-head{display:flex;align-items:center;gap:16px;margin-bottom:22px}
+  .kb-modal-thumb{width:100px;height:100px;border-radius:8px;overflow:hidden;background:var(--surface2);flex-shrink:0}
+  .kb-modal-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .kb-modal-name{font-family:var(--font-display);font-size:24px;font-weight:700;color:var(--text)}
+  .kb-modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .kb-modal-grid .kb-f.full{grid-column:1 / -1}
+  .kb-modal-grid textarea{min-height:90px}
   .kb-f{display:flex;flex-direction:column;gap:3px;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted)}
   .kb-f select,.kb-f input,.kb-f textarea{background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 8px;text-transform:none;letter-spacing:normal}
   .kb-f textarea{resize:vertical;min-height:50px;line-height:1.5}
@@ -1064,6 +1076,12 @@
       <div id="kanban-loading" class="dup-loading"><span class="dup-spinner"></span><span id="kanban-load-status">Loading…</span></div>
       <div id="kanban-board" class="kanban-board"></div>
       <div id="kanban-mobile-note">Kanban is a desktop view. On mobile, use the status dropdown to browse a stage.</div>
+      <div id="kb-modal" class="kb-modal" onclick="if(event.target===this)closeKanbanModal()">
+        <div class="kb-modal-panel">
+          <button class="kb-modal-close" onclick="closeKanbanModal()">✕</button>
+          <div id="kb-modal-body"></div>
+        </div>
+      </div>
     </div>
 
   </div><!-- /form-area -->
@@ -1246,7 +1264,7 @@ function kanbanCardHtml(m){
   const cached = m.head ? kbHeadCache[m.head] : null;
   const thumb = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : '';
   return `<div class="kb-card" data-id="${m.id}">
-    <div class="kb-card-top" onclick="toggleKanbanCard('${m.id}')">
+    <div class="kb-card-top" onclick="openKanbanModal('${m.id}')">
       <div class="kb-thumb" id="kbthumb-${m.id}">${thumb}</div>
       <div class="kb-name">${escapeHtml(m.name||'(no name)')}</div>
       <span class="kb-caret" id="kbcaret-${m.id}">▾</span>
@@ -1294,16 +1312,13 @@ async function fetchKanbanHeadshots(){
   }
 }
 
-async function toggleKanbanCard(id){
-  const full=document.getElementById('kbfull-'+id);
-  const caret=document.getElementById('kbcaret-'+id);
-  if(!full) return;
-  if(full.style.display==='none'){
-    full.style.display=''; if(caret) caret.textContent='▴';
-    if(!full.dataset.loaded){ full.innerHTML='<div class="kb-loading-sm">Loading…</div>'; await renderKanbanEditor(id, full); full.dataset.loaded='1'; }
-  } else {
-    full.style.display='none'; if(caret) caret.textContent='▾';
-  }
+function closeKanbanModal(){ document.getElementById('kb-modal').classList.remove('open'); }
+async function openKanbanModal(id){
+  const modal=document.getElementById('kb-modal');
+  const body=document.getElementById('kb-modal-body');
+  modal.classList.add('open');
+  body.innerHTML='<div class="kb-loading-sm">Loading…</div>';
+  await renderKanbanEditor(id, body);
 }
 
 async function renderKanbanEditor(id, full){
@@ -1316,24 +1331,36 @@ async function renderKanbanEditor(id, full){
   let twUrl=''; try{ twUrl=JSON.parse(cv['lien_internet'].value)?.url || ''; }catch{}
   const gen=cv['long_text_mktg36ee']?.text||'', av=cv['long_text_mm1z9aeg']?.text||'', tat=cv['long_text_mm1zsdyv']?.text||'', rate=cv['text_mm1zb8xf']?.text||'';
   const statusOpts = KB_STATUS_ORDER.map(idx=>`<option value="${idx}" ${idx===curIdx?'selected':''}>${escapeHtml(STATUS_NAME[idx]||('status '+idx))}</option>`).join('');
+  const m = kanbanItems.find(x=>x.id===id);
+  const headUrl = (m && m.head && kbHeadCache[m.head]) ? kbHeadCache[m.head] : '';
+  const headImg = headUrl ? `<img src="${escapeHtml(headUrl)}" alt="">` : '';
   full.innerHTML = `
-    <label class="kb-f">MODEL STATUS<select id="kbe-status-${id}">${statusOpts}</select></label>
-    <label class="kb-f">General Notes<textarea id="kbe-gen-${id}">${escapeHtml(gen)}</textarea></label>
-    <label class="kb-f">Availability Notes<textarea id="kbe-av-${id}">${escapeHtml(av)}</textarea></label>
-    <label class="kb-f">Tattoos Notes<textarea id="kbe-tat-${id}">${escapeHtml(tat)}</textarea></label>
-    <label class="kb-f">Twitter<input id="kbe-tw-${id}" value="${escapeHtml(twUrl)}"></label>
-    <label class="kb-f">Rate Offered<input id="kbe-rate-${id}" value="${escapeHtml(rate)}"></label>
-    <div class="kb-actions">
+    <div class="kb-modal-head">
+      <div class="kb-modal-thumb">${headImg}</div>
+      <div>
+        <div class="kb-modal-name">${escapeHtml((m&&m.name)||it.name||'(no name)')}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Currently: ${escapeHtml(STATUS_NAME[curIdx]||'—')}</div>
+      </div>
+    </div>
+    <div class="kb-modal-grid">
+      <label class="kb-f">MODEL STATUS<select id="kbe-status-${id}">${statusOpts}</select></label>
+      <label class="kb-f">Rate Offered<input id="kbe-rate-${id}" value="${escapeHtml(rate)}"></label>
+      <label class="kb-f full">Twitter<input id="kbe-tw-${id}" value="${escapeHtml(twUrl)}"></label>
+      <label class="kb-f full">General Notes<textarea id="kbe-gen-${id}">${escapeHtml(gen)}</textarea></label>
+      <label class="kb-f full">Availability Notes<textarea id="kbe-av-${id}">${escapeHtml(av)}</textarea></label>
+      <label class="kb-f full">Tattoos Notes<textarea id="kbe-tat-${id}">${escapeHtml(tat)}</textarea></label>
+    </div>
+    <div class="kb-actions" style="margin-top:18px">
       <button class="kb-save" onclick="saveKanbanCard('${id}')">Save</button>
       <button class="kb-open" onclick="openKanbanFull('${id}',${curIdx})">Open full editor ↗</button>
       <span class="kb-save-status" id="kbe-msg-${id}"></span>
     </div>
-    <div style="font-size:10px;color:var(--text-dim)">Full editor covers photos, type, role &amp; every other field.</div>`;
+    <div style="font-size:10px;color:var(--text-dim);margin-top:8px">Full editor covers photos, type, role &amp; every other field.</div>`;
   full._init={status:curIdx, gen, av, tat, tw:twUrl, rate};
 }
 
 async function saveKanbanCard(id){
-  const full=document.getElementById('kbfull-'+id); if(!full||!full._init) return;
+  const full=document.getElementById('kb-modal-body'); if(!full||!full._init) return;
   const init=full._init, g=x=>document.getElementById(x);
   const msg=document.getElementById('kbe-msg-'+id);
   const newStatus=parseInt(g('kbe-status-'+id).value,10);
@@ -1361,6 +1388,7 @@ async function saveKanbanCard(id){
 }
 
 async function openKanbanFull(id, curIdx){
+  closeKanbanModal();
   await setMode(kbStatusToMode(curIdx));
   loadCandidate(id);
 }
@@ -3169,6 +3197,7 @@ async function bootCheck(){
    v6.2: mobile — replaced hamburger drawer with a native status dropdown above search.
    v6.3: mobile photos — 3-across grid, roomier lightbox + bigger tap targets, swipe to flip.
    v7: ALL MODELS tab + KANBAN board (status columns, expandable inline-edit cards).
+   v7.1: kanban — wider columns, full-screen modal editor on card click.
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
