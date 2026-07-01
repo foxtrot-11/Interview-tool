@@ -80,6 +80,38 @@
   .dup-loading{text-align:center;padding:40px;color:var(--text-muted);font-size:12px;letter-spacing:0.15em;text-transform:uppercase}
   .dup-spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
   .dup-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px}
+  /* ── KANBAN ── */
+  .mode-btn.active[data-mode="all"]{background:#e8e8f0;color:#111}
+  .mode-btn.active[data-mode="kanban"]{background:#9d50dd;color:#fff}
+  .kanban-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
+  .kb-col{flex:0 0 262px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;max-height:calc(100vh - 230px)}
+  .kb-col-head{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:0.04em;color:#111;padding:10px 12px;border-radius:7px 7px 0 0}
+  .kb-count{opacity:0.65;margin-left:4px}
+  .kb-col-body{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
+  .kb-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  .kb-card-top{display:flex;align-items:center;gap:8px;padding:8px;cursor:pointer}
+  .kb-thumb{width:42px;height:42px;border-radius:4px;background:var(--surface2);flex-shrink:0;overflow:hidden}
+  .kb-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .kb-name{flex:1;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kb-caret{color:var(--text-muted);font-size:12px}
+  .kb-mini{padding:0 8px 8px;font-size:11px}
+  .kb-notes{color:var(--text-muted);line-height:1.4}
+  .kb-empty{color:var(--text-dim)}
+  .kb-tw{display:inline-block;margin-top:5px;color:var(--accent);font-size:11px;text-decoration:none}
+  .kb-full{border-top:1px solid var(--border);padding:10px 8px;display:flex;flex-direction:column;gap:8px;background:var(--surface2)}
+  .kb-f{display:flex;flex-direction:column;gap:3px;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted)}
+  .kb-f select,.kb-f input,.kb-f textarea{background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 8px;text-transform:none;letter-spacing:normal}
+  .kb-f textarea{resize:vertical;min-height:50px;line-height:1.5}
+  .kb-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px}
+  .kb-save{background:var(--accent);color:var(--bg);border:none;border-radius:5px;padding:8px 14px;font-family:var(--font-mono);font-size:11px;cursor:pointer}
+  .kb-open{background:transparent;border:1px solid var(--border);color:var(--text-muted);border-radius:5px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;cursor:pointer}
+  .kb-open:hover{border-color:var(--accent);color:var(--accent)}
+  .kb-save-status{font-size:11px;color:var(--text-muted)}
+  .kb-loading-sm{font-size:12px;color:var(--text-muted);padding:8px}
+  #kanban-mobile-note{display:none;color:var(--text-muted);font-size:13px;padding:20px 4px}
+  body.is-mobile #kanban-board,body.is-mobile #kanban-loading{display:none!important}
+  body.is-mobile #kanban-mobile-note{display:block}
+  body.narrow .kanban-btn{display:none}
   .dup-search-input{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px}
   .dup-search-input:focus{outline:none;border-color:var(--accent)}
   .dup-search-input::placeholder{color:var(--text-muted)}
@@ -485,6 +517,7 @@
   <div class="mode-selector" id="mode-selector">
     <div class="drawer-head">Menu</div>
     <button class="mode-btn" data-mode="new" onclick="setMode('new')">+ NEW MODEL</button>
+    <button class="mode-btn" data-mode="all" onclick="setMode('all')">ALL MODELS</button>
     <button class="mode-btn active" data-mode="0" onclick="setMode('0')">0-APPLICANT</button>
     <button class="mode-btn" data-mode="1" onclick="setMode('1')">1-SCREEN</button>
     <button class="mode-btn" data-mode="2" onclick="setMode('2')">2-POTENTIAL</button>
@@ -493,6 +526,7 @@
     <button class="mode-btn" data-mode="5a" onclick="setMode('5a')">5-APPROVED</button>
     <button class="mode-btn" data-mode="5r" onclick="setMode('5r')">5-REJECTED</button>
     <button class="mode-btn batch-btn" data-mode="batch" onclick="setMode('batch')">EVERNOTE BATCH IMPORT</button>
+    <button class="mode-btn kanban-btn" data-mode="kanban" onclick="setMode('kanban')">KANBAN</button>
     <button class="mode-btn dup-btn" data-mode="dup" onclick="setMode('dup')">DUPLICATES</button>
   </div>
 
@@ -506,6 +540,7 @@
   <select class="mobile-mode-select" id="mobile-mode-select" onchange="setMode(this.value)" aria-label="Choose status">
     <option value="" disabled selected>Choose a status…</option>
     <option value="new">+ New Model</option>
+    <option value="all">ALL MODELS</option>
     <option value="0">0 — Applicant</option>
     <option value="1">1 — Screen</option>
     <option value="2">2 — Potential</option>
@@ -1019,6 +1054,18 @@
       </div>
     </div>
 
+    <div id="kanban-view" style="display:none">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+        <div style="font-family:var(--font-display);font-size:20px;font-weight:700">Kanban</div>
+        <div style="font-size:11px;color:var(--text-muted)" id="kanban-summary"></div>
+        <button class="dup-refresh-btn" onclick="loadKanban()">↺ Refresh</button>
+        <input type="text" id="kanban-search" class="dup-search-input" placeholder="Filter by name…" oninput="renderKanban()" onfocus="this.select()" autocomplete="off" style="max-width:220px">
+      </div>
+      <div id="kanban-loading" class="dup-loading"><span class="dup-spinner"></span><span id="kanban-load-status">Loading…</span></div>
+      <div id="kanban-board" class="kanban-board"></div>
+      <div id="kanban-mobile-note">Kanban is a desktop view. On mobile, use the status dropdown to browse a stage.</div>
+    </div>
+
   </div><!-- /form-area -->
 </div><!-- /main -->
 
@@ -1033,7 +1080,7 @@ const GROUP_POTENTIAL = 'group_mm202zgr';
 const API_URL  = '/api';   // same-origin proxy; the token lives only on the server
 
 // Status label index → mode key
-const MODE_STATUS_IDS = { '0':[5], '1':[8], '2':[10], '3':[7], '4':[9], '5a':[2,4,105], '5r':[3], 'batch':null };
+const MODE_STATUS_IDS = { '0':[5], '1':[8], '2':[10], '3':[7], '4':[9], '5a':[2,4,105], '5r':[3], 'batch':null, 'all':null };
 
 // Map of the full-view sections → their questions, in display order. Each question
 // points at the input/control id to scroll to. Drives the left-side question list.
@@ -1141,6 +1188,182 @@ window.addEventListener('resize', refreshViewMode);
   },{passive:true});
 })();
 refreshViewMode();
+
+// ── KANBAN (desktop) ──
+const KANBAN_COLS = [
+  {mode:'0',  label:'0 - APPLICANT', ids:[5]},
+  {mode:'1',  label:'1 - SCREEN',    ids:[8]},
+  {mode:'2',  label:'2 - POTENTIAL', ids:[10]},
+  {mode:'3',  label:'3 - INTERVIEW', ids:[7]},
+  {mode:'4',  label:'4 - REVIEW',    ids:[9]},
+  {mode:'5a', label:'5 - APPROVED',  ids:[2,4,105,0,6,1]}, // Approved + All-Star/Exclusive/Retired/Delete/Outside
+  {mode:'5r', label:'5 - REJECTED',  ids:[3]},
+];
+const KANBAN_COLOR = {'0':'#c4c4c4','1':'#cab641','2':'#ff6d3b','3':'#ffcb00','4':'#579bfc','5a':'#037f4c','5r':'#df2f4a'};
+const KB_STATUS_ORDER = [5,8,10,7,9,2,105,4,1,0,6,3,11,12]; // dropdown order (incl. Evernote/Duplicate so a card can be moved out)
+let kanbanItems = [];
+let kbHeadCache = {};
+function kbIdxToCol(){ const m={}; KANBAN_COLS.forEach((c,i)=>c.ids.forEach(id=>m[id]=i)); return m; }
+function kbStatusToMode(idx){ for(const c of KANBAN_COLS){ if(c.ids.includes(idx)) return c.mode; } return 'all'; }
+
+async function loadKanban(){
+  const board=document.getElementById('kanban-board');
+  const loading=document.getElementById('kanban-loading');
+  const setLoad=t=>{const el=document.getElementById('kanban-load-status'); if(el) el.textContent=t;};
+  board.innerHTML=''; loading.style.display='';
+  document.getElementById('kanban-summary').textContent='';
+  try{
+    setLoad('Loading models… (first load can take ~30–60s on a cold start)');
+    const idxToCol=kbIdxToCol();
+    const items=[]; let cursor=null, pages=0;
+    do{
+      const cp = cursor ? `cursor:"${cursor}"` : 'limit:200';
+      const data = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name updated_at column_values(ids:["label","long_text_mktg36ee","lien_internet","files_mkncw5nm"]){id text value}}}}}`);
+      const page = data.boards[0].items_page;
+      page.items.forEach(it=>{
+        const cv={}; (it.column_values||[]).forEach(c=>cv[c.id]=c);
+        let statusIdx=null; try{ statusIdx = JSON.parse(cv['label'].value)?.index ?? null; }catch{}
+        if(statusIdx===null || !(statusIdx in idxToCol)) return; // excludes Evernote(11), Duplicate(12), unset
+        let head=null; try{ const f=JSON.parse(cv['files_mkncw5nm'].value); if(f&&f.files&&f.files.length) head=f.files[0].assetId; }catch{}
+        let twUrl=''; try{ twUrl = JSON.parse(cv['lien_internet'].value)?.url || ''; }catch{}
+        items.push({id:it.id, name:(it.name||'').trim(), updated_at:it.updated_at||'', statusIdx, notes:(cv['long_text_mktg36ee']?.text||''), twUrl, head});
+      });
+      cursor=page.cursor; pages++;
+      setLoad(`Loading models… ${items.length} loaded`);
+    } while(cursor && pages<8);
+    kanbanItems=items;
+    loading.style.display='none';
+    renderKanban();
+    fetchKanbanHeadshots();
+  }catch(e){
+    loading.innerHTML='<span style="color:var(--danger)">Failed to load: '+escapeHtml(e.message)+'</span>';
+  }
+}
+
+function kanbanCardHtml(m){
+  const notes = m.notes ? escapeHtml(m.notes.length>90 ? m.notes.slice(0,88)+'…' : m.notes) : '<span class="kb-empty">— no notes —</span>';
+  const tw = m.twUrl ? `<a class="kb-tw" href="${escapeHtml(m.twUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Twitter ↗</a>` : '';
+  const cached = m.head ? kbHeadCache[m.head] : null;
+  const thumb = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : '';
+  return `<div class="kb-card" data-id="${m.id}">
+    <div class="kb-card-top" onclick="toggleKanbanCard('${m.id}')">
+      <div class="kb-thumb" id="kbthumb-${m.id}">${thumb}</div>
+      <div class="kb-name">${escapeHtml(m.name||'(no name)')}</div>
+      <span class="kb-caret" id="kbcaret-${m.id}">▾</span>
+    </div>
+    <div class="kb-mini">
+      <div class="kb-notes">${notes}</div>
+      ${tw}
+    </div>
+    <div class="kb-full" id="kbfull-${m.id}" style="display:none"></div>
+  </div>`;
+}
+
+function renderKanban(){
+  const board=document.getElementById('kanban-board');
+  const q=(document.getElementById('kanban-search')?.value||'').trim().toLowerCase();
+  const idxToCol=kbIdxToCol();
+  const buckets=KANBAN_COLS.map(()=>[]);
+  kanbanItems.forEach(m=>{
+    if(q && !m.name.toLowerCase().includes(q)) return;
+    const ci=idxToCol[m.statusIdx]; if(ci==null) return;
+    buckets[ci].push(m);
+  });
+  buckets.forEach(b=>b.sort((a,b2)=>(b2.updated_at||'').localeCompare(a.updated_at||'')));
+  board.innerHTML = KANBAN_COLS.map((c,i)=>`
+    <div class="kb-col">
+      <div class="kb-col-head" style="background:${KANBAN_COLOR[c.mode]}">${escapeHtml(c.label)}<span class="kb-count">${buckets[i].length}</span></div>
+      <div class="kb-col-body" id="kbcol-${i}">${buckets[i].map(kanbanCardHtml).join('')}</div>
+    </div>`).join('');
+  document.getElementById('kanban-summary').textContent = `${kanbanItems.length} models`;
+}
+
+async function fetchKanbanHeadshots(){
+  const need = kanbanItems.filter(m=>m.head && !kbHeadCache[m.head]);
+  for(let i=0;i<need.length;i+=40){
+    const chunk=need.slice(i,i+40);
+    const ids=chunk.map(m=>m.head).join(',');
+    let data; try{ data=await gql(`{assets(ids:[${ids}]){id public_url}}`); }catch(e){ continue; }
+    const byId={}; (data.assets||[]).forEach(a=>byId[String(a.id)]=a.public_url);
+    chunk.forEach(m=>{
+      const u=byId[String(m.head)]; if(!u) return;
+      kbHeadCache[m.head]=u;
+      const el=document.getElementById('kbthumb-'+m.id);
+      if(el && !el.querySelector('img')) el.innerHTML=`<img loading="lazy" src="${escapeHtml(u)}" alt="">`;
+    });
+  }
+}
+
+async function toggleKanbanCard(id){
+  const full=document.getElementById('kbfull-'+id);
+  const caret=document.getElementById('kbcaret-'+id);
+  if(!full) return;
+  if(full.style.display==='none'){
+    full.style.display=''; if(caret) caret.textContent='▴';
+    if(!full.dataset.loaded){ full.innerHTML='<div class="kb-loading-sm">Loading…</div>'; await renderKanbanEditor(id, full); full.dataset.loaded='1'; }
+  } else {
+    full.style.display='none'; if(caret) caret.textContent='▾';
+  }
+}
+
+async function renderKanbanEditor(id, full){
+  let data;
+  try{ data=await gql(`{items(ids:[${id}]){id name column_values(ids:["label","long_text_mktg36ee","long_text_mm1z9aeg","long_text_mm1zsdyv","lien_internet","text_mm1zb8xf"]){id text value}}}`); }
+  catch(e){ full.innerHTML='<div class="kb-loading-sm" style="color:var(--danger)">Load failed: '+escapeHtml(e.message)+'</div>'; return; }
+  const it=data.items&&data.items[0]; if(!it){ full.innerHTML='<div class="kb-loading-sm">Not found</div>'; return; }
+  const cv={}; (it.column_values||[]).forEach(c=>cv[c.id]=c);
+  let curIdx=null; try{ curIdx=JSON.parse(cv['label'].value)?.index ?? null; }catch{}
+  let twUrl=''; try{ twUrl=JSON.parse(cv['lien_internet'].value)?.url || ''; }catch{}
+  const gen=cv['long_text_mktg36ee']?.text||'', av=cv['long_text_mm1z9aeg']?.text||'', tat=cv['long_text_mm1zsdyv']?.text||'', rate=cv['text_mm1zb8xf']?.text||'';
+  const statusOpts = KB_STATUS_ORDER.map(idx=>`<option value="${idx}" ${idx===curIdx?'selected':''}>${escapeHtml(STATUS_NAME[idx]||('status '+idx))}</option>`).join('');
+  full.innerHTML = `
+    <label class="kb-f">MODEL STATUS<select id="kbe-status-${id}">${statusOpts}</select></label>
+    <label class="kb-f">General Notes<textarea id="kbe-gen-${id}">${escapeHtml(gen)}</textarea></label>
+    <label class="kb-f">Availability Notes<textarea id="kbe-av-${id}">${escapeHtml(av)}</textarea></label>
+    <label class="kb-f">Tattoos Notes<textarea id="kbe-tat-${id}">${escapeHtml(tat)}</textarea></label>
+    <label class="kb-f">Twitter<input id="kbe-tw-${id}" value="${escapeHtml(twUrl)}"></label>
+    <label class="kb-f">Rate Offered<input id="kbe-rate-${id}" value="${escapeHtml(rate)}"></label>
+    <div class="kb-actions">
+      <button class="kb-save" onclick="saveKanbanCard('${id}')">Save</button>
+      <button class="kb-open" onclick="openKanbanFull('${id}',${curIdx})">Open full editor ↗</button>
+      <span class="kb-save-status" id="kbe-msg-${id}"></span>
+    </div>
+    <div style="font-size:10px;color:var(--text-dim)">Full editor covers photos, type, role &amp; every other field.</div>`;
+  full._init={status:curIdx, gen, av, tat, tw:twUrl, rate};
+}
+
+async function saveKanbanCard(id){
+  const full=document.getElementById('kbfull-'+id); if(!full||!full._init) return;
+  const init=full._init, g=x=>document.getElementById(x);
+  const msg=document.getElementById('kbe-msg-'+id);
+  const newStatus=parseInt(g('kbe-status-'+id).value,10);
+  const newGen=g('kbe-gen-'+id).value, newAv=g('kbe-av-'+id).value, newTat=g('kbe-tat-'+id).value;
+  const newTw=g('kbe-tw-'+id).value.trim(), newRate=g('kbe-rate-'+id).value;
+  const cols={};
+  if(newStatus!==init.status) cols['label']={index:newStatus};
+  if(newGen!==init.gen) cols['long_text_mktg36ee']={text:newGen};
+  if(newAv!==init.av) cols['long_text_mm1z9aeg']={text:newAv};
+  if(newTat!==init.tat) cols['long_text_mm1zsdyv']={text:newTat};
+  if(newTw!==init.tw) cols['lien_internet']= newTw ? {url:newTw,text:newTw} : {url:'',text:''};
+  if(newRate!==init.rate) cols['text_mm1zb8xf']=newRate;
+  if(Object.keys(cols).length===0){ if(msg) msg.textContent='No changes'; return; }
+  if(msg) msg.textContent='Saving…';
+  try{
+    await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
+      {i:id, b:String(MAIN_BOARD_ID), c:JSON.stringify(cols)});
+    if(msg) msg.textContent='Saved ✓';
+    const m=kanbanItems.find(x=>x.id===id);
+    const statusChanged = ('label' in cols);
+    if(m){ m.notes=newGen; m.twUrl=newTw; m.updated_at=new Date().toISOString(); if(statusChanged) m.statusIdx=newStatus; }
+    full._init={status:newStatus, gen:newGen, av:newAv, tat:newTat, tw:newTw, rate:newRate};
+    if(statusChanged) renderKanban(); // re-bucket → card moves to new column (top, since updated now)
+  }catch(e){ if(msg) msg.textContent='Error: '+escapeHtml(e.message); }
+}
+
+async function openKanbanFull(id, curIdx){
+  await setMode(kbStatusToMode(curIdx));
+  loadCandidate(id);
+}
 
 async function init(){
   try{
@@ -1280,6 +1503,21 @@ async function setMode(mode){
   currentMode=mode;
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
   resetForm();
+  hide('kanban-view');
+  if(mode==='kanban'){
+    hide('selector-bar');
+    hide('candidate-strip');
+    hide('empty-state');
+    hide('full-view');
+    hide('interview-view');
+    hide('new-model-view');
+    hide('dup-view');
+    buildSidebarNav('blank');
+    document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
+    show('kanban-view');
+    loadKanban();
+    return;
+  }
   if(mode==='dup'){
     hide('selector-bar');
     hide('candidate-strip');
@@ -2930,6 +3168,7 @@ async function bootCheck(){
    v6.1: drawer stacking fix — drawer now sits above the overlay (was tap-blocked).
    v6.2: mobile — replaced hamburger drawer with a native status dropdown above search.
    v6.3: mobile photos — 3-across grid, roomier lightbox + bigger tap targets, swipe to flip.
+   v7: ALL MODELS tab + KANBAN board (status columns, expandable inline-edit cards).
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
