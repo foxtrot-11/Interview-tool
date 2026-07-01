@@ -102,9 +102,16 @@
   .kb-caret{flex:0 0 auto;color:var(--text-muted);font-size:12px;padding-left:2px}
   .kb-mono{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:var(--font-display);font-weight:700;font-size:34px;color:var(--text-muted)}
   .kb-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
-  .kb-photo{aspect-ratio:1;border-radius:6px;overflow:hidden;background:var(--bg);cursor:pointer;border:1px solid var(--border)}
-  .kb-photo img{width:100%;height:100%;object-fit:cover;display:block}
+  .kb-photo{position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;background:var(--bg);border:1px solid var(--border)}
+  .kb-photo img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer}
   .kb-photo.hs{outline:2px solid var(--accent);outline-offset:-2px}
+  .kb-seths{position:absolute;bottom:4px;left:4px;right:4px;background:rgba(0,0,0,0.72);color:#fff;border:none;border-radius:4px;padding:5px;font-size:10px;font-family:var(--font-mono);cursor:pointer;opacity:0;transition:opacity .12s}
+  .kb-photo:hover .kb-seths{opacity:1}
+  .kb-hs-tag{position:absolute;bottom:4px;left:4px;background:var(--accent);color:var(--bg);border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700;font-family:var(--font-mono)}
+  .kb-photo-actions{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .kb-upload-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;cursor:pointer}
+  .kb-upload-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .kb-photo-msg{font-size:11px;color:var(--text-muted)}
   .kb-loadphotos{display:block;margin:8px 8px 0;padding:8px;background:var(--surface);border:1px dashed var(--border-active);color:var(--text-muted);border-radius:6px;font-family:var(--font-mono);font-size:11px;cursor:pointer;text-align:center}
   .kb-loadphotos:hover{border-color:var(--accent);color:var(--accent)}
   .kb-mini{padding:0 8px 8px;font-size:11px}
@@ -1235,10 +1242,13 @@ const KANBAN_COLS = [
   {mode:'2',  label:'2 - POTENTIAL', ids:[10]},
   {mode:'3',  label:'3 - INTERVIEW', ids:[7]},
   {mode:'4',  label:'4 - REVIEW',    ids:[9]},
-  {mode:'5a', label:'5 - APPROVED',  ids:[2,4,105,0,6,1]}, // Approved + All-Star/Exclusive/Retired/Delete/Outside
+  {mode:'5a', label:'5 - APPROVED',  ids:[2,0,6,1]}, // approved + retired/delete/outside (all-star & exclusive are their own columns)
+  {mode:'as', label:'00 - ALL-STAR', ids:[4]},
+  {mode:'ex', label:'00 - EXCLUSIVE',ids:[105]},
   {mode:'5r', label:'5 - REJECTED',  ids:[3]},
+  {mode:'ev', label:'XX - EVERNOTE IMPORT', ids:[11]},
 ];
-const KANBAN_COLOR = {'0':'#c4c4c4','1':'#cab641','2':'#ff6d3b','3':'#ffcb00','4':'#579bfc','5a':'#037f4c','5r':'#df2f4a'};
+const KANBAN_COLOR = {'0':'#c4c4c4','1':'#cab641','2':'#ff6d3b','3':'#ffcb00','4':'#579bfc','5a':'#037f4c','as':'#9d50dd','ex':'#00c875','5r':'#df2f4a','ev':'#fdab3d'};
 const KB_STATUS_ORDER = [5,8,10,7,9,2,105,4,1,0,6,3,11,12]; // dropdown order (incl. Evernote/Duplicate so a card can be moved out)
 let kanbanItems = [];
 let kbHeadCache = {};
@@ -1489,7 +1499,9 @@ async function fetchKanbanHeadshotsForModels(models){
 }
 
 let kbModalPhotos=[];
+let kbModalItemId=null;
 async function kbLoadModalPhotos(id){
+  kbModalItemId=id;
   const grid=document.getElementById('kb-photos'); if(!grid) return;
   try{
     const data=await gql(`{items(ids:[${id}]){assets{id public_url file_extension name} column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
@@ -1502,10 +1514,60 @@ async function kbLoadModalPhotos(id){
     add(entries('files_mkncw5nm'),true);
     add(entries('file_mkp1n4bt'),false);
     kbModalPhotos=list;
-    grid.innerHTML = list.length ? list.map((p,n)=>`<div class="kb-photo${p.isHeadshot?' hs':''}" title="${escapeHtml(p.name||'')}" onclick="kbOpenPhoto(${n})"><img loading="lazy" src="${escapeHtml(p.url)}" alt=""></div>`).join('') : '<span class="kb-empty">No photos on file</span>';
+    grid.innerHTML = list.length ? list.map((p,n)=>`<div class="kb-photo${p.isHeadshot?' hs':''}" title="${escapeHtml(p.name||'')}"><img loading="lazy" src="${escapeHtml(p.url)}" alt="" onclick="kbOpenPhoto(${n})">${p.isHeadshot?'<span class="kb-hs-tag">HEADSHOT</span>':`<button class="kb-seths" onclick="event.stopPropagation();kbSetHeadshot(${p.assetId})">★ Set</button>`}</div>`).join('') : '<span class="kb-empty">No photos on file</span>';
   }catch(e){ grid.innerHTML='<span class="kb-empty">Photos failed to load</span>'; }
 }
 function kbOpenPhoto(n){ candidatePhotos=kbModalPhotos; window.lbViewOnly=true; openLightbox(n); }
+function kbPhotoMsg(t){ const el=document.getElementById('kb-photo-msg'); if(el) el.textContent=t||''; }
+
+function kbRefreshCardThumb(id){
+  const hs=kbModalPhotos.find(p=>p.isHeadshot); if(!hs) return;
+  kbHeadCache[hs.assetId]=hs.url;
+  const m=kanbanItems.find(x=>x.id===id); if(m) m.head=hs.assetId;
+  const el=document.getElementById('kbthumb-'+id);
+  if(el) el.innerHTML=`<img loading="lazy" src="${escapeHtml(hs.url)}" alt="">`;
+  const mt=document.querySelector('#kb-modal-body .kb-modal-thumb');
+  if(mt) mt.innerHTML=`<img src="${escapeHtml(hs.url)}" alt="">`;
+}
+
+async function kbSetHeadshot(assetId){
+  const id=kbModalItemId; if(!id) return;
+  kbPhotoMsg('Updating headshot…');
+  try{
+    const rest=kbModalPhotos.filter(p=>String(p.assetId)!==String(assetId)).map(p=>p.assetId);
+    await rearrangePhotos(id,[assetId],rest);
+    await kbLoadModalPhotos(id);
+    kbRefreshCardThumb(id);
+    kbPhotoMsg('Headshot updated ✓');
+  }catch(e){ kbPhotoMsg('Error: '+escapeHtml(e.message)); }
+}
+
+async function kbUploadPhoto(kind, input){
+  const id=kbModalItemId; const file=input.files&&input.files[0]; if(input) input.value=''; if(!id||!file) return;
+  try{
+    if(kind==='extra'){
+      kbPhotoMsg('Uploading photo… 0%');
+      await uploadFileToMonday(id,'file_mkp1n4bt',file,pct=>kbPhotoMsg('Uploading photo… '+Math.round(pct*100)+'%'));
+      await kbLoadModalPhotos(id);
+      kbPhotoMsg('Photo uploaded ✓');
+    } else {
+      // Upload as an extra, then atomically promote it to headshot so it becomes THE headshot.
+      const before=new Set(kbModalPhotos.map(p=>String(p.assetId)));
+      kbPhotoMsg('Uploading headshot… 0%');
+      await uploadFileToMonday(id,'file_mkp1n4bt',file,pct=>kbPhotoMsg('Uploading headshot… '+Math.round(pct*100)+'%'));
+      await kbLoadModalPhotos(id);
+      const added=kbModalPhotos.find(p=>!before.has(String(p.assetId)));
+      if(added){
+        kbPhotoMsg('Setting as headshot…');
+        const rest=kbModalPhotos.filter(p=>String(p.assetId)!==String(added.assetId)).map(p=>p.assetId);
+        await rearrangePhotos(id,[added.assetId],rest);
+        await kbLoadModalPhotos(id);
+      }
+      kbRefreshCardThumb(id);
+      kbPhotoMsg('Headshot uploaded ✓');
+    }
+  }catch(e){ kbPhotoMsg('Error: '+escapeHtml(e.message)); }
+}
 
 function closeKanbanModal(){ document.getElementById('kb-modal').classList.remove('open'); }
 async function openKanbanModal(id){
@@ -1546,7 +1608,15 @@ async function renderKanbanEditor(id, full){
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Currently: ${escapeHtml(KB_STATUS_LABELS.label[curIdx]||'—')}</div>
       </div>
     </div>
-    <div class="kb-sec"><div class="kb-sec-title">Photos</div><div class="kb-photo-grid" id="kb-photos"><span class="kb-loading-sm">Loading photos…</span></div></div>
+    <div class="kb-sec"><div class="kb-sec-title">Photos</div>
+      <div class="kb-photo-grid" id="kb-photos"><span class="kb-loading-sm">Loading photos…</span></div>
+      <div class="kb-photo-actions">
+        <label class="kb-upload-btn">+ Upload headshot<input type="file" accept="image/*,.heic,.heif" style="display:none" onchange="kbUploadPhoto('headshot', this)"></label>
+        <label class="kb-upload-btn">+ Upload extra pic<input type="file" accept="image/*,.heic,.heif" style="display:none" onchange="kbUploadPhoto('extra', this)"></label>
+        <span class="kb-photo-msg" id="kb-photo-msg"></span>
+      </div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:4px">Click a photo to enlarge. Hover a photo and hit ★ Set to make it the headshot.</div>
+    </div>
     ${sectionsHtml}
     <div class="kb-savebar">
       <button class="kb-save" onclick="saveKanbanCard('${id}')">Save changes</button>
@@ -3407,6 +3477,7 @@ async function bootCheck(){
    v7.2: kanban — full field set in scrolling modal, bulletproof cards, removed 'open full editor'.
    v7.3: kanban — scrollable header tabs, Approved loads on-demand (Load photos button), no-cache headers.
    v7.4: kanban — fixed card flex-squish (real cutoff cause), 2x larger cards, load-button feedback, extra-pics grid + lightbox in modal.
+   v7.5: kanban — All-Star/Exclusive/Evernote columns, modal photo upload (headshot/extra) + reselect headshot.
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
