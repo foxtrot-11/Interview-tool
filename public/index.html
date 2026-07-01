@@ -419,21 +419,18 @@
   .upload-step.error{color:var(--danger)}
   .upload-step-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
 
-  /* ── MOBILE: class-driven so the Desktop/Mobile toggle works both ways ── */
-  .hamburger{display:none;background:transparent;border:1px solid var(--border);color:var(--text);font-size:18px;line-height:1;padding:5px 11px;border-radius:var(--radius);cursor:pointer}
+  /* ── MOBILE: simple native status dropdown above the search bar (no hamburger) ── */
+  .hamburger{display:none}
   .drawer-head{display:none}
   .mode-btn.view-toggle{display:none}
   .drawer-overlay{display:none}
-  body.narrow .hamburger{display:inline-flex;align-items:center;justify-content:center}
-  body.narrow header{padding:0 14px;justify-content:flex-start;gap:12px;z-index:130}
-  body.narrow .mode-selector{position:fixed;top:0;left:0;bottom:0;width:80%;max-width:300px;display:flex;flex-direction:column;align-items:stretch;gap:0;border:none;border-right:1px solid var(--border);border-radius:0;background:var(--surface);z-index:120;transform:translateX(-100%);transition:transform 0.25s ease;overflow-y:auto;-webkit-overflow-scrolling:touch}
-  body.narrow .mode-selector.open{transform:translateX(0)}
-  body.narrow .mode-btn{border-right:none;border-bottom:1px solid var(--border);padding:15px 18px;font-size:13px;text-align:left;min-height:50px}
-  body.narrow .mode-btn:last-child{border-bottom:none}
-  body.narrow .drawer-head{display:block;padding:16px 18px 12px;font-family:var(--font-mono);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border)}
-  body.narrow .mode-btn.view-toggle{display:block;color:var(--accent);margin-top:auto;border-top:1px solid var(--border);border-bottom:none}
-  body.narrow .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:115}
-  body.narrow .drawer-overlay.open{display:block}
+  .mobile-mode-bar{display:none}
+  body.narrow .mode-selector{display:none}
+  body.narrow header{padding:0 14px}
+  body.narrow .mobile-mode-bar{display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);position:relative;z-index:95}
+  .mobile-mode-select{flex:1;min-width:0;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:13px 12px;font-family:var(--font-mono);font-size:14px;min-height:46px;-webkit-appearance:menulist;appearance:menulist}
+  .mobile-mode-select:focus{outline:none;border-color:var(--accent)}
+  .mobile-view-toggle{flex-shrink:0;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:0 12px;font-family:var(--font-mono);font-size:11px;letter-spacing:0.05em;min-height:46px;cursor:pointer}
   body.is-mobile .main{grid-template-columns:1fr}
   body.is-mobile .sidebar{display:none}
   body.is-mobile .form-area{padding:18px 14px}
@@ -475,7 +472,6 @@
 
 <!-- HEADER -->
 <header>
-  <button class="hamburger" id="hamburger" onclick="toggleDrawer()" aria-label="Menu">☰</button>
   <div class="logo">Carnal <span>Media</span></div>
 
   <!-- MODE SELECTOR -->
@@ -491,7 +487,6 @@
     <button class="mode-btn" data-mode="5r" onclick="setMode('5r')">5-REJECTED</button>
     <button class="mode-btn batch-btn" data-mode="batch" onclick="setMode('batch')">EVERNOTE BATCH IMPORT</button>
     <button class="mode-btn dup-btn" data-mode="dup" onclick="setMode('dup')">DUPLICATES</button>
-    <button class="mode-btn view-toggle" id="view-toggle-btn" onclick="toggleViewMode()">Switch to desktop view</button>
   </div>
 
   <div class="save-area">
@@ -499,7 +494,23 @@
     <div class="save-status" id="save-status"></div>
   </div>
 </header>
-<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+<!-- MOBILE STATUS PICKER — shown on narrow screens, above the search bar -->
+<div class="mobile-mode-bar" id="mobile-mode-bar">
+  <select class="mobile-mode-select" id="mobile-mode-select" onchange="setMode(this.value)" aria-label="Choose status">
+    <option value="" disabled selected>Choose a status…</option>
+    <option value="new">+ New Model</option>
+    <option value="0">0 — Applicant</option>
+    <option value="1">1 — Screen</option>
+    <option value="2">2 — Potential</option>
+    <option value="3">3 — Interview</option>
+    <option value="4">4 — Review</option>
+    <option value="5a">5 — Approved</option>
+    <option value="5r">5 — Rejected</option>
+    <option value="batch">Evernote Batch Import</option>
+    <option value="dup">Duplicates</option>
+  </select>
+  <button class="mobile-view-toggle" id="view-toggle-btn" onclick="toggleViewMode()">Desktop</button>
+</div>
 
 <!-- SELECTOR BAR (hidden in new model mode) -->
 <div class="selector-bar" id="selector-bar">
@@ -1094,7 +1105,7 @@ function refreshViewMode(){
   document.body.classList.toggle('is-mobile', mobileLayout);   // controls single-column layout
   document.body.classList.toggle('force-desktop', pref==='desktop' && narrow);
   const vt=document.getElementById('view-toggle-btn');
-  if(vt) vt.textContent = mobileLayout ? 'Switch to desktop view' : 'Switch to mobile view';
+  if(vt) vt.textContent = mobileLayout ? 'Desktop' : 'Mobile';
 }
 function toggleViewMode(){
   const isMobileNow = document.body.classList.contains('is-mobile');
@@ -1241,6 +1252,7 @@ function buildAllDropdowns(){
 // ── MODE ──
 async function setMode(mode){
   closeDrawer();
+  try{ const _mm=document.getElementById('mobile-mode-select'); if(_mm && _mm.value!==mode) _mm.value=mode; }catch(e){}
   // Switch active board: batch tab → batch board, everything else → main board.
   const wantBoard = (mode === 'batch') ? BATCH_BOARD_ID : MAIN_BOARD_ID;
   if(wantBoard !== BOARD_ID){
@@ -2898,6 +2910,7 @@ async function bootCheck(){
    v5: dup search + lazy per-group load, local draft autosave, contrast, search-focus.
    v6: mobile skeleton — responsive layout + hamburger drawer + view toggle.
    v6.1: drawer stacking fix — drawer now sits above the overlay (was tap-blocked).
+   v6.2: mobile — replaced hamburger drawer with a native status dropdown above search.
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
