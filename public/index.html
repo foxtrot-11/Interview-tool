@@ -11,7 +11,7 @@
     --bg:#0d0d0f;--surface:#141416;--surface2:#1c1c1f;
     --border:#2a2a2e;--border-active:#5a5a6e;
     --accent:#c8b4ff;--accent2:#ff7eb3;--accent3:#7ef4c8;
-    --text:#e8e8f0;--text-muted:#6b6b7e;--text-dim:#3a3a4a;
+    --text:#e8e8f0;--text-muted:#8b8ba0;--text-dim:#74748a;
     --success:#4ade80;--warning:#facc15;--danger:#f87171;
     --radius:6px;--font-display:'Syne',sans-serif;--font-mono:'DM Mono',monospace;
   }
@@ -79,6 +79,15 @@
   .dup-empty{text-align:center;padding:60px 20px;color:var(--text-muted);font-size:13px}
   .dup-loading{text-align:center;padding:40px;color:var(--text-muted);font-size:12px;letter-spacing:0.15em;text-transform:uppercase}
   .dup-spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
+  .dup-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px}
+  .dup-search-input{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:12px}
+  .dup-search-input:focus{outline:none;border-color:var(--accent)}
+  .dup-search-input::placeholder{color:var(--text-muted)}
+  .dup-loadall-btn,.dup-load-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:8px 14px;font-family:var(--font-mono);font-size:11px;letter-spacing:0.06em;cursor:pointer}
+  .dup-loadall-btn:hover,.dup-load-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .dup-load-btn{margin:8px}
+  .draft-banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#facc1518;border:1px solid #facc1550;color:var(--text);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px}
+  .draft-banner-actions{margin-left:auto;display:flex;gap:8px}
   /* DUPV2 review styles */
   .dup-type-A{background:#4ade8020;color:#4ade80;border:1px solid #4ade8040}
   .dup-type-B{background:#facc1520;color:#facc15;border:1px solid #facc1540}
@@ -957,6 +966,10 @@
         <div style="font-size:11px;color:var(--text-muted)" id="dup-summary"></div>
         <button class="dup-refresh-btn" onclick="loadDuplicates()">↺ Refresh</button>
       </div>
+      <div class="dup-toolbar">
+        <input type="text" id="dup-search" class="dup-search-input" placeholder="Search duplicates by name…" oninput="renderDupGroups()" onfocus="this.select()" autocomplete="off">
+        <button class="dup-loadall-btn" id="dup-loadall-btn" onclick="loadAllGroupDetails()">Load all sequentially</button>
+      </div>
       <div id="dup-groups-container">
         <div class="dup-loading">Scanning boards for duplicates...</div>
       </div>
@@ -1187,6 +1200,8 @@ async function setMode(mode){
     hide('full-view');
     hide('interview-view');
     hide('new-model-view');
+    buildSidebarNav('blank');
+    document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
     show('dup-view');
     loadDuplicates();
     return;
@@ -1409,8 +1424,12 @@ function onComboInput(val, keepClosed){
   if(!keepClosed) openComboPanel();
 }
 function onComboFocus(){
-  // On focus, show the full list (or current filtered) so a click-then-type flow works
-  renderComboPanel(document.getElementById('candidate-combo').value || '');
+  // Click the box → highlight the current name so typing replaces it immediately
+  // (no manual erasing), and show the full list to browse. The loaded record is NOT
+  // cleared — you stay on the current model until you actually pick a new row.
+  const el=document.getElementById('candidate-combo');
+  if(el) el.select();
+  renderComboPanel('');
   openComboPanel();
 }
 function onComboKey(e){
@@ -1451,6 +1470,60 @@ document.addEventListener('click', (e)=>{
   const wrap = document.getElementById('combo-wrap');
   if(wrap && !wrap.contains(e.target)) closeComboPanel();
 });
+
+// ── LOCAL DRAFT AUTOSAVE ──
+// Saves the in-progress form to this device (localStorage) every 30s while dirty, plus
+// on tab close. Survives the server dropping mid-edit, since it never touches the server.
+// On opening a record, if a draft exists, we offer to restore it.
+function draftKey(id){ return 'draft:'+BOARD_ID+':'+id; }
+function captureDraft(){
+  if(!currentItem) return;
+  try{
+    const fields={};
+    document.querySelectorAll('input,textarea,select').forEach(el=>{
+      if(el.id && (el.id.startsWith('f-')||el.id.startsWith('iv-')||el.id==='strip-name')) fields[el.id]=el.value;
+    });
+    localStorage.setItem(draftKey(currentItem.id), JSON.stringify({t:Date.now(),mode:currentMode,fields,statusValues,selectValues,multiValues}));
+  }catch(e){}
+}
+function clearDraft(id){ try{ localStorage.removeItem(draftKey(id)); }catch(e){} const b=document.getElementById('draft-banner'); if(b) b.remove(); }
+function applyStatusVisuals(){
+  Object.keys(statusValues).forEach(key=>{
+    const v=statusValues[key];
+    ['f-','iv-','iv2-','ive-'].forEach(pre=>{
+      const g=document.getElementById(pre+key);
+      if(g) g.querySelectorAll('.status-pill').forEach(p=>p.classList.toggle('selected', String(p.dataset.value)===String(v)));
+    });
+  });
+}
+function restoreDraft(id){
+  let raw; try{ raw=localStorage.getItem(draftKey(id)); }catch(e){}
+  if(!raw) return;
+  try{
+    const d=JSON.parse(raw);
+    Object.entries(d.fields||{}).forEach(([fid,val])=>{ const el=document.getElementById(fid); if(el) el.value=val; });
+    if(d.statusValues){ Object.keys(d.statusValues).forEach(k=>statusValues[k]=d.statusValues[k]); applyStatusVisuals(); }
+    if(d.selectValues){ Object.keys(d.selectValues).forEach(k=>selectValues[k]=d.selectValues[k]); }
+    if(d.multiValues){ Object.keys(d.multiValues).forEach(k=>multiValues[k]=d.multiValues[k]); if(typeof renderCompatButtons==='function') renderCompatButtons(); }
+    isDirty=true; document.getElementById('unsaved-dot')?.classList.add('visible');
+    const b=document.getElementById('draft-banner'); if(b) b.remove();
+    showToast('Draft restored — review, then Save','success');
+  }catch(e){ showToast('Could not restore draft','error'); }
+}
+function maybeShowDraftBanner(id){
+  const old=document.getElementById('draft-banner'); if(old) old.remove();
+  let raw; try{ raw=localStorage.getItem(draftKey(id)); }catch(e){}
+  if(!raw) return;
+  let d; try{ d=JSON.parse(raw); }catch(e){ return; }
+  const when=new Date(d.t).toLocaleString();
+  const bar=document.createElement('div'); bar.id='draft-banner'; bar.className='draft-banner';
+  bar.innerHTML='<span>💾 Unsaved local draft found from '+escapeHtml(when)+' (saved on this device — e.g. if the server dropped mid-edit).</span>'+
+    '<span class="draft-banner-actions"><button class="merge-btn" onclick="restoreDraft(\''+id+'\')">Restore</button>'+
+    '<button class="skip-btn" onclick="clearDraft(\''+id+'\')">Discard</button></span>';
+  const fa=document.getElementById('form-area'); if(fa) fa.insertBefore(bar, fa.firstChild);
+}
+setInterval(()=>{ if(currentItem && isDirty) captureDraft(); }, 30000);
+window.addEventListener('beforeunload', ()=>{ if(currentItem && isDirty) captureDraft(); });
 
 // ── LOAD CANDIDATE ──
 async function loadCandidate(itemId){
@@ -1493,6 +1566,7 @@ async function loadCandidate(itemId){
   isDirty=false;
   document.getElementById('unsaved-dot').classList.remove('visible');
   document.getElementById('save-status').textContent='';
+  maybeShowDraftBanner(currentItem.id);
   showToast('Loaded','success');
 }
 
@@ -1900,6 +1974,8 @@ async function saveRecord(){
       catch(e){ showToast('Headshot swap failed: '+e.message,'error'); console.error(e); }
     }
     isDirty=false;
+    try{ if(currentItem) localStorage.removeItem('draft:'+BOARD_ID+':'+currentItem.id); }catch(e){}
+    { const _db=document.getElementById('draft-banner'); if(_db) _db.remove(); }
     // Newly-added Site Compat tags are now saved → fold them into the baseline so
     // they switch from red (new) to yellow (existing), and re-render.
     compatSavedIds = new Set((multiValues['dropdown_mkncp6xy']||[]).map(Number));
@@ -2762,6 +2838,7 @@ async function bootCheck(){
        deletion verified by item state (+ Recycle Bin note).
    v3: live scan progress + spinner.
    v4: resilient deletes (retry) + keeper guardrail.
+   v5: dup search + lazy per-group load, local draft autosave, contrast, search-focus.
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
@@ -2925,6 +3002,7 @@ function setDupFilter(f){ dupFilter=f; renderDupGroups(); }
 function renderDupGroups(){
   const container = document.getElementById('dup-groups-container');
   const summary   = document.getElementById('dup-summary');
+  const dupSearch=(document.getElementById('dup-search')?.value||'').trim().toLowerCase();
   const tally = {A:0,B:0,C:0,D:0,E:0};
   dupGroups.forEach(g => { if(!g.done) tally[classifyType(g).type]++; });
   const total = Object.values(tally).reduce((a,b)=>a+b,0);
@@ -2939,6 +3017,7 @@ function renderDupGroups(){
     if(group.done) return;
     const info = classifyType(group);
     if(dupFilter!=='ALL' && dupFilter!==info.type) return;
+    if(dupSearch && !group.name.toLowerCase().includes(dupSearch)) return;
     shown++;
     const gid = group.gid;
     const div = document.createElement('div');
@@ -2951,7 +3030,7 @@ function renderDupGroups(){
         <div class="dup-case-badge ${info.cls}">Type ${info.type}: ${info.label}</div>
         <div style="margin-left:auto;font-size:10px;color:var(--text-dim)">oldest ${oldest.created_at.slice(0,10)} · id ${oldest.id}</div>
       </div>
-      <div class="dup-items" id="dup-items-${gid}"><div style="padding:12px;color:var(--text-muted);font-size:12px">Loading details…</div></div>
+      <div class="dup-items" id="dup-items-${gid}"><button class="dup-load-btn" onclick="loadGroupDetails('${gid}')">Load details</button></div>
       <div class="dup-preview" id="dup-preview-${gid}"></div>
       <div class="dup-actions">
         ${info.type==='D'
@@ -2962,9 +3041,28 @@ function renderDupGroups(){
         <div id="dup-log-${gid}" class="dup-merge-log"></div>
       </div>`;
     container.appendChild(div);
-    loadGroupDetails(gid);
   });
   if(!shown) container.innerHTML = `<div class="dup-empty">No groups in this filter.</div>`;
+}
+
+// Load every currently-visible group's details one after another (manual, on demand)
+async function loadAllGroupDetails(){
+  const btn=document.getElementById('dup-loadall-btn');
+  const q=(document.getElementById('dup-search')?.value||'').trim().toLowerCase();
+  const visible=dupGroups.filter(g=>{
+    if(g.done) return false;
+    const t=classifyType(g).type;
+    if(dupFilter!=='ALL' && dupFilter!==t) return false;
+    if(q && !g.name.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  if(btn) btn.disabled=true;
+  let done=0;
+  for(const g of visible){
+    if(btn) btn.textContent=`Loading ${++done}/${visible.length}…`;
+    try{ await loadGroupDetails(g.gid); }catch(e){}
+  }
+  if(btn){ btn.textContent='Load all sequentially'; btn.disabled=false; }
 }
 
 async function loadGroupDetails(gid){
