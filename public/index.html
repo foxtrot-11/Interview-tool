@@ -90,7 +90,7 @@
   .mode-btn.active[data-mode="all"]{background:#e8e8f0;color:#111}
   .mode-btn.active[data-mode="kanban"]{background:#9d50dd;color:#fff}
   .kanban-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
-  .kb-col{flex:0 0 380px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;max-height:calc(100vh - 230px)}
+  .kb-col{flex:0 0 300px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;max-height:calc(100vh - 230px)}
   .kb-col-head{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:0.04em;color:#111;padding:10px 12px;border-radius:7px 7px 0 0}
   .kb-count{opacity:0.65;margin-left:4px}
   .kb-col-body{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
@@ -1270,19 +1270,19 @@ async function loadKanban(){
     const items=[]; let cursor=null, pages=0;
     do{
       const cp = cursor ? `cursor:"${cursor}"` : 'limit:200';
-      const data = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name updated_at column_values(ids:["label","long_text_mktg36ee","lien_internet","files_mkncw5nm"]){id text value}}}}}`);
+      const data = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name updated_at column_values(ids:["label","lien_internet","files_mkncw5nm"]){id value}}}}}`);
       const page = data.boards[0].items_page;
       page.items.forEach(it=>{
         const cv={}; (it.column_values||[]).forEach(c=>cv[c.id]=c);
         let statusIdx=null; try{ statusIdx = JSON.parse(cv['label'].value)?.index ?? null; }catch{}
-        if(statusIdx===null || !(statusIdx in idxToCol)) return; // excludes Evernote(11), Duplicate(12), unset
+        if(statusIdx===null || !(statusIdx in idxToCol)) return; // excludes Duplicate(12) + unset (Evernote 11 is now its own column)
         let head=null; try{ const f=JSON.parse(cv['files_mkncw5nm'].value); if(f&&f.files&&f.files.length) head=f.files[0].assetId; }catch{}
         let twUrl=''; try{ twUrl = JSON.parse(cv['lien_internet'].value)?.url || ''; }catch{}
-        items.push({id:it.id, name:(it.name||'').trim(), updated_at:it.updated_at||'', statusIdx, notes:(cv['long_text_mktg36ee']?.text||''), twUrl, head});
+        items.push({id:it.id, name:(it.name||'').trim(), updated_at:it.updated_at||'', statusIdx, notes:'', notesLoaded:false, twUrl, head});
       });
       cursor=page.cursor; pages++;
       setLoad(`Loading models… ${items.length} loaded`);
-    } while(cursor && pages<8);
+    } while(cursor && pages<40); // page through the WHOLE board (stops as soon as cursor runs out)
     kanbanItems=items;
     kbColLoaded={};
     loading.style.display='none';
@@ -1440,7 +1440,7 @@ function kanbanCardHtml(m){
       <span class="kb-caret" id="kbcaret-${m.id}">▾</span>
     </div>
     <div class="kb-mini">
-      <div class="kb-notes">${notes}</div>
+      <div class="kb-notes" id="kbnotes-${m.id}">${notes}</div>
       ${tw}
     </div>
     <div class="kb-full" id="kbfull-${m.id}" style="display:none"></div>
@@ -1461,7 +1461,7 @@ function renderKanban(){
   kbBuckets = buckets;
   board.innerHTML = KANBAN_COLS.map((c,i)=>{
     const big = buckets[i].length > KB_AUTO_THRESHOLD && !kbColLoaded[i];
-    const loadBtn = big ? `<button class="kb-loadphotos" data-col="${i}" onclick="loadKanbanColumnPhotos(${i})">⬇ Load ${buckets[i].length} photos</button>` : '';
+    const loadBtn = big ? `<button class="kb-loadphotos" data-col="${i}" onclick="loadKanbanColumnPhotos(${i})">⬇ Load ${buckets[i].length} photos + notes</button>` : '';
     return `
     <div class="kb-col">
       <div class="kb-col-head" style="background:${KANBAN_COLOR[c.mode]}">${escapeHtml(c.label)}<span class="kb-count">${buckets[i].length}</span></div>
@@ -1471,14 +1471,14 @@ function renderKanban(){
   }).join('');
   document.getElementById('kanban-summary').textContent = `${kanbanItems.length} models`;
   // Auto-load headshots for small columns (and any column the user asked to load); skip big ones.
-  buckets.forEach((b,i)=>{ if(b.length<=KB_AUTO_THRESHOLD || kbColLoaded[i]) fetchKanbanHeadshotsForModels(b); });
+  buckets.forEach((b,i)=>{ if(b.length<=KB_AUTO_THRESHOLD || kbColLoaded[i]){ fetchKanbanHeadshotsForModels(b); fetchKanbanNotesForModels(b); } });
 }
 
 async function loadKanbanColumnPhotos(i){
   kbColLoaded[i]=true;
   const btn=document.querySelector('.kb-loadphotos[data-col="'+i+'"]');
   if(btn){ btn.textContent='Loading photos…'; btn.style.pointerEvents='none'; btn.style.opacity='0.7'; }
-  await fetchKanbanHeadshotsForModels(kbBuckets[i]||[]);
+  await Promise.all([fetchKanbanHeadshotsForModels(kbBuckets[i]||[]), fetchKanbanNotesForModels(kbBuckets[i]||[])]);
   if(btn && btn.parentNode) btn.remove();
 }
 
@@ -1494,6 +1494,22 @@ async function fetchKanbanHeadshotsForModels(models){
       kbHeadCache[m.head]=u;
       const el=document.getElementById('kbthumb-'+m.id);
       if(el && !el.querySelector('img')) el.innerHTML=`<img loading="lazy" src="${escapeHtml(u)}" alt="">`;
+    });
+  }
+}
+
+// Notes are heavy, so they load per-column (with the photos) rather than up front — this is what lets the whole board load fast & complete.
+async function fetchKanbanNotesForModels(models){
+  const need = (models||[]).filter(m=>!m.notesLoaded);
+  for(let i=0;i<need.length;i+=25){
+    const chunk=need.slice(i,i+25);
+    const ids=chunk.map(m=>m.id).join(',');
+    let data; try{ data=await gql(`{items(ids:[${ids}]){id column_values(ids:["long_text_mktg36ee"]){text}}}`); }catch(e){ continue; }
+    const byId={}; (data.items||[]).forEach(it=>{ byId[String(it.id)]=(it.column_values&&it.column_values[0]&&it.column_values[0].text)||''; });
+    chunk.forEach(m=>{
+      m.notesLoaded=true; m.notes=byId[String(m.id)]||'';
+      const el=document.getElementById('kbnotes-'+m.id);
+      if(el) el.innerHTML = m.notes ? escapeHtml(m.notes.length>90 ? m.notes.slice(0,88)+'…' : m.notes) : '<span class="kb-empty">— no notes —</span>';
     });
   }
 }
@@ -3478,6 +3494,7 @@ async function bootCheck(){
    v7.3: kanban — scrollable header tabs, Approved loads on-demand (Load photos button), no-cache headers.
    v7.4: kanban — fixed card flex-squish (real cutoff cause), 2x larger cards, load-button feedback, extra-pics grid + lightbox in modal.
    v7.5: kanban — All-Star/Exclusive/Evernote columns, modal photo upload (headshot/extra) + reselect headshot.
+   v7.6: kanban — full board load fix (pages through ALL ~950 items; Evernote now shows all 433, search covers everyone), notes lazy-load per column, thinner status columns.
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
