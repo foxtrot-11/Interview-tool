@@ -843,8 +843,11 @@
         <div class="section-header"><div class="section-title">Physical</div><div class="section-count">4/7</div></div>
         <div class="field-grid triple">
           <div class="field"><div class="field-label">Height</div><input type="text" id="f-text_mknc1sps" placeholder='5&apos;11"' oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Height (metric)</div><input type="text" id="f-metric_h" placeholder="185 cm" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Weight</div><input type="text" id="f-text_mm1yx2wg" placeholder="175 lbs" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Weight (metric)</div><input type="text" id="f-metric_w" placeholder="70 kg" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Cock Size</div><input type="text" id="f-text_mm1y2znz" placeholder='7"' oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Cock Size (metric)</div><input type="text" id="f-metric_c" placeholder="17 cm" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Hair Color</div><input type="text" id="f-text_mkncjzx8" placeholder="Brown" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Eye Color</div><input type="text" id="f-text_mkncsqaq" placeholder="Blue" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Cut vs Uncut</div><div class="custom-select-wrap"><div class="custom-select-display" id="display-dropdown_mkx04tbr" onclick="event.stopPropagation();toggleCustom('dropdown_mkx04tbr',true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="dropdown-dropdown_mkx04tbr"></div></div></div>
@@ -946,10 +949,13 @@
           <div class="field"><div class="field-label">Other Social Media</div><input type="text" id="iv-lien_internet3" placeholder="https://..." oninput="syncIvField('lien_internet3',this.value)"></div>
           <div class="field"><div class="field-label">Age</div><input type="number" id="iv-age-quick" min="18" max="99" placeholder="e.g. 28" oninput="syncAgeFromQuick(this.value)"></div>
           <div class="field"><div class="field-label">Height</div><input type="text" id="iv-text_mknc1sps" placeholder="5\u201911&quot;" oninput="syncIvField('text_mknc1sps',this.value)"></div>
+          <div class="field"><div class="field-label">Height (metric)</div><input type="text" id="iv-metric_h" placeholder="185 cm" oninput="syncIvField('metric_h',this.value)"></div>
           <div class="field"><div class="field-label">Weight</div><input type="text" id="iv-text_mm1yx2wg" placeholder="175 lbs" oninput="syncIvField('text_mm1yx2wg',this.value)"></div>
+          <div class="field"><div class="field-label">Weight (metric)</div><input type="text" id="iv-metric_w" placeholder="70 kg" oninput="syncIvField('metric_w',this.value)"></div>
           <div class="field"><div class="field-label">Hair Color</div><input type="text" id="iv-text_mkncjzx8" placeholder="Brown" oninput="syncIvField('text_mkncjzx8',this.value)"></div>
           <div class="field"><div class="field-label">Eye Color</div><input type="text" id="iv-text_mkncsqaq" placeholder="Blue" oninput="syncIvField('text_mkncsqaq',this.value)"></div>
           <div class="field"><div class="field-label">Cock Size</div><input type="text" id="iv-text_mm1y2znz" placeholder="7&quot;" oninput="syncIvField('text_mm1y2znz',this.value)"></div>
+          <div class="field"><div class="field-label">Cock Size (metric)</div><input type="text" id="iv-metric_c" placeholder="17 cm" oninput="syncIvField('metric_c',this.value)"></div>
           <div class="field"><div class="field-label">Cut vs Uncut</div><div class="custom-select-wrap"><div class="custom-select-display" id="iv-display-dropdown_mkx04tbr" onclick="event.stopPropagation();toggleCustom('dropdown_mkx04tbr',true,'iv')"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="iv-dropdown-dropdown_mkx04tbr"></div></div></div>
           <div class="field"><div class="field-label">Shirt Size</div><input type="text" id="iv-text_mknc62rg" placeholder="XS/S/M/L/XL" oninput="syncIvField('text_mknc62rg',this.value)"></div>
           <div class="field"><div class="field-label">Shoe Size</div><input type="text" id="iv-text_mknc2t7g" placeholder="10.5" oninput="syncIvField('text_mknc2t7g',this.value)"></div>
@@ -1059,8 +1065,11 @@
           <div class="field"><div class="field-label">Location</div><input type="text" id="new-location" placeholder="City, State" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Date of Birth</div><input type="date" id="new-dob" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Height</div><input type="text" id="new-height" placeholder='5&apos;11"' oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Height (metric)</div><input type="text" id="new-height-metric" placeholder="185 cm" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Weight</div><input type="text" id="new-weight" placeholder="175 lbs" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Weight (metric)</div><input type="text" id="new-weight-metric" placeholder="70 kg" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Cock Size</div><input type="text" id="new-cock" placeholder='7"' oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Cock Size (metric)</div><input type="text" id="new-cock-metric" placeholder="17 cm" oninput="markDirty()"></div>
           <div class="field field-full"><div class="field-label">Referred By</div><textarea id="new-referred" placeholder="Who referred this model?" oninput="markDirty()"></textarea></div>
           <div class="field field-full"><div class="field-label">General Notes</div><textarea id="new-notes" placeholder="Any additional notes..." oninput="markDirty()"></textarea></div>
 
@@ -1139,12 +1148,6 @@
       <div id="kanban-loading" class="dup-loading"><span class="dup-spinner"></span><span id="kanban-load-status">Loading…</span></div>
       <div id="kanban-board" class="kanban-board"></div>
       <div id="kanban-mobile-note">Kanban is a desktop view. On mobile, use the status dropdown to browse a stage.</div>
-      <div id="kb-modal" class="kb-modal" onclick="if(event.target===this)closeKanbanModal()">
-        <div class="kb-modal-panel">
-          <button class="kb-modal-close" onclick="closeKanbanModal()">✕</button>
-          <div id="kb-modal-body"></div>
-        </div>
-      </div>
     </div>
 
     <div id="am-view" style="display:none">
@@ -1170,6 +1173,14 @@
       <div class="am-count" id="am-note" style="margin-bottom:8px"></div>
       <div id="am-grid" class="am-grid"></div>
       <div id="am-empty" class="am-empty" style="display:none">No matching results</div>
+    </div>
+
+    <!-- Kanban/All-Models editor modal — top-level so it renders from ANY tab (was nested inside kanban-view, which display:none'd it on the All Models tab) -->
+    <div id="kb-modal" class="kb-modal" onclick="if(event.target===this)closeKanbanModal()">
+      <div class="kb-modal-panel">
+        <button class="kb-modal-close" onclick="closeKanbanModal()">✕</button>
+        <div id="kb-modal-body"></div>
+      </div>
     </div>
 
   </div><!-- /form-area -->
@@ -1366,6 +1377,107 @@ function parseCockIn(raw){
   else if((m=s.match(/(\d+(?:\.\d+)?)/)))                             v=parseFloat(m[1]);
   if(v==null||!isFinite(v)) return null;
   return (v>=2 && v<=13) ? Math.round(v*100)/100 : null;
+}
+
+// ── Metric ⇄ US conversion (v7.10) ──
+// Metric column ids differ per board; US ids are identical on both. Unknown boards
+// (e.g. the production BATCH board) return null → metric writes are skipped there.
+const METRIC_COLS = {
+  '18419204393': { h:'text_mm4w7b2j', w:'text_mm4w5484', c:'text_mm4w2rnw' },  // staging
+  '3636652411':  { h:'text_mm4vkygb', w:'text_mm4v5sfk', c:'text_mm4vfz4v' }   // production
+};
+function metricCols(boardId){ return METRIC_COLS[String(boardId)] || null; }
+
+// Metric-side parsers. Reject obvious US-unit strings typed into the metric box
+// (e.g. "150 lbs", 5'9") rather than mis-convert them.
+function parseMetricHeightCm(raw){
+  const s=normMeas(raw); if(!s) return null;
+  if(/['"]|\bft\b|\bin\b|lb/i.test(s)) return null;
+  const m=s.match(/(\d+(?:[.,]\d+)?)\s*(cm|m)?\b/i); if(!m) return null;
+  let v=parseFloat(m[1].replace(',','.'));
+  const unit=(m[2]||'').toLowerCase();
+  if(unit==='m'||(!unit&&v<3)) v*=100;
+  return (v>=120&&v<=230)?Math.round(v*10)/10:null;
+}
+function parseMetricWeightKg(raw){
+  const s=normMeas(raw); if(!s) return null;
+  if(/lb|#|sto?ne/i.test(s)) return null;
+  const m=s.match(/(\d+(?:[.,]\d+)?)/); if(!m) return null;
+  const v=parseFloat(m[1].replace(',','.'));
+  return (v>=27&&v<=182)?Math.round(v*10)/10:null;
+}
+function parseMetricCockCm(raw){
+  const s=normMeas(raw); if(!s) return null;
+  if(/['"]|\bin\b/i.test(s)) return null;
+  const m=s.match(/(\d+(?:[.,]\d+)?)/); if(!m) return null;
+  const v=parseFloat(m[1].replace(',','.'));
+  return (v>=5&&v<=33.1)?Math.round(v*10)/10:null;
+}
+// Formatters: cm integers, kg 1 decimal (trailing .0 trimmed), US in familiar notation.
+function fmtCm(cm){ return `${Math.round(cm)} cm`; }
+function fmtKg(kg){ const v=Math.round(kg*10)/10; return `${(v%1===0)?String(Math.round(v)):v.toFixed(1)} kg`; }
+function fmtHeightUS(inches){ const n=Math.round(inches); return `${Math.floor(n/12)}'${n%12}"`; }
+function fmtCockUS(inches){ return `${Math.round(inches*4)/4}"`; }
+function fmtLbs(lb){ return `${Math.round(lb)} lbs`; }
+
+const MEAS_DEFS={
+  h:{us:'text_mknc1sps', label:'Height',    parseUS:parseHeightIn, parseMet:parseMetricHeightCm, usToMet:v=>fmtCm(v*2.54),       metToUS:v=>fmtHeightUS(v/2.54)},
+  w:{us:'text_mm1yx2wg', label:'Weight',    parseUS:parseWeightLb, parseMet:parseMetricWeightKg, usToMet:v=>fmtKg(v*0.45359237), metToUS:v=>fmtLbs(v*2.20462)},
+  c:{us:'text_mm1y2znz', label:'Cock Size', parseUS:parseCockIn,   parseMet:parseMetricCockCm,   usToMet:v=>fmtCm(v*2.54),       metToUS:v=>fmtCockUS(v/2.54)}
+};
+// One measurement pair at save time. US wins when both sides were edited; a blank
+// edit clears both; an unparseable edit saves as typed but leaves the twin alone (with a warning).
+function pairMeasurement(key, usRaw, metRaw, usChanged, metChanged){
+  const d=MEAS_DEFS[key], out={};
+  if(usChanged){
+    out.us=usRaw;
+    const t=(usRaw||'').trim();
+    if(t===''){ out.met=''; }
+    else{ const n=d.parseUS(t); if(n!=null) out.met=d.usToMet(n); else out.warn=`couldn't read ${d.label} (US) — metric not auto-filled`; }
+  } else if(metChanged){
+    out.met=metRaw;
+    const t=(metRaw||'').trim();
+    if(t===''){ out.us=''; }
+    else{ const n=d.parseMet(t); if(n!=null) out.us=d.metToUS(n); else out.warn=`couldn't read ${d.label} (metric) — US not auto-filled`; }
+  }
+  return out;
+}
+// ── Form glue: baselines + pairing for the full/interview editor ──
+let measBaseline={};
+function captureMeasBaseline(){
+  measBaseline={};
+  ['h','w','c'].forEach(k=>{
+    const us=document.getElementById('f-'+MEAS_DEFS[k].us), met=document.getElementById('f-metric_'+k);
+    measBaseline['us_'+k]=us?us.value:''; measBaseline['met_'+k]=met?met.value:'';
+  });
+}
+// Runs at the START of saveRecord, before buildColumnValues gathers input values.
+function applyMetricPairingToInputs(){
+  if(!metricCols(BOARD_ID)) return;  // board has no metric columns (e.g. production batch) → leave as-is
+  let warn='';
+  ['h','w','c'].forEach(k=>{
+    const usEl=document.getElementById('f-'+MEAS_DEFS[k].us), metEl=document.getElementById('f-metric_'+k);
+    if(!usEl||!metEl) return;
+    const usChanged = usEl.value!==(measBaseline['us_'+k]||'');
+    const metChanged = metEl.value!==(measBaseline['met_'+k]||'');
+    if(!usChanged&&!metChanged) return;
+    const out=pairMeasurement(k, usEl.value, metEl.value, usChanged, metChanged);
+    if(out.us!==undefined){ usEl.value=out.us; const iv=document.getElementById('iv-'+MEAS_DEFS[k].us); if(iv) iv.value=out.us; }
+    if(out.met!==undefined){ metEl.value=out.met; const iv=document.getElementById('iv-metric_'+k); if(iv) iv.value=out.met; }
+    if(out.warn) warn=out.warn;
+  });
+  if(warn) showToast('⚠ '+warn,'error');
+}
+// Splice the metric twin fields into the kanban/all-models modal spec once the board is known.
+function injectMetricKbFields(){
+  const mc=metricCols(MAIN_BOARD_ID); if(!mc) return;
+  for(const sec of KB_SECTIONS){
+    for(let i=sec.fields.length-1;i>=0;i--){
+      const cid=sec.fields[i][0];
+      const k = cid==='text_mknc1sps'?'h' : cid==='text_mm1yx2wg'?'w' : cid==='text_mm1y2znz'?'c' : null;
+      if(k){ sec.fields.splice(i+1,0,[mc[k], MEAS_DEFS[k].label+' (metric)','text']); KB_ALL_FIELD_IDS.push(mc[k]); }
+    }
+  }
 }
 
 // ── ALL MODELS: filter/sort definitions + state ──
@@ -1986,12 +2098,24 @@ async function saveKanbanCard(id){
       if(colId==='lien_internet') newTw=(cur||'').trim();
     }
   }
+  // Metric ⇄ US pairing (v7.10): whichever side was edited drives its twin; US wins when both were.
+  let measWarn='';
+  const mcKB=metricCols(MAIN_BOARD_ID);
+  if(mcKB) for(const k of ['h','w','c']){
+    const usCol=MEAS_DEFS[k].us, metCol=mcKB[k];
+    const usChanged=(usCol in cols), metChanged=(metCol in cols);
+    if(!usChanged && !metChanged) continue;
+    const out=pairMeasurement(k, usChanged?cols[usCol]:null, metChanged?cols[metCol]:null, usChanged, metChanged);
+    if(out.us!==undefined){ cols[usCol]=out.us; const el=document.getElementById('kbf_'+usCol); if(el) el.value=out.us; }
+    if(out.met!==undefined){ cols[metCol]=out.met; const el=document.getElementById('kbf_'+metCol); if(el) el.value=out.met; }
+    if(out.warn) measWarn=' ⚠ '+out.warn;
+  }
   if(Object.keys(cols).length===0){ if(msg) msg.textContent = hadPendingHs ? 'Headshot saved ✓' : 'No changes to save'; return; }
   if(msg) msg.textContent = hadPendingHs ? 'Headshot saved ✓ — saving other changes…' : 'Saving…';
   try{
     await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
       {i:id, b:String(MAIN_BOARD_ID), c:JSON.stringify(cols)});
-    if(msg) msg.textContent = hadPendingHs ? 'All changes saved ✓' : 'Saved ✓';
+    if(msg) msg.textContent = (hadPendingHs ? 'All changes saved ✓' : 'Saved ✓') + measWarn;
     const m=kanbanItems.find(x=>x.id===id);
     if(m){
       if(newGen!==null) m.notes=newGen; if(newTw!==null) m.twUrl=newTw; m.updated_at=new Date().toISOString(); if(statusChanged) m.statusIdx=newStatusIdx;
@@ -2028,6 +2152,7 @@ async function init(){
       if(cfg && cfg.mainBoardId){ MAIN_BOARD_ID = cfg.mainBoardId; BOARD_ID = MAIN_BOARD_ID; }
       if(cfg && cfg.batchBoardId){ BATCH_BOARD_ID = cfg.batchBoardId; }
     }catch(e){ console.warn('config fetch failed, using defaults', e); }
+    injectMetricKbFields();   // metric twin columns depend on which board /config selected
     await fetchBoardDropdownOptions();
     buildAllDropdowns();
     // Candidates load on first mode click (per-mode lazy cache)
@@ -2594,6 +2719,9 @@ function populateForm(item){
    'text_mkncgkwk','text_mkncht8f','text_mm1z66yj','text_mm1znrfv'
   ].forEach(id=>setTxt(id,txt(id))));
 
+  // Metric measurement twins (v7.10) — real column ids vary per board; blank on boards without them
+  guard('metric',()=>{ const mc=metricCols(BOARD_ID); ['h','w','c'].forEach(k=>setTxt('metric_'+k, mc?txt(mc[k]):'')); captureMeasBaseline(); });
+
   // Long text
   guard('longtext',()=>['long_text_mm1zsdyv','long_text_mm1zbe1t','long_text_mm1zshaw','long_text_mm1z9aeg',
    'long_text_mm1zhkyq','long_text_mm2mxr92','long_text_mm1zaqzq','long_text_mm252r65','long_text_mm252tt7'
@@ -2963,6 +3091,7 @@ async function saveAll(){
 async function saveRecord(){
   if(!currentItem&&currentMode!=='new')return;
   try{
+    applyMetricPairingToInputs();   // US ⇄ metric conversion happens here, before values are gathered
     const cv=buildColumnValues();
     await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
       {i:currentItem.id,b:BOARD_ID,c:JSON.stringify(cv)});
@@ -2971,6 +3100,7 @@ async function saveRecord(){
       try { await applyHeadshotSwap(); loadCandidatePhotos(currentItem.id); }
       catch(e){ showToast('Headshot swap failed: '+e.message,'error'); console.error(e); }
     }
+    captureMeasBaseline();          // paired values just saved become the new baseline
     isDirty=false;
     try{ if(currentItem) localStorage.removeItem('draft:'+BOARD_ID+':'+currentItem.id); }catch(e){}
     { const _db=document.getElementById('draft-banner'); if(_db) _db.remove(); }
@@ -3422,9 +3552,16 @@ async function saveNewModel(targetMode){
     const ig=document.getElementById('new-instagram').value; if(ig) cv['lien_internet9']={url:ig,text:ig};
     const loc=document.getElementById('new-location').value; if(loc) cv['text_mkncbdr1']=loc;
     const dob=document.getElementById('new-dob').value; if(dob) cv['date_of_birth_mkncwsrj']={date:dob};
-    const ht=document.getElementById('new-height').value; if(ht) cv['text_mknc1sps']=ht;
-    const wt=document.getElementById('new-weight').value; if(wt) cv['text_mm1yx2wg']=wt;
-    const ck=document.getElementById('new-cock').value; if(ck) cv['text_mm1y2znz']=ck;
+    // Height/Weight/Cock with metric ⇄ US pairing (fill either box; the other is computed)
+    const mcNew=metricCols(MAIN_BOARD_ID);
+    [['h','new-height','new-height-metric'],['w','new-weight','new-weight-metric'],['c','new-cock','new-cock-metric']].forEach(pair=>{
+      const k=pair[0];
+      const us=(document.getElementById(pair[1])||{value:''}).value;
+      const met=(document.getElementById(pair[2])||{value:''}).value;
+      const out=pairMeasurement(k, us, met, !!us.trim(), !!met.trim());
+      if(out.us) cv[MEAS_DEFS[k].us]=out.us;
+      if(mcNew && out.met) cv[mcNew[k]]=out.met;
+    });
     const ref=document.getElementById('new-referred').value; if(ref) cv['long_text_mm1zhkyq']={text:ref};
     const nt=document.getElementById('new-notes').value; if(nt) cv['long_text_mktg36ee']={text:nt};
     cv['label'] = {index:TARGET.index};
@@ -3676,6 +3813,10 @@ function buildColumnValues(){
   const texts=['text_mknceqty','text_mm1zb8xf','text_mknk1txg','text_mkncy7gf','text_mknc3aty','text_mknc1sps','text_mm1yx2wg','text_mm1y2znz','text_mknc2t7g','text_mknc62rg','text_mknc808t','text_mkncjzx8','text_mkncsqaq','text_mkncbdr1','text_mknct7cn','text_mkncgkwk','text_mkncht8f','text_mm1z66yj','text_mm1znrfv'];
   texts.forEach(id=>{const v=getv(id);if(v!==null)cv[id]=v;});
 
+  // Metric measurement twins — skipped on boards without the metric columns (e.g. production batch board)
+  const mcBV=metricCols(BOARD_ID);
+  if(mcBV){ ['h','w','c'].forEach(k=>{ const el=document.getElementById('f-metric_'+k); if(el) cv[mcBV[k]]=el.value; }); }
+
   const longs=['long_text_mm1zsdyv','long_text_mm1zbe1t','long_text_mm1zshaw','long_text_mm1z9aeg','long_text_mm1zhkyq','long_text_mm2mxr92','long_text_mm1zaqzq','long_text_mm252r65','long_text_mm252tt7'];
   longs.forEach(id=>{
     let v=getv(id);
@@ -3852,6 +3993,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.10: metric ⇄ US — Height/Weight/Cock get paired US + metric boxes in every editor (kanban/all-models modal, full editor, interview, new model); fill either side, Save converts the other (US wins if both edited; cm integers, kg 1 decimal); #kb-modal moved out of kanban-view so All Models tiles open the editor (bug fix).
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
