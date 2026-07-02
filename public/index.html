@@ -115,6 +115,31 @@
   .kb-hint{font-size:11px;color:var(--text-muted)}
   .kb-hs-prog{flex:1 1 100%;height:9px;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;overflow:hidden}
   .kb-hs-prog-bar{height:100%;width:8%;background:var(--accent);transition:width .5s ease}
+  /* ── ALL MODELS grid ── */
+  .am-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  #am-filterbtns{display:contents}
+  .am-fwrap{position:relative}
+  .am-fbtn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:7px 10px;font-family:var(--font-mono);font-size:11px;cursor:pointer;white-space:nowrap}
+  .am-fbtn:hover{color:var(--text)}
+  .am-fbtn.on{border-color:var(--accent);color:var(--accent)}
+  .am-fpop{position:absolute;top:calc(100% + 4px);left:0;z-index:80;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px;min-width:200px;max-height:320px;overflow:auto;box-shadow:0 10px 30px rgba(0,0,0,.55);display:none}
+  .am-fpop.open{display:block}
+  .am-fpop label{display:flex;gap:8px;align-items:center;padding:5px 7px;font-size:12px;color:var(--text);cursor:pointer;border-radius:4px;white-space:nowrap}
+  .am-fpop label:hover{background:var(--surface2)}
+  .am-sort{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 8px;font-family:var(--font-mono);font-size:11px;cursor:pointer}
+  .am-clear{background:transparent;border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:7px 10px;font-family:var(--font-mono);font-size:11px;cursor:pointer}
+  .am-clear:hover{border-color:var(--danger);color:var(--danger)}
+  .am-count{font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+  .am-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .am-tile{position:relative;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s}
+  .am-tile:hover{border-color:var(--accent)}
+  .am-caret{position:absolute;top:6px;right:6px;z-index:2;background:rgba(0,0,0,.55);color:#fff;border-radius:5px;padding:2px 7px;font-size:11px;pointer-events:none}
+  .am-thumb{width:100%;aspect-ratio:1/1;background:var(--surface);display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .am-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .am-mono{font-size:36px;color:var(--text-dim);font-weight:700;font-family:var(--font-display)}
+  .am-name{padding:7px 9px 2px;font-size:13px;font-weight:600;color:var(--text);line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:34px}
+  .am-sub{padding:0 9px 8px;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);min-height:15px}
+  .am-empty{padding:48px;text-align:center;color:var(--text-muted);font-family:var(--font-mono);font-size:13px}
   .kb-seths{position:absolute;bottom:4px;left:4px;right:4px;background:rgba(0,0,0,0.72);color:#fff;border:none;border-radius:4px;padding:5px;font-size:10px;font-family:var(--font-mono);cursor:pointer;opacity:0;transition:opacity .12s}
   .kb-photo:hover .kb-seths{opacity:1}
   .kb-hs-tag{position:absolute;bottom:4px;left:4px;background:var(--accent);color:var(--bg);border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700;font-family:var(--font-mono)}
@@ -1122,6 +1147,31 @@
       </div>
     </div>
 
+    <div id="am-view" style="display:none">
+      <div class="am-toolbar">
+        <div style="font-family:var(--font-display);font-size:20px;font-weight:700">All Models</div>
+        <button class="dup-refresh-btn" onclick="loadKanban()">↺ Refresh</button>
+        <input type="text" id="am-search" class="dup-search-input" placeholder="Search name…" oninput="amOnSearch()" onfocus="this.select()" autocomplete="off" style="max-width:200px">
+        <span id="am-filterbtns"></span>
+        <select id="am-sort" class="am-sort" onchange="renderAllModels()">
+          <option value="name-asc">Sort: Name A→Z</option>
+          <option value="name-desc">Sort: Name Z→A</option>
+          <option value="h-desc">Height: tallest first</option>
+          <option value="h-asc">Height: shortest first</option>
+          <option value="w-desc">Weight: heaviest first</option>
+          <option value="w-asc">Weight: lightest first</option>
+          <option value="c-desc">Cock: biggest first</option>
+          <option value="c-asc">Cock: smallest first</option>
+        </select>
+        <button class="am-clear" onclick="amClearFilters()">Clear</button>
+        <span class="am-count" id="am-count"></span>
+      </div>
+      <div id="am-loading" class="dup-loading" style="display:none"><span class="dup-spinner"></span><span id="am-load-status">Loading…</span></div>
+      <div class="am-count" id="am-note" style="margin-bottom:8px"></div>
+      <div id="am-grid" class="am-grid"></div>
+      <div id="am-empty" class="am-empty" style="display:none">No matching results</div>
+    </div>
+
   </div><!-- /form-area -->
 </div><!-- /main -->
 
@@ -1269,27 +1319,224 @@ let kbLoadedOnce = false;       // true after the first full board load, so re-e
 function kbIdxToCol(){ const m={}; KANBAN_COLS.forEach((c,i)=>c.ids.forEach(id=>m[id]=i)); return m; }
 function kbStatusToMode(idx){ for(const c of KANBAN_COLS){ if(c.ids.includes(idx)) return c.mode; } return 'all'; }
 
+// ── ALL MODELS: measurement parsers ──
+// Verified in tests against every distinct Height/Weight/Cock value on the production board (2026-07-01).
+function normMeas(s){
+  if(s==null) return '';
+  return String(s)
+    .replace(/[\u2018\u2019\u2032\u00B4\u0301\u0300]/g,"'")
+    .replace(/[\u201C\u201D\u2033]/g,'"')
+    .replace(/\s+/g,' ').trim();
+}
+function parseHeightIn(raw){
+  const s=normMeas(raw); if(!s) return null;
+  let m, v=null;
+  if((m=s.match(/(\d+(?:\.\d+)?)\s*cm\b/i)))       v=parseFloat(m[1])/2.54;
+  else if((m=s.match(/(\d\.\d{1,2})\s*m\b/i)))     v=parseFloat(m[1])*39.3701;
+  else if((m=s.match(/(\d)\s*(?:'+|ft)\s*-?\s*(\d{1,2}(?:\.\d+)?)/)))
+       v=parseInt(m[1],10)*12+parseFloat(m[2]);
+  else if((m=s.match(/(\d)\s*(?:'+|ft)/)))          v=parseInt(m[1],10)*12;
+  else if((m=s.match(/(\d)\s*"\s*(\d{1,2})/)))      v=parseInt(m[1],10)*12+parseFloat(m[2]);
+  else if((m=s.match(/^(\d)[.,](\d{1,2})$/)) && parseFloat(m[2])<=11.99)
+       v=parseInt(m[1],10)*12+parseFloat(m[2]);
+  else if((m=s.match(/^(\d)\s+(\d{1,2})$/)))        v=parseInt(m[1],10)*12+parseFloat(m[2]);
+  else if((m=s.match(/^(\d)(\d)$/)))                v=parseInt(m[1],10)*12+parseInt(m[2],10);
+  else if((m=s.match(/^(\d)\s*"?$/)))               v=parseInt(m[1],10)*12;
+  if(v==null||!isFinite(v)) return null;
+  return (v>=48 && v<=90) ? Math.round(v*10)/10 : null;
+}
+function parseWeightLb(raw){
+  const s=normMeas(raw); if(!s) return null;
+  let m, v=null, unit='lb';
+  if((m=s.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)/)))  v=(parseFloat(m[1])+parseFloat(m[2]))/2;
+  else if((m=s.match(/(\d+(?:\.\d+)?)/)))                    v=parseFloat(m[1]);
+  if(v==null||!isFinite(v)) return null;
+  if(/sto?ne/i.test(s)) unit='st';
+  else if(/(\d|\s)(kg?s?)\b/i.test(s)) unit='kg';
+  if(unit==='st') v*=14; else if(unit==='kg') v*=2.20462;
+  return (v>=60 && v<=400) ? Math.round(v*10)/10 : null;
+}
+function parseCockIn(raw){
+  const s=normMeas(raw); if(!s) return null;
+  let m, v=null;
+  if((m=s.match(/(\d+(?:\.\d+)?)\s*cm\b/i)))                          v=parseFloat(m[1])/2.54;
+  else if((m=s.match(/(\d+(?:\.\d+)?)\s*"?\s*[-\/]\s*(\d+(?:\.\d+)?)/))
+          && parseFloat(m[1])>=2 && parseFloat(m[1])<=13 && parseFloat(m[2])>=2 && parseFloat(m[2])<=13)
+       v=(parseFloat(m[1])+parseFloat(m[2]))/2;
+  else if((m=s.match(/(\d+(?:\.\d+)?)/)))                             v=parseFloat(m[1]);
+  if(v==null||!isFinite(v)) return null;
+  return (v>=2 && v<=13) ? Math.round(v*100)/100 : null;
+}
+
+// ── ALL MODELS: filter/sort definitions + state ──
+const AM_FILTERS=[
+ {key:'type', col:'dropdown_mm1zzwcg', label:'Type', kind:'dropdown'},
+ {key:'role', col:'dropdown_mknbe0p0', label:'Role', kind:'dropdown'},
+ {key:'loc',  col:'dropdown_mm254xed', label:'Location', kind:'dropdown'},
+ {key:'site', col:'dropdown_mkncp6xy', label:'Site Compat', kind:'dropdown'},
+ {key:'sex',  col:'dropdown_mm1by5q0', label:'Sexuality', kind:'dropdown'},
+ {key:'eth',  col:'dropdown_mm1zcar6', label:'Ethnicity', kind:'dropdown'},
+ {key:'ftm',  col:'color_mm1zk5e2',    label:'FTM?', kind:'status'},
+ {key:'tat',  col:'color_mm1zghx9',    label:'Tattoos', kind:'status'}
+];
+const AM_SORT_FIELDS={h:{key:'hIn',raw:'hRaw',label:'height'},w:{key:'wLb',raw:'wRaw',label:'weight'},c:{key:'cIn',raw:'cRaw',label:'cock size'}};
+const AM_DD_KEY={}, AM_ST_KEY={};
+AM_FILTERS.forEach(f=>{ (f.kind==='dropdown'?AM_DD_KEY:AM_ST_KEY)[f.col]=f.key; });
+let amFilters={};            // filter key -> Set of selected option ids
+let amSearchTimer=null;
+let amIO=null; const amPending=new Set(); let amFlushTimer=null;
+let activeGrid=null;         // 'kanban' | 'am' | null — which board-wide view is on screen
+function refreshActiveView(){ if(activeGrid==='kanban') renderKanban(); else if(activeGrid==='am') renderAllModels(); }
+
+// Pure filter+sort. Multiple picks within a filter = match ANY; across filters = must match ALL; search stacks on top.
+// Measurement sorts put models with no value at the end in BOTH directions; ties break alphabetically.
+function amApplyFilterSort(items, filters, search, sortVal){
+  const q=(search||'').trim().toLowerCase();
+  const list=items.filter(m=>{
+    if(q && !m.name.toLowerCase().includes(q)) return false;
+    for(const f of AM_FILTERS){
+      const sel=filters[f.key]; if(!sel || !sel.size) continue;
+      const v=m.f ? m.f[f.key] : undefined;
+      if(f.kind==='dropdown'){ if(!Array.isArray(v) || !v.some(id=>sel.has(id))) return false; }
+      else { if(v==null || !sel.has(v)) return false; }
+    }
+    return true;
+  });
+  const parts=(sortVal||'name-asc').split('-'), sk=parts[0], dir=parts[1];
+  let missing=0;
+  if(sk==='name'){
+    list.sort((a,b)=>a.name.localeCompare(b.name));
+    if(dir==='desc') list.reverse();
+  } else {
+    const K=AM_SORT_FIELDS[sk].key;
+    missing=list.reduce((n,m)=>n+(m[K]==null?1:0),0);
+    list.sort((a,b)=>{
+      const av=a[K], bv=b[K];
+      if(av==null && bv==null) return a.name.localeCompare(b.name);
+      if(av==null) return 1;
+      if(bv==null) return -1;
+      const d=(dir==='desc') ? (bv-av) : (av-bv);
+      return d!==0 ? d : a.name.localeCompare(b.name);
+    });
+  }
+  return {list, missing};
+}
+
+function amFilterOptions(f){
+  if(f.kind==='dropdown') return boardDropdownOptions[f.col]||FALLBACK_OPTIONS[f.col]||[];
+  const map=KB_STATUS_LABELS[f.col]||{};
+  return Object.keys(map).map(k=>({id:Number(k),label:map[k]}));
+}
+function amBuildFilters(){
+  const host=document.getElementById('am-filterbtns'); if(!host||host.childElementCount) return;
+  host.innerHTML=AM_FILTERS.map(f=>{
+    const opts=amFilterOptions(f);
+    return `<span class="am-fwrap"><button class="am-fbtn" id="amfb-${f.key}" onclick="event.stopPropagation();amToggleFpop('${f.key}')">${f.label} ▾</button><div class="am-fpop" id="amfp-${f.key}" onclick="event.stopPropagation()">${opts.map(o=>`<label><input type="checkbox" onchange="amToggleFilter('${f.key}',${o.id},this.checked)"> ${escapeHtml(o.label)}</label>`).join('')||'<span class="kb-empty">no options</span>'}</div></span>`;
+  }).join('');
+  if(!window._amDocClick){ window._amDocClick=true; document.addEventListener('click',amCloseFpops); }
+}
+function amToggleFpop(key){ const p=document.getElementById('amfp-'+key); if(!p) return; const wasOpen=p.classList.contains('open'); amCloseFpops(); if(!wasOpen) p.classList.add('open'); }
+function amCloseFpops(){ document.querySelectorAll('.am-fpop.open').forEach(p=>p.classList.remove('open')); }
+function amToggleFilter(key,id,on){ const s=amFilters[key]||(amFilters[key]=new Set()); if(on)s.add(id); else s.delete(id); amUpdateFbtn(key); renderAllModels(); }
+function amUpdateFbtn(key){ const f=AM_FILTERS.find(x=>x.key===key); const b=document.getElementById('amfb-'+key); if(!f||!b) return; const n=(amFilters[key]&&amFilters[key].size)||0; b.textContent = n?`${f.label} (${n}) ▾`:`${f.label} ▾`; b.classList.toggle('on',n>0); }
+function amClearFilters(){ amFilters={}; document.querySelectorAll('#am-filterbtns input[type=checkbox]').forEach(c=>c.checked=false); AM_FILTERS.forEach(f=>amUpdateFbtn(f.key)); const s=document.getElementById('am-search'); if(s) s.value=''; renderAllModels(); }
+function amOnSearch(){ clearTimeout(amSearchTimer); amSearchTimer=setTimeout(renderAllModels,150); }
+
+function renderAllModels(){
+  const grid=document.getElementById('am-grid'); if(!grid) return;
+  amBuildFilters();
+  const sortVal=document.getElementById('am-sort')?.value||'name-asc';
+  const res=amApplyFilterSort(kanbanItems, amFilters, document.getElementById('am-search')?.value, sortVal);
+  const list=res.list, SF=AM_SORT_FIELDS[sortVal.split('-')[0]];
+  const count=document.getElementById('am-count'); if(count) count.textContent=`${list.length} of ${kanbanItems.length} models`;
+  const note=document.getElementById('am-note');
+  if(note) note.textContent = (SF && res.missing) ? `${res.missing} of ${list.length} shown have no ${SF.label} on file — they're at the end` : '';
+  const empty=document.getElementById('am-empty'); if(empty) empty.style.display = (list.length||!kanbanItems.length) ? 'none':'';
+  grid.innerHTML=list.map(m=>{
+    const cached = m.head && kbHeadCache[m.head];
+    const inner = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : `<span class="am-mono">${escapeHtml((m.name[0]||'?').toUpperCase())}</span>`;
+    const sub = SF ? (m[SF.raw]||'—') : '';
+    return `<div class="am-tile" onclick="openKanbanModal('${m.id}')"><span class="am-caret">▾</span><div class="am-thumb" id="amthumb-${m.id}"${m.head?` data-head="${m.head}"`:''}>${inner}</div><div class="am-name">${escapeHtml(m.name)}</div><div class="am-sub">${escapeHtml(sub)}</div></div>`;
+  }).join('');
+  amObserve();
+}
+
+// Lazy thumbnails: only fetch photo URLs for tiles as they scroll into view (batched, cached in kbHeadCache).
+function amObserve(){
+  if(amIO) amIO.disconnect();
+  amPending.clear();
+  amIO=new IntersectionObserver(entries=>{
+    let queued=false;
+    for(const e of entries){
+      if(!e.isIntersecting) continue;
+      amIO.unobserve(e.target);
+      const h=e.target.dataset.head;
+      if(h && kbHeadCache[h]) amFillThumb(e.target);
+      else if(h){ amPending.add(h); queued=true; }
+    }
+    if(queued){ clearTimeout(amFlushTimer); amFlushTimer=setTimeout(amFlushThumbs,120); }
+  },{rootMargin:'400px'});
+  document.querySelectorAll('#am-grid .am-thumb[data-head]').forEach(el=>{ if(!el.querySelector('img')) amIO.observe(el); });
+}
+async function amFlushThumbs(){
+  const ids=[...amPending]; amPending.clear();
+  if(!ids.length) return;
+  await fetchAssetUrls(ids);
+  ids.forEach(h=>{ document.querySelectorAll('#am-grid .am-thumb[data-head="'+h+'"]').forEach(el=>amFillThumb(el)); });
+}
+function amFillThumb(el){
+  const u=kbHeadCache[el.dataset.head];
+  if(!u || el.querySelector('img')) return;
+  el.innerHTML=`<img loading="lazy" src="${escapeHtml(u)}" alt="">`;
+}
+
+// Shared asset-URL fetcher: fills kbHeadCache, 40 ids per query, up to 4 queries in flight (both Kanban and All Models use this).
+async function fetchAssetUrls(assetIds){
+  const need=[...new Set((assetIds||[]).filter(a=>a && !kbHeadCache[a]))];
+  if(!need.length) return;
+  const chunks=[]; for(let i=0;i<need.length;i+=40) chunks.push(need.slice(i,i+40));
+  let next=0;
+  async function worker(){
+    while(next<chunks.length){
+      const chunk=chunks[next++];
+      try{
+        const data=await gql(`{assets(ids:[${chunk.join(',')}]){id public_url}}`);
+        (data.assets||[]).forEach(a=>{ if(a && a.public_url) kbHeadCache[String(a.id)]=a.public_url; });
+      }catch(e){}
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(4,chunks.length)},()=>worker()));
+}
+
 async function loadKanban(){
   const board=document.getElementById('kanban-board');
-  const loading=document.getElementById('kanban-loading');
-  const setLoad=t=>{const el=document.getElementById('kanban-load-status'); if(el) el.textContent=t;};
-  board.innerHTML=''; loading.style.display='';
+  const loaders=['kanban-loading','am-loading'].map(i=>document.getElementById(i)).filter(Boolean);
+  const setLoad=t=>{['kanban-load-status','am-load-status'].forEach(i=>{const el=document.getElementById(i); if(el) el.textContent=t;});};
+  board.innerHTML='';
+  const amg=document.getElementById('am-grid'); if(amg) amg.innerHTML='';
+  const ame=document.getElementById('am-empty'); if(ame) ame.style.display='none';
+  loaders.forEach(l=>l.style.display='');
   document.getElementById('kanban-summary').textContent='';
   try{
     setLoad('Loading models… (first load can take ~30–60s on a cold start)');
-    const idxToCol=kbIdxToCol();
     const items=[]; let cursor=null, pages=0;
     do{
       const cp = cursor ? `cursor:"${cursor}"` : 'limit:200';
-      const data = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name updated_at column_values(ids:["label","lien_internet","files_mkncw5nm"]){id value}}}}}`);
+      const data = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name updated_at column_values(ids:["label","lien_internet","files_mkncw5nm","dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm254xed","dropdown_mkncp6xy","dropdown_mm1by5q0","dropdown_mm1zcar6","color_mm1zk5e2","color_mm1zghx9","text_mknc1sps","text_mm1yx2wg","text_mm1y2znz"]){id value}}}}}`);
       const page = data.boards[0].items_page;
       page.items.forEach(it=>{
         const cv={}; (it.column_values||[]).forEach(c=>cv[c.id]=c);
-        let statusIdx=null; try{ statusIdx = JSON.parse(cv['label'].value)?.index ?? null; }catch{}
-        if(statusIdx===null || !(statusIdx in idxToCol)) return; // excludes Duplicate(12) + unset (Evernote 11 is now its own column)
-        let head=null; try{ const f=JSON.parse(cv['files_mkncw5nm'].value); if(f&&f.files&&f.files.length) head=f.files[0].assetId; }catch{}
-        let twUrl=''; try{ twUrl = JSON.parse(cv['lien_internet'].value)?.url || ''; }catch{}
-        items.push({id:it.id, name:(it.name||'').trim(), updated_at:it.updated_at||'', statusIdx, notes:'', notesLoaded:false, twUrl, head});
+        const pv=id=>{ try{ return cv[id]?JSON.parse(cv[id].value):null; }catch{ return null; } };
+        const dd=id=>{ const v=pv(id); return (v&&Array.isArray(v.ids))?v.ids.map(Number):[]; };
+        const st=id=>{ const v=pv(id); return (v&&v.index!=null)?Number(v.index):null; };
+        const tx=id=>{ const v=pv(id); return (typeof v==='string')?v:''; };
+        const statusIdx=st('label'); // ALL statuses kept now (incl. Duplicate + unset) — kanban excludes at bucket time; All Models shows everything
+        let head=null; const fv=pv('files_mkncw5nm'); if(fv&&fv.files&&fv.files.length) head=fv.files[0].assetId;
+        const twUrl=(pv('lien_internet')||{}).url||'';
+        const hRaw=tx('text_mknc1sps'), wRaw=tx('text_mm1yx2wg'), cRaw=tx('text_mm1y2znz');
+        items.push({id:it.id, name:(it.name||'').trim(), updated_at:it.updated_at||'', statusIdx, notes:'', notesLoaded:false, twUrl, head,
+          f:{type:dd('dropdown_mm1zzwcg'),role:dd('dropdown_mknbe0p0'),loc:dd('dropdown_mm254xed'),site:dd('dropdown_mkncp6xy'),sex:dd('dropdown_mm1by5q0'),eth:dd('dropdown_mm1zcar6'),ftm:st('color_mm1zk5e2'),tat:st('color_mm1zghx9')},
+          hRaw,wRaw,cRaw,hIn:parseHeightIn(hRaw),wLb:parseWeightLb(wRaw),cIn:parseCockIn(cRaw)});
       });
       cursor=page.cursor; pages++;
       setLoad(`Loading models… ${items.length} loaded`);
@@ -1297,10 +1544,10 @@ async function loadKanban(){
     kanbanItems=items;
     kbColLoaded={};
     kbLoadedOnce=true;
-    loading.style.display='none';
-    renderKanban();
+    loaders.forEach(l=>l.style.display='none');
+    refreshActiveView();
   }catch(e){
-    loading.innerHTML='<span style="color:var(--danger)">Failed to load: '+escapeHtml(e.message)+'</span>';
+    loaders.forEach(l=>l.innerHTML='<span style="color:var(--danger)">Failed to load: '+escapeHtml(e.message)+'</span>');
   }
 }
 
@@ -1481,7 +1728,7 @@ function renderKanban(){
       <div class="kb-col-body" id="kbcol-${i}">${buckets[i].map(kanbanCardHtml).join('')}</div>
     </div>`;
   }).join('');
-  document.getElementById('kanban-summary').textContent = `${kanbanItems.length} models`;
+  document.getElementById('kanban-summary').textContent = `${buckets.reduce((n,b)=>n+b.length,0)} models`;
   // Auto-load headshots for small columns (and any column the user asked to load); skip big ones.
   buckets.forEach((b,i)=>{ if(b.length<=KB_AUTO_THRESHOLD || kbColLoaded[i]){ fetchKanbanHeadshotsForModels(b); fetchKanbanNotesForModels(b); } });
 }
@@ -1495,19 +1742,13 @@ async function loadKanbanColumnPhotos(i){
 }
 
 async function fetchKanbanHeadshotsForModels(models){
-  const need = (models||[]).filter(m=>m.head && !kbHeadCache[m.head]);
-  for(let i=0;i<need.length;i+=40){
-    const chunk=need.slice(i,i+40);
-    const ids=chunk.map(m=>m.head).join(',');
-    let data; try{ data=await gql(`{assets(ids:[${ids}]){id public_url}}`); }catch(e){ continue; }
-    const byId={}; (data.assets||[]).forEach(a=>byId[String(a.id)]=a.public_url);
-    chunk.forEach(m=>{
-      const u=byId[String(m.head)]; if(!u) return;
-      kbHeadCache[m.head]=u;
-      const el=document.getElementById('kbthumb-'+m.id);
-      if(el && !el.querySelector('img')) el.innerHTML=`<img loading="lazy" src="${escapeHtml(u)}" alt="">`;
-    });
-  }
+  const withHead=(models||[]).filter(m=>m.head);
+  await fetchAssetUrls(withHead.map(m=>m.head)); // parallel chunks — big columns fill several times faster than the old serial loop
+  withHead.forEach(m=>{
+    const u=kbHeadCache[m.head]; if(!u) return;
+    const el=document.getElementById('kbthumb-'+m.id);
+    if(el && !el.querySelector('img')) el.innerHTML=`<img loading="lazy" src="${escapeHtml(u)}" alt="">`;
+  });
 }
 
 // Notes are heavy, so they load per-column (with the photos) rather than up front — this is what lets the whole board load fast & complete.
@@ -1628,6 +1869,8 @@ function kbRefreshCardThumb(id){
   const m=kanbanItems.find(x=>x.id===id); if(m) m.head=hs.assetId;
   const el=document.getElementById('kbthumb-'+id);
   if(el) el.innerHTML=`<img loading="lazy" src="${escapeHtml(hs.url)}" alt="">`;
+  const ael=document.getElementById('amthumb-'+id);
+  if(ael) ael.innerHTML=`<img loading="lazy" src="${escapeHtml(hs.url)}" alt="">`;
   const mt=document.querySelector('#kb-modal-body .kb-modal-thumb');
   if(mt) mt.innerHTML=`<img src="${escapeHtml(hs.url)}" alt="">`;
 }
@@ -1750,10 +1993,24 @@ async function saveKanbanCard(id){
       {i:id, b:String(MAIN_BOARD_ID), c:JSON.stringify(cols)});
     if(msg) msg.textContent = hadPendingHs ? 'All changes saved ✓' : 'Saved ✓';
     const m=kanbanItems.find(x=>x.id===id);
-    if(m){ if(newGen!==null) m.notes=newGen; if(newTw!==null) m.twUrl=newTw; m.updated_at=new Date().toISOString(); if(statusChanged) m.statusIdx=newStatusIdx; }
+    if(m){
+      if(newGen!==null) m.notes=newGen; if(newTw!==null) m.twUrl=newTw; m.updated_at=new Date().toISOString(); if(statusChanged) m.statusIdx=newStatusIdx;
+      // Keep the shared store's filter/sort values in sync with what was just saved (so All Models filters reflect edits instantly).
+      if(m.f) for(const cid in cols){
+        const v=cols[cid];
+        if(AM_DD_KEY[cid]) m.f[AM_DD_KEY[cid]] = (v && Array.isArray(v.ids)) ? v.ids.map(Number) : [];
+        else if(AM_ST_KEY[cid]) m.f[AM_ST_KEY[cid]] = (v && v.index!=null) ? Number(v.index) : null;
+        else if(cid==='text_mknc1sps'){ m.hRaw=(v==null?'':String(v)); m.hIn=parseHeightIn(m.hRaw); }
+        else if(cid==='text_mm1yx2wg'){ m.wRaw=(v==null?'':String(v)); m.wLb=parseWeightLb(m.wRaw); }
+        else if(cid==='text_mm1y2znz'){ m.cRaw=(v==null?'':String(v)); m.cIn=parseCockIn(m.cRaw); }
+      }
+    }
     // refresh baseline so a second Save won't resend unchanged fields
     for(const sec of KB_SECTIONS) for(const f of sec.fields){ const cur=kbReadControl(f); if(cur===undefined) continue; init[f[0]] = (f[2]==='dropdown')?JSON.stringify(cur):cur; }
-    if(statusChanged){ renderKanban(); if(newStatusIdx==null || !(newStatusIdx in kbIdxToCol())) closeKanbanModal(); }
+    if(statusChanged || activeGrid==='am'){
+      refreshActiveView();
+      if(statusChanged && activeGrid==='kanban' && (newStatusIdx==null || !(newStatusIdx in kbIdxToCol()))) closeKanbanModal();
+    }
   }catch(e){ if(msg) msg.textContent='Error: '+escapeHtml(e.message); }
 }
 
@@ -1902,6 +2159,8 @@ async function setMode(mode){
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
   resetForm();
   hide('kanban-view');
+  hide('am-view');
+  activeGrid=null;
   if(mode==='kanban'){
     hide('selector-bar');
     hide('candidate-strip');
@@ -1912,8 +2171,24 @@ async function setMode(mode){
     hide('dup-view');
     buildSidebarNav('blank');
     document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
+    activeGrid='kanban';
     show('kanban-view');
     if(kbLoadedOnce && kanbanItems.length){ renderKanban(); } else { loadKanban(); }
+    return;
+  }
+  if(mode==='all'){
+    hide('selector-bar');
+    hide('candidate-strip');
+    hide('empty-state');
+    hide('full-view');
+    hide('interview-view');
+    hide('new-model-view');
+    hide('dup-view');
+    buildSidebarNav('blank');
+    document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
+    activeGrid='am';
+    show('am-view');
+    if(kbLoadedOnce && kanbanItems.length){ renderAllModels(); } else { loadKanban(); }
     return;
   }
   if(mode==='dup'){
@@ -3576,6 +3851,7 @@ async function bootCheck(){
    v7.6: kanban — full board load fix (pages through ALL ~950 items; Evernote now shows all 433, search covers everyone), notes lazy-load per column, thinner status columns.
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
+   v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
