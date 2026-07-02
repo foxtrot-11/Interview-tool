@@ -113,6 +113,8 @@
   .kb-hs-save:disabled{opacity:0.6;cursor:default}
   .kb-hs-cancel{background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;cursor:pointer}
   .kb-hint{font-size:11px;color:var(--text-muted)}
+  .kb-hs-prog{flex:1 1 100%;height:9px;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;overflow:hidden}
+  .kb-hs-prog-bar{height:100%;width:8%;background:var(--accent);transition:width .5s ease}
   .kb-seths{position:absolute;bottom:4px;left:4px;right:4px;background:rgba(0,0,0,0.72);color:#fff;border:none;border-radius:4px;padding:5px;font-size:10px;font-family:var(--font-mono);cursor:pointer;opacity:0;transition:opacity .12s}
   .kb-photo:hover .kb-seths{opacity:1}
   .kb-hs-tag{position:absolute;bottom:4px;left:4px;background:var(--accent);color:var(--bg);border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700;font-family:var(--font-mono)}
@@ -1263,6 +1265,7 @@ let kbHeadCache = {};
 const KB_AUTO_THRESHOLD = 60;   // columns bigger than this load photos only on demand
 let kbBuckets = [];
 let kbColLoaded = {};           // colIndex -> true once photos requested
+let kbLoadedOnce = false;       // true after the first full board load, so re-entering Kanban doesn't re-fetch
 function kbIdxToCol(){ const m={}; KANBAN_COLS.forEach((c,i)=>c.ids.forEach(id=>m[id]=i)); return m; }
 function kbStatusToMode(idx){ for(const c of KANBAN_COLS){ if(c.ids.includes(idx)) return c.mode; } return 'all'; }
 
@@ -1293,6 +1296,7 @@ async function loadKanban(){
     } while(cursor && pages<40); // page through the WHOLE board (stops as soon as cursor runs out)
     kanbanItems=items;
     kbColLoaded={};
+    kbLoadedOnce=true;
     loading.style.display='none';
     renderKanban();
   }catch(e){
@@ -1561,7 +1565,7 @@ function kbRenderPhotoActions(){
   const upload = `<label class="kb-upload-btn">+ Upload headshot<input type="file" accept="image/*,.heic,.heif" style="display:none" onchange="kbUploadPhoto('headshot', this)"></label>`
     + `<label class="kb-upload-btn">+ Upload extra pic<input type="file" accept="image/*,.heic,.heif" style="display:none" onchange="kbUploadPhoto('extra', this)"></label>`;
   if(kbPendingHeadshot){
-    el.innerHTML = `<button class="kb-hs-save" onclick="kbSaveHeadshot()">Save headshot</button><button class="kb-hs-cancel" onclick="kbCancelRechoose()">Cancel</button><span class="kb-hint">New headshot selected (red box) — hit Save to apply.</span>`;
+    el.innerHTML = `<button class="kb-hs-save" onclick="kbSaveHeadshot()">Save headshot + changes</button><button class="kb-hs-cancel" onclick="kbCancelRechoose()">Cancel</button><span class="kb-hint">New headshot selected (red box). Save applies it plus any other edits.</span>`;
   } else if(kbRechooseMode){
     el.innerHTML = `<button class="kb-hs-cancel" onclick="kbCancelRechoose()">Cancel</button><span class="kb-hint">Click the photo you want as the headshot.</span>`;
   } else {
@@ -1580,23 +1584,41 @@ function kbPickHeadshot(assetId){
   if(p.isHeadshot){ kbCancelRechoose(); kbPhotoMsg('That photo is already the headshot.'); return; }
   kbPendingHeadshot=assetId; kbRechooseMode=false; kbRenderPhotos();
 }
-// The explicit Save step: processes the image on Monday and reports success or the error.
-async function kbSaveHeadshot(){
-  const id=kbModalItemId, assetId=kbPendingHeadshot; if(!id||!assetId) return;
-  const btn=document.querySelector('#kb-photo-actions .kb-hs-save'); if(btn){ btn.disabled=true; btn.textContent='Processing…'; }
-  kbPhotoMsg('Processing image on Monday… this can take a few seconds.');
+// Animated progress bar shown while Monday processes the image (the /rearrange-photos call gives no real progress events).
+let kbHsTimer=null;
+function kbHsProgressStart(){
+  const el=document.getElementById('kb-photo-actions'); if(!el) return;
+  el.innerHTML = `<div class="kb-hs-prog"><div class="kb-hs-prog-bar" id="kb-hs-prog-bar"></div></div><span class="kb-hint" id="kb-hs-stage">Starting…</span>`;
+  const stages=['Sending the new photo order to Monday…','Monday is processing the image…','Finalizing headshot…','Almost done…'];
+  let i=0, pct=8;
+  const bar=document.getElementById('kb-hs-prog-bar'), stage=document.getElementById('kb-hs-stage');
+  if(bar) bar.style.width=pct+'%'; if(stage) stage.textContent=stages[0];
+  if(kbHsTimer) clearInterval(kbHsTimer);
+  kbHsTimer=setInterval(()=>{
+    pct = Math.min(pct + Math.max(1,(92-pct)*0.12), 92); // ease toward 92%, hold until done
+    if(bar) bar.style.width=pct+'%';
+    const target=Math.floor(pct/23); if(target>i && i<stages.length-1){ i=target; if(stage) stage.textContent=stages[i]; }
+  }, 600);
+}
+function kbHsProgressDone(ok){
+  if(kbHsTimer){ clearInterval(kbHsTimer); kbHsTimer=null; }
+  const bar=document.getElementById('kb-hs-prog-bar'); if(bar){ bar.style.width='100%'; bar.style.background=ok?'var(--accent)':'var(--danger)'; }
+}
+// Apply the chosen headshot (atomic rearrange on Monday). Throws on failure.
+async function kbApplyHeadshot(id){
+  const assetId=kbPendingHeadshot; if(!assetId) return;
+  kbHsProgressStart();
   try{
     const rest=kbModalPhotos.filter(p=>String(p.assetId)!==String(assetId)).map(p=>p.assetId);
     await rearrangePhotos(id,[assetId],rest);
     kbPendingHeadshot=null; kbRechooseMode=false;
+    kbHsProgressDone(true);
     await kbLoadModalPhotos(id);   // reload from Monday to confirm the change stuck
     kbRefreshCardThumb(id);
-    kbPhotoMsg('Headshot updated ✓');
-  }catch(e){
-    kbPhotoMsg('Error: '+escapeHtml(e.message||String(e))+' — nothing was changed. You can try Save again.');
-    kbRenderPhotos(); // keep the pending selection + Save/Cancel so they can retry
-  }
+  }catch(e){ kbHsProgressDone(false); throw e; }
 }
+// "Save headshot" button — now saves the headshot AND any other pending field edits in one go.
+async function kbSaveHeadshot(){ return saveKanbanCard(kbModalItemId); }
 function kbOpenPhoto(n){ candidatePhotos=kbModalPhotos; window.lbViewOnly=true; openLightbox(n); }
 function kbPhotoMsg(t){ const el=document.getElementById('kb-photo-msg'); if(el) el.textContent=t||''; }
 
@@ -1695,6 +1717,14 @@ async function renderKanbanEditor(id, full){
 async function saveKanbanCard(id){
   const full=document.getElementById('kb-modal-body'); if(!full||!full._init) return;
   const init=full._init, msg=document.getElementById('kbe-msg-'+id);
+  // 1) If a new headshot is pending, apply it FIRST (shows its own progress bar).
+  const hadPendingHs = !!kbPendingHeadshot;
+  if(hadPendingHs){
+    if(msg) msg.textContent='Saving headshot…';
+    try{ await kbApplyHeadshot(id); }
+    catch(e){ if(msg) msg.textContent='Headshot error: '+escapeHtml(e.message||String(e))+' — stopped; field changes not saved. Try Save again.'; return; }
+  }
+  // 2) Diff and save any field changes.
   const cols={};
   let statusChanged=false, newStatusIdx=null, newGen=null, newTw=null;
   for(const sec of KB_SECTIONS){
@@ -1713,12 +1743,12 @@ async function saveKanbanCard(id){
       if(colId==='lien_internet') newTw=(cur||'').trim();
     }
   }
-  if(Object.keys(cols).length===0){ if(msg) msg.textContent='No changes to save'; return; }
-  if(msg) msg.textContent='Saving…';
+  if(Object.keys(cols).length===0){ if(msg) msg.textContent = hadPendingHs ? 'Headshot saved ✓' : 'No changes to save'; return; }
+  if(msg) msg.textContent = hadPendingHs ? 'Headshot saved ✓ — saving other changes…' : 'Saving…';
   try{
     await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
       {i:id, b:String(MAIN_BOARD_ID), c:JSON.stringify(cols)});
-    if(msg) msg.textContent='Saved ✓';
+    if(msg) msg.textContent = hadPendingHs ? 'All changes saved ✓' : 'Saved ✓';
     const m=kanbanItems.find(x=>x.id===id);
     if(m){ if(newGen!==null) m.notes=newGen; if(newTw!==null) m.twUrl=newTw; m.updated_at=new Date().toISOString(); if(statusChanged) m.statusIdx=newStatusIdx; }
     // refresh baseline so a second Save won't resend unchanged fields
@@ -1883,7 +1913,7 @@ async function setMode(mode){
     buildSidebarNav('blank');
     document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
     show('kanban-view');
-    loadKanban();
+    if(kbLoadedOnce && kanbanItems.length){ renderKanban(); } else { loadKanban(); }
     return;
   }
   if(mode==='dup'){
@@ -3545,6 +3575,7 @@ async function bootCheck(){
    v7.5: kanban — All-Star/Exclusive/Evernote columns, modal photo upload (headshot/extra) + reselect headshot.
    v7.6: kanban — full board load fix (pages through ALL ~950 items; Evernote now shows all 433, search covers everyone), notes lazy-load per column, thinner status columns.
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
+   v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    ============================================================ */
 
 const ST = { APPLICANT:5, SCREEN:8, POTENTIAL:10, INTERVIEW:7, REVIEW:9,
