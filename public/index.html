@@ -201,6 +201,9 @@
   .port-err{color:var(--danger)}
   #port-status a{color:var(--accent)}
   .port-label{font-family:var(--font-display);font-weight:800;font-size:13px;letter-spacing:0.09em;color:var(--accent);white-space:nowrap;border-left:3px solid var(--accent);padding-left:10px;text-transform:uppercase}
+  .port-row-wrap{position:relative;display:inline-block}
+  .port-row-picker{width:320px}
+  #port-row-search{width:100%;margin-bottom:6px}
   .kb-seths{position:absolute;bottom:4px;left:4px;right:4px;background:rgba(0,0,0,0.72);color:#fff;border:none;border-radius:4px;padding:5px;font-size:10px;font-family:var(--font-mono);cursor:pointer;opacity:0;transition:opacity .12s}
   .kb-photo:hover .kb-seths{opacity:1}
   .kb-hs-tag{position:absolute;bottom:4px;left:4px;background:var(--accent);color:var(--bg);border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700;font-family:var(--font-mono)}
@@ -1250,7 +1253,13 @@
         <span id="port-wrap" style="display:none;align-items:center;gap:6px;margin-left:10px">
           <span class="port-label">PORT SHOOT TAG TO MONDAY</span>
           <select id="port-tag" class="am-sort" title="Shoot tag to port"></select>
-          <select id="port-row" class="am-sort" title="CASTING PRIORITY STACK row" style="max-width:230px"></select>
+          <span class="port-row-wrap">
+            <button type="button" id="port-row-btn" class="am-sort" style="max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="event.stopPropagation();toggleRowPicker()">Casting row… ▾</button>
+            <div class="shoot-picker port-row-picker" id="port-row-picker" onclick="event.stopPropagation()">
+              <input type="text" id="port-row-search" placeholder="Search active rows…" autocomplete="off" oninput="portRenderRowList()" onkeydown="if(event.key==='Enter'){event.preventDefault();portRowEnter();}">
+              <div class="shoot-picker-list" id="port-row-list"></div>
+            </div>
+          </span>
           <button class="am-clear" title="Reload casting rows" onclick="portLoadRows(true)">↻</button>
           <button class="am-clear" id="port-btn" style="border-color:var(--accent);color:var(--accent)" onclick="portOpen()">⇪ Port</button>
         </span>
@@ -2317,7 +2326,7 @@ function qnavSpy(){
   });
 }
 document.getElementById('form-area')?.addEventListener('scroll', qnavSpy, {passive:true});
-document.addEventListener('click', e=>{ if(!e.target.closest('.shoot-picker-wrap')) closeShootPicker(); });
+document.addEventListener('click', e=>{ if(!e.target.closest('.shoot-picker-wrap')) closeShootPicker(); if(!e.target.closest('.port-row-wrap')) closeRowPicker(); });
 
 // ── PORT TO CASTING STACK (v7.13) ──
 // Pushes every 5-APPROVED-scope model carrying a chosen shoot tag into a chosen
@@ -2328,6 +2337,7 @@ document.addEventListener('click', e=>{ if(!e.target.closest('.shoot-picker-wrap
 // PRODUCTION tracker items — staging model ids are rejected (itemsNotInConnectedBoards),
 // so Confirm is gated to production.
 const CASTING_BOARD_ID='8533133380', CASTING_SUBITEM_BOARD_ID='8533133826', CASTING_LINK_COL='connect_boards_mknb48ca';
+const CASTING_TOP_GROUP='topics';   // the board's top "REQUESTS" group — rows in the groups below it (COMPLETED / HOLD / CANCELLED…) are done and hidden from the picker
 const PROD_TRACKER_ID='3636652411';
 let portRowsCache=null, portPlan=null;
 
@@ -2372,33 +2382,55 @@ function portPopulateTags(){
   sel.innerHTML='<option value="">Shoot tag…</option>'+opts.map(o=>`<option value="${o.id}">${escapeHtml(String(o.label))}</option>`).join('');
   if(cur && opts.some(o=>String(o.id)===cur)) sel.value=cur;
 }
+function portFilterRows(items){
+  return (items||[]).filter(it=>{
+    const cv=(it.column_values||[])[0];
+    const grp=it.group&&it.group.id;
+    return grp===CASTING_TOP_GROUP && cv && (cv.index===0 || cv.index===4);   // TYPE = CASTING(0) or CREW(4)
+  }).map(it=>({id:it.id,name:it.name})).sort((a,b)=>a.name.localeCompare(b.name));
+}
+let portSelectedRowId='', portSelectedRowName='', portRowOpts=[];
 async function portLoadRows(force){
-  const sel=document.getElementById('port-row'); if(!sel) return;
-  if(portRowsCache && !force){ portRenderRows(); return; }
-  sel.innerHTML='<option value="">Loading rows…</option>';
+  const btn=document.getElementById('port-row-btn'); if(!btn) return;
+  if(portRowsCache && !force){ portRenderRowBtn(); portRenderRowList(); return; }
+  btn.textContent='Loading rows…';
   try{
-    const d=await gql(`{boards(ids:[${CASTING_BOARD_ID}]){items_page(limit:500){items{id name column_values(ids:["color_mkq0g0sq"]){id ... on StatusValue{index}}}}}}`);
-    const items=((d.boards[0]||{}).items_page||{}).items||[];
-    portRowsCache=items.filter(it=>{
-      const cv=(it.column_values||[])[0];
-      return cv && (cv.index===0 || cv.index===4);   // TYPE = CASTING(0) or CREW(4)
-    }).map(it=>({id:it.id,name:it.name})).sort((a,b)=>a.name.localeCompare(b.name));
-    portRenderRows();
-  }catch(e){ sel.innerHTML='<option value="">rows failed — ↻ to retry</option>'; console.warn('port rows load failed', e); }
+    const d=await gql(`{boards(ids:[${CASTING_BOARD_ID}]){items_page(limit:500){items{id name group{id} column_values(ids:["color_mkq0g0sq"]){id ... on StatusValue{index}}}}}`);
+    portRowsCache=portFilterRows(((d.boards[0]||{}).items_page||{}).items||[]);
+    if(portSelectedRowId && !portRowsCache.some(r=>String(r.id)===String(portSelectedRowId))){ portSelectedRowId=''; portSelectedRowName=''; }
+    portRenderRowBtn(); portRenderRowList();
+  }catch(e){ btn.textContent='rows failed — ↻ to retry'; console.warn('port rows load failed', e); }
 }
-function portRenderRows(){
-  const sel=document.getElementById('port-row'); if(!sel) return;
-  const cur=sel.value;
-  sel.innerHTML='<option value="">Casting row…</option>'+(portRowsCache||[]).map(r=>`<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
-  if(cur && (portRowsCache||[]).some(r=>String(r.id)===cur)) sel.value=cur;
+function portRenderRowBtn(){
+  const btn=document.getElementById('port-row-btn'); if(!btn) return;
+  btn.textContent=portSelectedRowName||'Casting row… ▾';
+  btn.title=portSelectedRowName||'Pick a CASTING PRIORITY STACK row (active/REQUESTS group only)';
 }
+function toggleRowPicker(){
+  const p=document.getElementById('port-row-picker'); if(!p) return;
+  const open=p.classList.toggle('open');
+  if(open){ const s=document.getElementById('port-row-search'); if(s){ s.value=''; s.focus(); } portRenderRowList(); }
+}
+function closeRowPicker(){ const p=document.getElementById('port-row-picker'); if(p) p.classList.remove('open'); }
+function portRenderRowList(){
+  const list=document.getElementById('port-row-list'); if(!list) return;
+  const q=((document.getElementById('port-row-search')||{}).value||'').trim().toLowerCase();
+  portRowOpts=(portRowsCache||[]).filter(r=>!q||r.name.toLowerCase().includes(q));
+  list.innerHTML=portRowOpts.map((r,n)=>`<div class="shoot-opt${String(r.id)===String(portSelectedRowId)?' sel':''}" onclick="portRowPick(${n})">${String(r.id)===String(portSelectedRowId)?'✓ ':''}${escapeHtml(r.name)}</div>`).join('')||'<div class="shoot-opt dim">no matching active rows</div>';
+}
+function portRowPick(n){
+  const r=portRowOpts[n]; if(!r) return;
+  portSelectedRowId=String(r.id); portSelectedRowName=r.name;
+  portRenderRowBtn(); closeRowPicker();
+}
+function portRowEnter(){ if(portRowOpts.length) portRowPick(0); }
 async function portOpen(){
-  const tagSel=document.getElementById('port-tag'), rowSel=document.getElementById('port-row');
-  const tagId=tagSel&&tagSel.value, rowId=rowSel&&rowSel.value;
+  const tagSel=document.getElementById('port-tag');
+  const tagId=tagSel&&tagSel.value, rowId=portSelectedRowId;
   if(!tagId){ showToast('Pick a shoot tag first','error'); return; }
   if(!rowId){ showToast('Pick a casting row first','error'); return; }
   const tagOpt=(boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.id)===String(tagId));
-  const rowName=((portRowsCache||[]).find(r=>String(r.id)===String(rowId))||{}).name||rowId;
+  const rowName=portSelectedRowName||rowId;
   const roleOpts=boardDropdownOptions['dropdown_mknbe0p0']||[];
   const scopeIds=GRID_SCOPES['5a'].ids;
   const models=kanbanItems
@@ -4673,6 +4705,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.15: casting-row picker — searchable dropdown (type to filter, Enter picks first match, ↻ still reloads) showing ONLY active rows from the board’s top "REQUESTS" group; COMPLETED/HOLD/CANCELLED rows are hidden.
    v7.14: Port unblocked — the server /api security allow-list was rejecting the casting board (that was the "rows failed"); it now permits reads/writes on CASTING PRIORITY STACK (8533133380) + its subitem board (8533133826) and the create_subitem mutation, nothing else widened. Port controls now carry a big "PORT SHOOT TAG TO MONDAY" label so they don't read as filters. TWO-FILE release (server.js + index.html).
    v7.13: PORT TO CASTING — in the 5-APPROVED grid pick a shoot tag + a CASTING PRIORITY STACK row, preview who fills which slot (TOP/BOTTOM/VERSE/ALTERNATE from Role: VERSE or TOP+BOTTOM → VERSE slots; lowest empty slot, else creates TYPE<n+1>; already-linked models skipped; tag untouched), then Confirm writes each MODEL NAME link (mirrors auto-fill). Confirm is production-only (Monday rejects staging model ids). Polish: ✕ clears the sidebar field search; field flash holds 3s; ← Back to grid pinned beside Model Status.
    v7.12: approved-editor polish — Back-to-grid button moved next to Model Status; fixed invisible candidate strip (name/headshot/photo grid now show when opening a tile); ✂ Recrop Headshot (drag a square selection, crop becomes the headshot, original kept in Extra pictures; new same-origin /asset-bytes server route for canvas pixels); SHOOT TAGS as compat-style boxes + searchable "+ Add tag" picker (create-on-the-fly kept); sidebar scrollspy highlights where you are; sidebar field search (Enter jumps to first match).
