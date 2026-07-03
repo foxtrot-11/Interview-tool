@@ -103,10 +103,17 @@ const authLimiter = rateLimit({
 // so production behaves identically whether or not the vars are set.
 const MAIN_BOARD_ID  = process.env.MAIN_BOARD_ID  || '3636652411';
 const BATCH_BOARD_ID = process.env.BATCH_BOARD_ID || '18416230588';
-const ALLOWED_BOARD_IDS = new Set([MAIN_BOARD_ID, BATCH_BOARD_ID]); // whichever boards this environment uses
+// v7.14: the Port-to-Casting feature reads the CASTING PRIORITY STACK and links models
+// into its subitem board. These two IDs are the same in every environment (there is no
+// staging casting board), so they are allow-listed unconditionally. Note the MODEL NAME
+// link column itself only accepts production-tracker items — Monday enforces that.
+const CASTING_BOARD_ID = '8533133380';
+const CASTING_SUBITEM_BOARD_ID = '8533133826';
+const ALLOWED_BOARD_IDS = new Set([MAIN_BOARD_ID, BATCH_BOARD_ID, CASTING_BOARD_ID, CASTING_SUBITEM_BOARD_ID]); // whichever boards this environment uses + casting stack
 const ALLOWED_QUERY_ROOTS = new Set(['boards', 'items', 'assets']);
 const ALLOWED_MUTATION_ROOTS = new Set([
   'change_multiple_column_values',
+  'create_subitem',
   'change_simple_column_value',
   'create_item',
   'create_update',

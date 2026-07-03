@@ -200,6 +200,7 @@
   .port-ok{color:#22c55e}
   .port-err{color:var(--danger)}
   #port-status a{color:var(--accent)}
+  .port-label{font-family:var(--font-display);font-weight:800;font-size:13px;letter-spacing:0.09em;color:var(--accent);white-space:nowrap;border-left:3px solid var(--accent);padding-left:10px;text-transform:uppercase}
   .kb-seths{position:absolute;bottom:4px;left:4px;right:4px;background:rgba(0,0,0,0.72);color:#fff;border:none;border-radius:4px;padding:5px;font-size:10px;font-family:var(--font-mono);cursor:pointer;opacity:0;transition:opacity .12s}
   .kb-photo:hover .kb-seths{opacity:1}
   .kb-hs-tag{position:absolute;bottom:4px;left:4px;background:var(--accent);color:var(--bg);border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700;font-family:var(--font-mono)}
@@ -1247,6 +1248,7 @@
         </select>
         <button class="am-clear" onclick="amClearFilters()">Clear</button>
         <span id="port-wrap" style="display:none;align-items:center;gap:6px;margin-left:10px">
+          <span class="port-label">PORT SHOOT TAG TO MONDAY</span>
           <select id="port-tag" class="am-sort" title="Shoot tag to port"></select>
           <select id="port-row" class="am-sort" title="CASTING PRIORITY STACK row" style="max-width:230px"></select>
           <button class="am-clear" title="Reload casting rows" onclick="portLoadRows(true)">↻</button>
@@ -4671,6 +4673,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.14: Port unblocked — the server /api security allow-list was rejecting the casting board (that was the "rows failed"); it now permits reads/writes on CASTING PRIORITY STACK (8533133380) + its subitem board (8533133826) and the create_subitem mutation, nothing else widened. Port controls now carry a big "PORT SHOOT TAG TO MONDAY" label so they don't read as filters. TWO-FILE release (server.js + index.html).
    v7.13: PORT TO CASTING — in the 5-APPROVED grid pick a shoot tag + a CASTING PRIORITY STACK row, preview who fills which slot (TOP/BOTTOM/VERSE/ALTERNATE from Role: VERSE or TOP+BOTTOM → VERSE slots; lowest empty slot, else creates TYPE<n+1>; already-linked models skipped; tag untouched), then Confirm writes each MODEL NAME link (mirrors auto-fill). Confirm is production-only (Monday rejects staging model ids). Polish: ✕ clears the sidebar field search; field flash holds 3s; ← Back to grid pinned beside Model Status.
    v7.12: approved-editor polish — Back-to-grid button moved next to Model Status; fixed invisible candidate strip (name/headshot/photo grid now show when opening a tile); ✂ Recrop Headshot (drag a square selection, crop becomes the headshot, original kept in Extra pictures; new same-origin /asset-bytes server route for canvas pixels); SHOOT TAGS as compat-style boxes + searchable "+ Add tag" picker (create-on-the-fly kept); sidebar scrollspy highlights where you are; sidebar field search (Enter jumps to first match).
    v7.11: unsaved-changes guard (Save/Discard/Keep-editing on every exit: modal ✕, tile/card clicks, tab switches, candidate switches, browser close; backdrop-close removed); 5-APPROVED is now a photo grid (own filters incl. Shoot Tags, search, sort) whose tiles open the FULL editor with a ← Back to grid button; SHOOT TAGS chips box in the approved editor (new tags created on Monday at Save); expandable full-text carets in duplicate merge review + General Notes.
