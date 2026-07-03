@@ -159,6 +159,36 @@
   .xnote-lbl{display:block;font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 3px}
   .xnote-part:first-child .xnote-lbl{margin-top:0}
   textarea.gn-expanded{max-height:none!important}
+  /* ── Headshot recrop (v7.12) ── */
+  .recrop-modal{position:fixed;inset:0;z-index:9400;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center}
+  .recrop-modal.open{display:flex}
+  .recrop-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;max-width:min(92vw,900px);max-height:92vh;display:flex;flex-direction:column;gap:10px}
+  .recrop-hint{font-size:11px;color:var(--text-muted)}
+  .recrop-stage{position:relative;align-self:center;user-select:none;touch-action:none;overflow:hidden}
+  .recrop-stage img{display:block;max-width:min(84vw,820px);max-height:62vh;pointer-events:none}
+  .recrop-box{position:absolute;border:2px dashed var(--accent);box-shadow:0 0 0 9999px rgba(0,0,0,.55);cursor:move;touch-action:none}
+  .recrop-handle{position:absolute;right:-8px;bottom:-8px;width:16px;height:16px;background:var(--accent);border-radius:3px;cursor:nwse-resize;touch-action:none}
+  .recrop-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  /* ── Shoot tag boxes + searchable picker (v7.12) ── */
+  .shoot-boxes{display:flex;flex-wrap:wrap;gap:6px;min-height:26px}
+  .shoot-box{background:#233150;color:#9db9ff;border-color:#3d5591}
+  .shoot-box:hover{border-color:var(--danger);color:var(--danger)}
+  .shoot-picker-wrap{position:relative;display:inline-block;margin-top:8px}
+  .shoot-arrow{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 10px;font-family:var(--font-mono);font-size:11px;cursor:pointer}
+  .shoot-arrow:hover{border-color:var(--accent);color:var(--accent)}
+  .shoot-picker{position:absolute;top:calc(100% + 4px);left:0;z-index:70;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;width:280px;box-shadow:0 10px 30px rgba(0,0,0,.55);display:none}
+  .shoot-picker.open{display:block}
+  #shoot-picker-search{width:100%;margin-bottom:6px}
+  .shoot-picker-list{max-height:240px;overflow:auto}
+  .shoot-opt{padding:6px 8px;font-size:12px;border-radius:4px;cursor:pointer;color:var(--text)}
+  .shoot-opt:hover{background:var(--surface2)}
+  .shoot-opt.sel{color:var(--accent)}
+  .shoot-opt.create{color:#facc15}
+  .shoot-opt.dim{color:var(--text-dim);cursor:default}
+  /* ── Sidebar field search + scrollspy (v7.12) ── */
+  .qnav-search{display:none;width:calc(100% - 24px);margin:10px 12px 0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:11px;font-family:var(--font-mono)}
+  .qnav-item.spy{color:var(--accent);background:var(--surface2);border-left-color:var(--accent)}
+  .qnav-item.hit{color:#facc15}
   .kb-seths{position:absolute;bottom:4px;left:4px;right:4px;background:rgba(0,0,0,0.72);color:#fff;border:none;border-radius:4px;padding:5px;font-size:10px;font-family:var(--font-mono);cursor:pointer;opacity:0;transition:opacity .12s}
   .kb-photo:hover .kb-seths{opacity:1}
   .kb-hs-tag{position:absolute;bottom:4px;left:4px;background:var(--accent);color:var(--bg);border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700;font-family:var(--font-mono)}
@@ -651,7 +681,6 @@
 <!-- SELECTOR BAR (hidden in new model mode) -->
 <div class="selector-bar" id="selector-bar">
   <div class="selector-row">
-    <button class="dup-refresh-btn" id="back-to-grid-btn" style="display:none" onclick="backToApprovedGrid()">← Back to grid</button>
     <div class="combo-wrap" id="combo-wrap">
       <span class="search-icon">⌕</span>
       <input type="text" id="candidate-combo" autocomplete="off" placeholder="Type to search candidates…"
@@ -671,6 +700,7 @@
 <div class="main">
   <!-- SIDEBAR -->
   <nav class="sidebar" id="sidebar">
+    <input class="qnav-search" id="qnav-search" placeholder="⌕ Find a field…" autocomplete="off" oninput="qnavFilter(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();qnavEnter();}">
     <div class="sidebar-nav" id="sidebar-nav">
       <!-- filled by JS based on mode -->
     </div>
@@ -691,6 +721,7 @@
         </div>
         <div class="status-dd-menu" id="status-dd-menu"></div>
       </div>
+      <button class="dup-refresh-btn" id="back-to-grid-btn" style="display:none" onclick="backToApprovedGrid()">← Back to grid</button>
       <button class="save-btn" id="save-btn" onclick="saveAll()" disabled style="margin-left:auto">Save Changes</button>
       <div id="save-progress-bar" style="display:none;position:absolute;bottom:0;left:0;height:3px;background:var(--accent);border-radius:2px;width:0%;transition:width 0.3s ease"></div>
     </div>
@@ -715,6 +746,7 @@
       <div class="strip-photo-grid" id="strip-photo-grid"></div>
       <div class="photo-controls" id="photo-controls" style="display:none">
         <button class="photo-action-btn" id="rechoose-btn" onclick="toggleRechoose()">Re-choose Headshot</button>
+        <button class="photo-action-btn" id="recrop-btn" onclick="openRecrop()">✂ Recrop Headshot</button>
         <div class="photo-hint" id="photo-hint"></div>
       </div>
     </div>
@@ -932,13 +964,15 @@
           <div class="field"><div class="field-label">Date First Shot</div><input type="date" id="f-date_mknb5z70" oninput="markDirty()"></div>
           <div class="field field-full" id="shoot-tags-block" style="display:none">
             <div class="field-label">SHOOT TAGS</div>
-            <div class="shoot-chips" id="shoot-chips"></div>
-            <div style="display:flex;gap:8px;margin-top:6px">
-              <input type="text" id="shoot-tag-input" list="shoot-tag-datalist" placeholder="Type a tag, press Enter to add…" onkeydown="if(event.key==='Enter'){event.preventDefault();addShootTag();}">
-              <button type="button" class="kb-change-hs" onclick="addShootTag()">+ Add</button>
+            <div class="shoot-boxes" id="shoot-boxes"></div>
+            <div class="shoot-picker-wrap">
+              <button type="button" class="shoot-arrow" onclick="event.stopPropagation();toggleShootPicker()">+ Add tag ▾</button>
+              <div class="shoot-picker" id="shoot-picker" onclick="event.stopPropagation()">
+                <input type="text" id="shoot-picker-search" placeholder="Search tags… (Enter adds)" autocomplete="off" oninput="renderShootPicker()" onkeydown="if(event.key==='Enter'){event.preventDefault();shootPickerEnter();}">
+                <div class="shoot-picker-list" id="shoot-picker-list"></div>
+              </div>
             </div>
-            <datalist id="shoot-tag-datalist"></datalist>
-            <div style="font-size:10px;color:var(--text-dim);margin-top:4px">Pick an existing tag or type a new one — new tags are created on Monday when you Save.</div>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:4px">Click a box to remove it. New tags are created on Monday when you Save.</div>
           </div>
         </div>
         <div class="section-nav"><button class="nav-btn" onclick="goFSection(5)">← Prev</button><div class="section-progress">7/7</div><button class="save-btn" onclick="saveAll()">✓ Save All</button></div>
@@ -1210,6 +1244,23 @@
       <div class="kb-modal-panel">
         <button class="kb-modal-close" onclick="closeKanbanModal()">✕</button>
         <div id="kb-modal-body"></div>
+      </div>
+    </div>
+
+    <!-- Headshot recrop modal (v7.12) -->
+    <div id="recrop-modal" class="recrop-modal">
+      <div class="recrop-panel">
+        <div class="unsaved-title">Recrop headshot</div>
+        <div class="recrop-hint">Drag the box to reposition · drag the corner handle to resize · the square becomes the new headshot. The original photo is kept in Extra pictures.</div>
+        <div class="recrop-stage" id="recrop-stage">
+          <img id="recrop-img" draggable="false">
+          <div class="recrop-box" id="recrop-box" style="display:none"><div class="recrop-handle" id="recrop-handle"></div></div>
+        </div>
+        <div class="recrop-actions">
+          <button class="kb-save" id="recrop-save" onclick="saveRecrop()">Save crop</button>
+          <button class="kb-hs-cancel" onclick="closeRecrop()">Cancel</button>
+          <span class="am-count" id="recrop-status"></span>
+        </div>
       </div>
     </div>
 
@@ -2081,6 +2132,153 @@ async function kbUploadPhoto(kind, input){
   }catch(e){ kbPhotoMsg('Error: '+escapeHtml(e.message)); }
 }
 
+// ── Headshot recrop (v7.12): drag a square, the crop becomes the new headshot; original kept in Extra pictures ──
+let rcState=null;
+async function openRecrop(){
+  const hs=(candidatePhotos||[]).find(p=>p.isHeadshot);
+  if(!hs){ showToast('No headshot to recrop','error'); return; }
+  if(!currentItem) return;
+  const modal=document.getElementById('recrop-modal'); modal.classList.add('open');
+  const img=document.getElementById('recrop-img'); const st=document.getElementById('recrop-status');
+  st.textContent='Loading image…'; img.removeAttribute('src');
+  document.getElementById('recrop-box').style.display='none';
+  document.getElementById('recrop-save').disabled=true;
+  try{
+    // S3 public_url has no CORS headers → canvas would be tainted. /asset-bytes streams the
+    // same bytes from OUR origin so the pixels are readable.
+    const r=await fetch('/asset-bytes?assetId='+hs.assetId,{headers:{'X-App-Auth':APP_PW}});
+    if(!r.ok) throw new Error('image fetch failed ('+r.status+')');
+    const blob=await r.blob();
+    if(rcState&&rcState.url) URL.revokeObjectURL(rcState.url);
+    const url=URL.createObjectURL(blob);
+    await new Promise((res,rej)=>{ img.onload=res; img.onerror=()=>rej(new Error('image decode failed')); img.src=url; });
+    await new Promise(r2=>requestAnimationFrame(r2));   // let layout settle before measuring
+    const dw=img.clientWidth, dh=img.clientHeight;
+    if(!dw||!dh) throw new Error('image failed to lay out');
+    const s=Math.round(Math.min(dw,dh)*0.8);
+    rcState={url, itemId:currentItem.id, headId:hs.assetId, dw, dh, box:{x:Math.round((dw-s)/2), y:Math.round((dh-s)/2), s}, drag:null};
+    document.getElementById('recrop-box').style.display='';
+    rcApply(); st.textContent=''; document.getElementById('recrop-save').disabled=false;
+  }catch(e){ st.textContent='Error: '+(e.message||String(e)); }
+}
+function rcApply(){ const b=document.getElementById('recrop-box'); const s=rcState.box; b.style.left=s.x+'px'; b.style.top=s.y+'px'; b.style.width=s.s+'px'; b.style.height=s.s+'px'; }
+function rcClamp(){ const st=rcState; st.box.s=Math.max(40,Math.min(st.box.s,Math.min(st.dw,st.dh))); st.box.x=Math.max(0,Math.min(st.box.x,st.dw-st.box.s)); st.box.y=Math.max(0,Math.min(st.box.y,st.dh-st.box.s)); }
+(function(){ // recrop pointer wiring — square box: drag to move, corner handle to resize
+  document.addEventListener('pointerdown',e=>{
+    if(!rcState) return;
+    const b=document.getElementById('recrop-box'); if(!b||!b.contains(e.target)) return;
+    e.preventDefault();
+    rcState.drag={ mode:(e.target.id==='recrop-handle')?'size':'move', px:e.clientX, py:e.clientY, x0:rcState.box.x, y0:rcState.box.y, s0:rcState.box.s };
+  });
+  document.addEventListener('pointermove',e=>{
+    if(!rcState||!rcState.drag) return;
+    const d=rcState.drag, dx=e.clientX-d.px, dy=e.clientY-d.py;
+    if(d.mode==='move'){ rcState.box.x=d.x0+dx; rcState.box.y=d.y0+dy; }
+    else { rcState.box.s=d.s0+Math.max(dx,dy); }
+    rcClamp(); rcApply();
+  });
+  document.addEventListener('pointerup',()=>{ if(rcState) rcState.drag=null; });
+})();
+function closeRecrop(){ const m=document.getElementById('recrop-modal'); m.classList.remove('open'); if(rcState&&rcState.url) URL.revokeObjectURL(rcState.url); rcState=null; }
+async function saveRecrop(){
+  if(!rcState) return;
+  const st=document.getElementById('recrop-status'); const btn=document.getElementById('recrop-save');
+  btn.disabled=true;
+  try{
+    const img=document.getElementById('recrop-img');
+    const sx=img.naturalWidth/rcState.dw, sy=img.naturalHeight/rcState.dh;
+    const cx=Math.round(rcState.box.x*sx), cy=Math.round(rcState.box.y*sy);
+    const cw=Math.round(rcState.box.s*sx), ch=Math.round(rcState.box.s*sy);
+    const side=Math.min(1200, cw);
+    const c=document.createElement('canvas'); c.width=side; c.height=side;
+    c.getContext('2d').drawImage(img, cx, cy, cw, ch, 0, 0, side, side);
+    const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
+    if(!blob) throw new Error('crop failed');
+    const file=new File([blob],'headshot-crop.jpg',{type:'image/jpeg'});
+    const itemId=rcState.itemId;
+    // Read CURRENT photo ids fresh (don't trust possibly-stale local state)
+    st.textContent='Reading current photos…';
+    const parseIds=(cvArr,colId)=>{ const cv=(cvArr||[]).find(x=>x.id===colId); if(!cv||!cv.value) return []; try{ return (JSON.parse(cv.value).files||[]).map(f=>f.assetId); }catch{ return []; } };
+    const before=await gql(`{items(ids:[${itemId}]){column_values(ids:["file_mkp1n4bt","files_mkncw5nm"]){id value}}}`);
+    const extrasBefore=parseIds(before.items[0].column_values,'file_mkp1n4bt');
+    const headBefore=parseIds(before.items[0].column_values,'files_mkncw5nm');
+    const oldHead=(headBefore[0]!=null)?headBefore[0]:rcState.headId;
+    st.textContent='Uploading crop…';
+    await uploadFileToMonday(itemId,'file_mkp1n4bt',file,p=>{ st.textContent='Uploading crop… '+Math.round(p*100)+'%'; });
+    st.textContent='Finding uploaded crop…';
+    const after=await gql(`{items(ids:[${itemId}]){column_values(ids:["file_mkp1n4bt"]){id value}}}`);
+    const extrasAfter=parseIds(after.items[0].column_values,'file_mkp1n4bt');
+    const newId=extrasAfter.find(a=>!extrasBefore.some(b=>String(b)===String(a)));
+    if(!newId) throw new Error('uploaded crop not found on Monday');
+    st.textContent='Setting as headshot on Monday… (a few seconds)';
+    await rearrangePhotos(itemId,[newId],[oldHead,...extrasBefore].filter(x=>x!=null));
+    st.textContent='Refreshing…';
+    await loadCandidatePhotos(itemId);
+    refreshHeadEverywhere(itemId);
+    closeRecrop();
+    showToast('Headshot recropped ✓ (original kept in Extra pictures)','success');
+  }catch(e){ st.textContent='Error: '+(e.message||String(e)); btn.disabled=false; }
+}
+// After a recrop/photo change, update the shared store + any grid/kanban tiles for this item.
+function refreshHeadEverywhere(itemId){
+  const hs=(candidatePhotos||[]).find(p=>p.isHeadshot);
+  const m=(typeof kanbanItems!=='undefined'&&kanbanItems)?kanbanItems.find(x=>String(x.id)===String(itemId)):null;
+  if(m) m.head=hs?hs.assetId:null;
+  if(hs){
+    kbHeadCache[String(hs.assetId)]=hs.url;
+    ['amthumb-','kbthumb-'].forEach(pre=>{ const el=document.getElementById(pre+itemId); if(el) el.innerHTML=`<img loading="lazy" src="${escapeHtml(hs.url)}" alt="">`; });
+  }
+}
+
+// ── Sidebar field search + scrollspy (v7.12) ──
+function qnavFilter(q){
+  q=(q||'').trim().toLowerCase();
+  const nav=document.getElementById('sidebar-nav'); if(!nav) return;
+  nav.querySelectorAll('.qnav-item').forEach(it=>{
+    const hit=!q||it.textContent.toLowerCase().includes(q);
+    it.style.display=hit?'':'none';
+    it.classList.toggle('hit', !!q&&hit);
+  });
+  nav.querySelectorAll('.qnav-group-label').forEach(lb=>{
+    let any=false, n=lb.nextElementSibling;
+    while(n && !n.classList.contains('qnav-group-label')){ if(n.classList.contains('qnav-item') && n.style.display!=='none') any=true; n=n.nextElementSibling; }
+    lb.style.display=any?'':'none';
+  });
+}
+function qnavEnter(){
+  const nav=document.getElementById('sidebar-nav'); if(!nav) return;
+  const vis=i=>i.style.display!=='none';
+  const first=[...nav.querySelectorAll('.qnav-item.hit')].find(vis) || [...nav.querySelectorAll('.qnav-item')].find(vis);
+  if(first) first.click();   // scrollToField already flashes the field
+}
+let _spyTick=null;
+function qnavSpy(){
+  if(_spyTick) return;
+  _spyTick=requestAnimationFrame(()=>{
+    _spyTick=null;
+    const fv=document.getElementById('full-view');
+    if(!fv || fv.style.display==='none') return;
+    const fa=document.getElementById('form-area'); const nav=document.getElementById('sidebar-nav'); if(!fa||!nav) return;
+    const items=[...nav.querySelectorAll('.qnav-item')]; if(!items.length) return;
+    const faTop=fa.getBoundingClientRect().top;
+    let best=null, bestTop=-Infinity;
+    for(const it of items){
+      const el=document.getElementById(it.dataset.target);
+      if(!el || el.offsetParent===null) continue;
+      const t=el.getBoundingClientRect().top - faTop;
+      if(t<=150 && t>bestTop){ bestTop=t; best=it; }
+    }
+    if(!best) best=items.find(i=>{ const el=document.getElementById(i.dataset.target); return el && el.offsetParent!==null; });
+    if(best && !best.classList.contains('spy')){
+      items.forEach(i=>i.classList.remove('spy'));
+      best.classList.add('spy');
+      best.scrollIntoView({block:'nearest'});
+    }
+  });
+}
+document.getElementById('form-area')?.addEventListener('scroll', qnavSpy, {passive:true});
+document.addEventListener('click', e=>{ if(!e.target.closest('.shoot-picker-wrap')) closeShootPicker(); });
+
 function kbModalForceClose(){ document.getElementById('kb-modal').classList.remove('open'); }
 async function closeKanbanModal(){ if(await gateKbModal()) kbModalForceClose(); }
 
@@ -2193,19 +2391,53 @@ function syncStoreFromCv(itemId, cv){
 // ── SHOOT TAGS (dropdown_mkyj8js9 — same id on staging and production) ──
 const SHOOT_COL='dropdown_mkyj8js9';
 let shootTags=[], shootTagsDirty=false;
-function renderShootChips(){
-  const c=document.getElementById('shoot-chips'); if(!c) return;
+let shootPickerOpts=[];
+function renderShootChips(){   // name kept (populateForm + refreshShootOptions call it) — now renders compat-style boxes + the picker
+  const c=document.getElementById('shoot-boxes'); if(!c) return;
   c.innerHTML = shootTags.length
-    ? shootTags.map((t,i)=>`<span class="shoot-chip" title="Click to remove" onclick="removeShootTag(${i})">${escapeHtml(t)} ✕</span>`).join('')
+    ? shootTags.map((t,i)=>`<button type="button" class="compat-btn shoot-box" title="Click to remove" onclick="removeShootTag(${i})">${escapeHtml(t)} ✕</button>`).join('')
     : '<span class="kb-empty">— no shoot tags —</span>';
-  const dl=document.getElementById('shoot-tag-datalist');
-  if(dl) dl.innerHTML=(boardDropdownOptions[SHOOT_COL]||[]).map(o=>`<option value="${escapeHtml(o.label)}">`).join('');
+  renderShootPicker();
 }
-function addShootTag(){
-  const inp=document.getElementById('shoot-tag-input'); if(!inp) return;
-  const t=inp.value.trim(); if(!t) return;
-  if(!shootTags.some(x=>x.toLowerCase()===t.toLowerCase())){ shootTags.push(t); shootTagsDirty=true; markDirty(); renderShootChips(); }
-  inp.value='';
+function toggleShootPicker(){
+  const p=document.getElementById('shoot-picker'); if(!p) return;
+  const open=p.classList.toggle('open');
+  if(open){ const s=document.getElementById('shoot-picker-search'); if(s){ s.value=''; s.focus(); } renderShootPicker(); }
+}
+function closeShootPicker(){ const p=document.getElementById('shoot-picker'); if(p) p.classList.remove('open'); }
+function renderShootPicker(){
+  const list=document.getElementById('shoot-picker-list'); if(!list) return;
+  const sEl=document.getElementById('shoot-picker-search');
+  const raw=(sEl?sEl.value:'').trim(); const q=raw.toLowerCase();
+  const all=(boardDropdownOptions[SHOOT_COL]||[]).map(o=>String(o.label));
+  shootPickerOpts=all.filter(l=>!q||l.toLowerCase().includes(q));
+  const sel=l=>shootTags.some(x=>x.toLowerCase()===l.toLowerCase());
+  let html=shootPickerOpts.map((l,n)=>`<div class="shoot-opt${sel(l)?' sel':''}" onclick="shootPickerPick(${n})">${sel(l)?'✓ ':''}${escapeHtml(l)}</div>`).join('');
+  if(raw && !all.some(l=>l.toLowerCase()===q)) html+=`<div class="shoot-opt create" onclick="shootPickerCreate()">+ Create “${escapeHtml(raw)}”</div>`;
+  list.innerHTML=html||'<div class="shoot-opt dim">no tags yet — type to create one</div>';
+}
+function shootPickerPick(n){
+  const l=shootPickerOpts[n]; if(l==null) return;
+  const i=shootTags.findIndex(x=>x.toLowerCase()===l.toLowerCase());
+  if(i>=0) shootTags.splice(i,1); else shootTags.push(l);
+  shootTagsDirty=true; markDirty(); renderShootChips();
+}
+function shootPickerCreate(){
+  const s=document.getElementById('shoot-picker-search'); const t=(s?s.value:'').trim(); if(!t) return;
+  if(!shootTags.some(x=>x.toLowerCase()===t.toLowerCase())){ shootTags.push(t); shootTagsDirty=true; markDirty(); }
+  if(s) s.value='';
+  renderShootChips();
+}
+function shootPickerEnter(){
+  const s=document.getElementById('shoot-picker-search'); const raw=(s?s.value:'').trim(); if(!raw) return;
+  const q=raw.toLowerCase();
+  const all=(boardDropdownOptions[SHOOT_COL]||[]).map(o=>String(o.label));
+  const match=all.find(l=>l.toLowerCase()===q) || shootPickerOpts[0];
+  if(match){
+    if(!shootTags.some(x=>x.toLowerCase()===match.toLowerCase())){ shootTags.push(match); shootTagsDirty=true; markDirty(); }
+    if(s) s.value='';
+    renderShootChips();
+  } else { shootPickerCreate(); }
 }
 function removeShootTag(i){ shootTags.splice(i,1); shootTagsDirty=true; markDirty(); renderShootChips(); }
 async function refreshShootOptions(){
@@ -2599,6 +2831,8 @@ function showIvSection(section){
 function buildSidebarNav(type){
   const nav=document.getElementById('sidebar-nav');
   nav.innerHTML='';
+  const qs=document.getElementById('qnav-search');
+  if(qs){ qs.style.display=(type==='full')?'block':'none'; qs.value=''; }
   if(type==='full'){
     // One-scroll layout: list every question; clicking scrolls the form to it.
     FULL_QUESTION_MAP.forEach(([section, questions])=>{
@@ -2911,7 +3145,9 @@ async function loadCandidate(itemId){
     const showUpload = !['batch','dup','new'].includes(currentMode);
     document.getElementById('fv-upload-section').style.display = showUpload ? 'block' : 'none';
   }
-  document.getElementById('candidate-strip').classList.add('visible');
+  // v7.12 fix: setMode('5a') hides the strip with an INLINE display:none, which beats the
+  // .visible class — clear the inline style first or the strip (name/headshot/photos) never shows.
+  { const cs=document.getElementById('candidate-strip'); cs.style.display=''; cs.classList.add('visible'); }
   document.getElementById('sticky-status-bar').style.display='flex';
   // General Notes now lives in a sticky block at the top of each view (interview + full),
   // so the old sidebar-corner pin stays hidden.
@@ -4248,6 +4484,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.12: approved-editor polish — Back-to-grid button moved next to Model Status; fixed invisible candidate strip (name/headshot/photo grid now show when opening a tile); ✂ Recrop Headshot (drag a square selection, crop becomes the headshot, original kept in Extra pictures; new same-origin /asset-bytes server route for canvas pixels); SHOOT TAGS as compat-style boxes + searchable "+ Add tag" picker (create-on-the-fly kept); sidebar scrollspy highlights where you are; sidebar field search (Enter jumps to first match).
    v7.11: unsaved-changes guard (Save/Discard/Keep-editing on every exit: modal ✕, tile/card clicks, tab switches, candidate switches, browser close; backdrop-close removed); 5-APPROVED is now a photo grid (own filters incl. Shoot Tags, search, sort) whose tiles open the FULL editor with a ← Back to grid button; SHOOT TAGS chips box in the approved editor (new tags created on Monday at Save); expandable full-text carets in duplicate merge review + General Notes.
    v7.10: metric ⇄ US — Height/Weight/Cock get paired US + metric boxes in every editor (kanban/all-models modal, full editor, interview, new model); fill either side, Save converts the other (US wins if both edited; cm integers, kg 1 decimal); #kb-modal moved out of kanban-view so All Models tiles open the editor (bug fix).
    ============================================================ */

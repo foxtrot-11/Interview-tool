@@ -321,6 +321,22 @@ app.post('/rearrange-photos', dataLimiter, requireAuth, async (req, res) => {
 });
 
 // ---- shared helpers ----
+// v7.12: same-origin asset bytes for the headshot recropper. monday's S3 public_url
+// sends no CORS headers, so the browser cannot read pixels from it directly; this
+// streams the same bytes from our own origin instead. Auth + rate-limited like /api.
+app.get('/asset-bytes', dataLimiter, requireAuth, async (req, res) => {
+  try {
+    const assetId = String(req.query.assetId || '').replace(/[^0-9]/g, '');
+    if (!assetId) return res.status(400).json({ error: 'assetId required' });
+    const a = await downloadAsset(assetId);
+    res.set('Content-Type', a.mime || 'application/octet-stream');
+    res.set('Cache-Control', 'private, max-age=300');
+    res.send(a.buf);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 async function mondayGql(query, variables) {
   const r = await fetch('https://api.monday.com/v2', {
     method: 'POST',
