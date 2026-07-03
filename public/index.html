@@ -140,6 +140,25 @@
   .am-name{padding:7px 9px 2px;font-size:13px;font-weight:600;color:var(--text);line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:34px}
   .am-sub{padding:0 9px 8px;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);min-height:15px}
   .am-empty{padding:48px;text-align:center;color:var(--text-muted);font-family:var(--font-mono);font-size:13px}
+  /* ── Unsaved-changes dialog ── */
+  .unsaved-modal{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center}
+  .unsaved-modal.open{display:flex}
+  .unsaved-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px 26px;max-width:440px;margin:20px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .unsaved-title{font-family:var(--font-display);font-weight:700;font-size:16px;margin-bottom:6px;color:var(--text)}
+  .unsaved-text{font-size:12px;color:var(--text-muted);margin-bottom:16px;line-height:1.5}
+  .unsaved-actions{display:flex;gap:10px;flex-wrap:wrap}
+  /* ── Shoot tag chips ── */
+  .shoot-chips{display:flex;flex-wrap:wrap;gap:6px;min-height:24px}
+  .shoot-chip{background:var(--surface2);border:1px solid var(--accent);color:var(--accent);border-radius:12px;padding:3px 10px;font-size:11px;font-family:var(--font-mono);cursor:pointer;white-space:nowrap}
+  .shoot-chip:hover{border-color:var(--danger);color:var(--danger)}
+  /* ── Expandable long text (dup review + notes) ── */
+  .xnote{display:none;flex-basis:100%;white-space:pre-wrap;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;line-height:1.5;color:var(--text);margin-top:6px;max-height:420px;overflow:auto}
+  .xnote.open{display:block}
+  .xnote-caret{background:transparent;border:1px solid var(--border);color:var(--text-muted);border-radius:5px;padding:3px 8px;font-size:10px;cursor:pointer;font-family:var(--font-mono);flex:0 0 auto}
+  .xnote-caret:hover{color:var(--accent);border-color:var(--accent)}
+  .xnote-lbl{display:block;font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 3px}
+  .xnote-part:first-child .xnote-lbl{margin-top:0}
+  textarea.gn-expanded{max-height:none!important}
   .kb-seths{position:absolute;bottom:4px;left:4px;right:4px;background:rgba(0,0,0,0.72);color:#fff;border:none;border-radius:4px;padding:5px;font-size:10px;font-family:var(--font-mono);cursor:pointer;opacity:0;transition:opacity .12s}
   .kb-photo:hover .kb-seths{opacity:1}
   .kb-hs-tag{position:absolute;bottom:4px;left:4px;background:var(--accent);color:var(--bg);border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700;font-family:var(--font-mono)}
@@ -632,6 +651,7 @@
 <!-- SELECTOR BAR (hidden in new model mode) -->
 <div class="selector-bar" id="selector-bar">
   <div class="selector-row">
+    <button class="dup-refresh-btn" id="back-to-grid-btn" style="display:none" onclick="backToApprovedGrid()">← Back to grid</button>
     <div class="combo-wrap" id="combo-wrap">
       <span class="search-icon">⌕</span>
       <input type="text" id="candidate-combo" autocomplete="off" placeholder="Type to search candidates…"
@@ -744,7 +764,7 @@
 
       <!-- STICKY GENERAL NOTES (matches interview view) -->
       <div class="iv-notes-sticky">
-        <div class="field-label">General Notes</div>
+        <div class="field-label" style="display:flex;align-items:center;gap:10px">General Notes <button type="button" class="xnote-caret" onclick="toggleNotesExpand('fv-general-notes',this)">▾ expand</button></div>
         <textarea id="fv-general-notes" placeholder="General observations..." oninput="document.getElementById('sidebar-general-notes').value=this.value;markDirty()"></textarea>
       </div>
 
@@ -910,6 +930,16 @@
           <div class="field field-full"><div class="field-label">Rating Notes</div><textarea id="f-text_mm1znrfv" placeholder="Notes on rating..." oninput="markDirty()"></textarea></div>
           <div class="field"><div class="field-label">Rate Offered</div><input type="text" id="f-text_mm1zb8xf" placeholder="e.g. $800" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Date First Shot</div><input type="date" id="f-date_mknb5z70" oninput="markDirty()"></div>
+          <div class="field field-full" id="shoot-tags-block" style="display:none">
+            <div class="field-label">SHOOT TAGS</div>
+            <div class="shoot-chips" id="shoot-chips"></div>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <input type="text" id="shoot-tag-input" list="shoot-tag-datalist" placeholder="Type a tag, press Enter to add…" onkeydown="if(event.key==='Enter'){event.preventDefault();addShootTag();}">
+              <button type="button" class="kb-change-hs" onclick="addShootTag()">+ Add</button>
+            </div>
+            <datalist id="shoot-tag-datalist"></datalist>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:4px">Pick an existing tag or type a new one — new tags are created on Monday when you Save.</div>
+          </div>
         </div>
         <div class="section-nav"><button class="nav-btn" onclick="goFSection(5)">← Prev</button><div class="section-progress">7/7</div><button class="save-btn" onclick="saveAll()">✓ Save All</button></div>
       </div>
@@ -1152,7 +1182,7 @@
 
     <div id="am-view" style="display:none">
       <div class="am-toolbar">
-        <div style="font-family:var(--font-display);font-size:20px;font-weight:700">All Models</div>
+        <div style="font-family:var(--font-display);font-size:20px;font-weight:700" id="am-title">All Models</div>
         <button class="dup-refresh-btn" onclick="loadKanban()">↺ Refresh</button>
         <input type="text" id="am-search" class="dup-search-input" placeholder="Search name…" oninput="amOnSearch()" onfocus="this.select()" autocomplete="off" style="max-width:200px">
         <span id="am-filterbtns"></span>
@@ -1176,10 +1206,23 @@
     </div>
 
     <!-- Kanban/All-Models editor modal — top-level so it renders from ANY tab (was nested inside kanban-view, which display:none'd it on the All Models tab) -->
-    <div id="kb-modal" class="kb-modal" onclick="if(event.target===this)closeKanbanModal()">
+    <div id="kb-modal" class="kb-modal">
       <div class="kb-modal-panel">
         <button class="kb-modal-close" onclick="closeKanbanModal()">✕</button>
         <div id="kb-modal-body"></div>
+      </div>
+    </div>
+
+    <!-- Unsaved-changes dialog (v7.11) — sits above everything incl. the editor modal -->
+    <div id="unsaved-modal" class="unsaved-modal">
+      <div class="unsaved-panel">
+        <div class="unsaved-title">Unsaved changes</div>
+        <div class="unsaved-text">You've made changes that haven't been saved yet. What would you like to do?</div>
+        <div class="unsaved-actions">
+          <button class="kb-save" id="unsaved-save" onclick="unsavedChoose('save')">Save changes</button>
+          <button class="kb-hs-cancel" onclick="unsavedChoose('discard')">Discard</button>
+          <button class="kb-change-hs" onclick="unsavedChoose('cancel')">Keep editing</button>
+        </div>
       </div>
     </div>
 
@@ -1489,12 +1532,29 @@ const AM_FILTERS=[
  {key:'sex',  col:'dropdown_mm1by5q0', label:'Sexuality', kind:'dropdown'},
  {key:'eth',  col:'dropdown_mm1zcar6', label:'Ethnicity', kind:'dropdown'},
  {key:'ftm',  col:'color_mm1zk5e2',    label:'FTM?', kind:'status'},
- {key:'tat',  col:'color_mm1zghx9',    label:'Tattoos', kind:'status'}
+ {key:'tat',  col:'color_mm1zghx9',    label:'Tattoos', kind:'status'},
+ {key:'shoot',col:'dropdown_mkyj8js9', label:'Shoot Tags', kind:'dropdown', scope:'5a'}
 ];
 const AM_SORT_FIELDS={h:{key:'hIn',raw:'hRaw',label:'height'},w:{key:'wLb',raw:'wRaw',label:'weight'},c:{key:'cIn',raw:'cRaw',label:'cock size'}};
 const AM_DD_KEY={}, AM_ST_KEY={};
 AM_FILTERS.forEach(f=>{ (f.kind==='dropdown'?AM_DD_KEY:AM_ST_KEY)[f.col]=f.key; });
-let amFilters={};            // filter key -> Set of selected option ids
+let amFilters={};            // filter key -> Set of selected option ids (live set for the CURRENT scope)
+// Grid scopes: the same grid view serves ALL MODELS and 5-APPROVED, each with its own filters/search/sort.
+let gridScope='all';
+const GRID_SCOPES={ all:{title:'All Models', ids:null}, '5a':{title:'5-APPROVED', ids:[2,4,105]} };
+let amState={ all:{filters:{},search:'',sort:'name-asc'}, '5a':{filters:{},search:'',sort:'name-asc'} };
+let approvedFromGrid=false;
+function setGridScope(scope){
+  if(gridScope===scope) return;
+  amState[gridScope]={ filters:amFilters, search:(document.getElementById('am-search')||{}).value||'', sort:(document.getElementById('am-sort')||{}).value||'name-asc' };
+  gridScope=scope;
+  const st=amState[scope]||(amState[scope]={filters:{},search:'',sort:'name-asc'});
+  amFilters=st.filters;
+  const si=document.getElementById('am-search'); if(si) si.value=st.search;
+  const so=document.getElementById('am-sort'); if(so) so.value=st.sort;
+  const t=document.getElementById('am-title'); if(t) t.textContent=GRID_SCOPES[scope].title;
+  amBuildFilters(true);
+}
 let amSearchTimer=null;
 let amIO=null; const amPending=new Set(); let amFlushTimer=null;
 let activeGrid=null;         // 'kanban' | 'am' | null — which board-wide view is on screen
@@ -1539,12 +1599,16 @@ function amFilterOptions(f){
   const map=KB_STATUS_LABELS[f.col]||{};
   return Object.keys(map).map(k=>({id:Number(k),label:map[k]}));
 }
-function amBuildFilters(){
-  const host=document.getElementById('am-filterbtns'); if(!host||host.childElementCount) return;
-  host.innerHTML=AM_FILTERS.map(f=>{
+function amBuildFilters(force){
+  const host=document.getElementById('am-filterbtns'); if(!host) return;
+  if(!force && host.dataset.scope===gridScope && host.childElementCount) return;
+  host.dataset.scope=gridScope;
+  host.innerHTML=AM_FILTERS.filter(f=>!f.scope||f.scope===gridScope).map(f=>{
     const opts=amFilterOptions(f);
-    return `<span class="am-fwrap"><button class="am-fbtn" id="amfb-${f.key}" onclick="event.stopPropagation();amToggleFpop('${f.key}')">${f.label} ▾</button><div class="am-fpop" id="amfp-${f.key}" onclick="event.stopPropagation()">${opts.map(o=>`<label><input type="checkbox" onchange="amToggleFilter('${f.key}',${o.id},this.checked)"> ${escapeHtml(o.label)}</label>`).join('')||'<span class="kb-empty">no options</span>'}</div></span>`;
+    const sel=amFilters[f.key]||new Set();
+    return `<span class="am-fwrap"><button class="am-fbtn" id="amfb-${f.key}" onclick="event.stopPropagation();amToggleFpop('${f.key}')">${f.label} ▾</button><div class="am-fpop" id="amfp-${f.key}" onclick="event.stopPropagation()">${opts.map(o=>`<label><input type="checkbox" ${sel.has(Number(o.id))?'checked':''} onchange="amToggleFilter('${f.key}',${o.id},this.checked)"> ${escapeHtml(o.label)}</label>`).join('')||'<span class="kb-empty">no options</span>'}</div></span>`;
   }).join('');
+  AM_FILTERS.forEach(f=>amUpdateFbtn(f.key));
   if(!window._amDocClick){ window._amDocClick=true; document.addEventListener('click',amCloseFpops); }
 }
 function amToggleFpop(key){ const p=document.getElementById('amfp-'+key); if(!p) return; const wasOpen=p.classList.contains('open'); amCloseFpops(); if(!wasOpen) p.classList.add('open'); }
@@ -1557,10 +1621,12 @@ function amOnSearch(){ clearTimeout(amSearchTimer); amSearchTimer=setTimeout(ren
 function renderAllModels(){
   const grid=document.getElementById('am-grid'); if(!grid) return;
   amBuildFilters();
+  const scopeIds=GRID_SCOPES[gridScope] && GRID_SCOPES[gridScope].ids;
+  const base = scopeIds ? kanbanItems.filter(m=>scopeIds.includes(m.statusIdx)) : kanbanItems;
   const sortVal=document.getElementById('am-sort')?.value||'name-asc';
-  const res=amApplyFilterSort(kanbanItems, amFilters, document.getElementById('am-search')?.value, sortVal);
+  const res=amApplyFilterSort(base, amFilters, document.getElementById('am-search')?.value, sortVal);
   const list=res.list, SF=AM_SORT_FIELDS[sortVal.split('-')[0]];
-  const count=document.getElementById('am-count'); if(count) count.textContent=`${list.length} of ${kanbanItems.length} models`;
+  const count=document.getElementById('am-count'); if(count) count.textContent=`${list.length} of ${base.length} models`;
   const note=document.getElementById('am-note');
   if(note) note.textContent = (SF && res.missing) ? `${res.missing} of ${list.length} shown have no ${SF.label} on file — they're at the end` : '';
   const empty=document.getElementById('am-empty'); if(empty) empty.style.display = (list.length||!kanbanItems.length) ? 'none':'';
@@ -1568,7 +1634,8 @@ function renderAllModels(){
     const cached = m.head && kbHeadCache[m.head];
     const inner = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : `<span class="am-mono">${escapeHtml((m.name[0]||'?').toUpperCase())}</span>`;
     const sub = SF ? (m[SF.raw]||'—') : '';
-    return `<div class="am-tile" onclick="openKanbanModal('${m.id}')"><span class="am-caret">▾</span><div class="am-thumb" id="amthumb-${m.id}"${m.head?` data-head="${m.head}"`:''}>${inner}</div><div class="am-name">${escapeHtml(m.name)}</div><div class="am-sub">${escapeHtml(sub)}</div></div>`;
+    const openFn = (gridScope==='5a') ? 'openApprovedEditor' : 'openKanbanModal';
+    return `<div class="am-tile" onclick="${openFn}('${m.id}')"><span class="am-caret">▾</span><div class="am-thumb" id="amthumb-${m.id}"${m.head?` data-head="${m.head}"`:''}>${inner}</div><div class="am-name">${escapeHtml(m.name)}</div><div class="am-sub">${escapeHtml(sub)}</div></div>`;
   }).join('');
   amObserve();
 }
@@ -1634,7 +1701,7 @@ async function loadKanban(){
     const items=[]; let cursor=null, pages=0;
     do{
       const cp = cursor ? `cursor:"${cursor}"` : 'limit:200';
-      const data = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name updated_at column_values(ids:["label","lien_internet","files_mkncw5nm","dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm254xed","dropdown_mkncp6xy","dropdown_mm1by5q0","dropdown_mm1zcar6","color_mm1zk5e2","color_mm1zghx9","text_mknc1sps","text_mm1yx2wg","text_mm1y2znz"]){id value}}}}}`);
+      const data = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name updated_at column_values(ids:["label","lien_internet","files_mkncw5nm","dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm254xed","dropdown_mkncp6xy","dropdown_mm1by5q0","dropdown_mm1zcar6","color_mm1zk5e2","color_mm1zghx9","text_mknc1sps","text_mm1yx2wg","text_mm1y2znz","dropdown_mkyj8js9"]){id value}}}}}`);
       const page = data.boards[0].items_page;
       page.items.forEach(it=>{
         const cv={}; (it.column_values||[]).forEach(c=>cv[c.id]=c);
@@ -1647,7 +1714,7 @@ async function loadKanban(){
         const twUrl=(pv('lien_internet')||{}).url||'';
         const hRaw=tx('text_mknc1sps'), wRaw=tx('text_mm1yx2wg'), cRaw=tx('text_mm1y2znz');
         items.push({id:it.id, name:(it.name||'').trim(), updated_at:it.updated_at||'', statusIdx, notes:'', notesLoaded:false, twUrl, head,
-          f:{type:dd('dropdown_mm1zzwcg'),role:dd('dropdown_mknbe0p0'),loc:dd('dropdown_mm254xed'),site:dd('dropdown_mkncp6xy'),sex:dd('dropdown_mm1by5q0'),eth:dd('dropdown_mm1zcar6'),ftm:st('color_mm1zk5e2'),tat:st('color_mm1zghx9')},
+          f:{type:dd('dropdown_mm1zzwcg'),role:dd('dropdown_mknbe0p0'),loc:dd('dropdown_mm254xed'),site:dd('dropdown_mkncp6xy'),sex:dd('dropdown_mm1by5q0'),eth:dd('dropdown_mm1zcar6'),shoot:dd('dropdown_mkyj8js9'),ftm:st('color_mm1zk5e2'),tat:st('color_mm1zghx9')},
           hRaw,wRaw,cRaw,hIn:parseHeightIn(hRaw),wLb:parseWeightLb(wRaw),cIn:parseCockIn(cRaw)});
       });
       cursor=page.cursor; pages++;
@@ -2014,8 +2081,161 @@ async function kbUploadPhoto(kind, input){
   }catch(e){ kbPhotoMsg('Error: '+escapeHtml(e.message)); }
 }
 
-function closeKanbanModal(){ document.getElementById('kb-modal').classList.remove('open'); }
+function kbModalForceClose(){ document.getElementById('kb-modal').classList.remove('open'); }
+async function closeKanbanModal(){ if(await gateKbModal()) kbModalForceClose(); }
+
+// ── Unsaved-changes guard (v7.11): 3-button dialog + gates on EVERY exit path ──
+let unsavedResolve=null;
+function askUnsaved(allowSave){
+  return new Promise(res=>{
+    unsavedResolve=res;
+    const sv=document.getElementById('unsaved-save'); if(sv) sv.style.display=(allowSave===false)?'none':'';
+    document.getElementById('unsaved-modal').classList.add('open');
+  });
+}
+function unsavedChoose(choice){
+  document.getElementById('unsaved-modal').classList.remove('open');
+  const r=unsavedResolve; unsavedResolve=null; if(r) r(choice);
+}
+// Shared diff for the kanban/all-models modal — the SAME comparison Save uses, so the
+// warning fires exactly when a Save would write something. Metric auto-fill never trips
+// it: pairing only writes at save time and baselines refresh right after.
+function kbCollectChangedCols(full){
+  const init=full._init;
+  const cols={};
+  let statusChanged=false, newStatusIdx=null, newGen=null, newTw=null;
+  for(const sec of KB_SECTIONS){
+    for(const f of sec.fields){
+      const [colId,,kind,multi]=f;
+      const cur=kbReadControl(f); if(cur===undefined) continue;
+      let changed;
+      if(kind==='dropdown') changed = JSON.stringify(cur)!==init[colId];
+      else if(kind==='status') changed = (cur!==init[colId]);
+      else changed = (String(cur)!==String(init[colId]==null?'':init[colId]));
+      if(!changed) continue;
+      if(kind==='phone'){ const country=(full._phoneCountry&&full._phoneCountry[colId])||'US'; cols[colId]={phone:cur||'',countryShortName:country}; }
+      else cols[colId]=kbBuildColVal(f,cur);
+      if(colId==='label'){ statusChanged=true; newStatusIdx=cur; }
+      if(colId==='long_text_mktg36ee') newGen=cur;
+      if(colId==='lien_internet') newTw=(cur||'').trim();
+    }
+  }
+  return {cols, statusChanged, newStatusIdx, newGen, newTw};
+}
+function kbModalDirty(){
+  const modal=document.getElementById('kb-modal');
+  if(!modal || !modal.classList.contains('open')) return false;
+  if(typeof kbPendingHeadshot!=='undefined' && kbPendingHeadshot) return true;
+  const full=document.getElementById('kb-modal-body'); if(!full||!full._init) return false;
+  try{ return Object.keys(kbCollectChangedCols(full).cols).length>0; }catch(e){ return false; }
+}
+async function gateKbModal(){
+  if(!kbModalDirty()) return true;
+  const r=await askUnsaved(true);
+  if(r==='cancel') return false;
+  if(r==='save'){ await saveKanbanCard(kbModalItemId); if(kbModalDirty()) return false; }
+  return true;
+}
+function fullEditorDirty(){ return !!isDirty && (!!currentItem || currentMode==='new'); }
+async function gateFullEditor(){
+  if(!fullEditorDirty()) return true;
+  const r=await askUnsaved(currentMode!=='new');   // new-model form has two send buttons, so no single "Save"
+  if(r==='cancel') return false;
+  if(r==='save'){ await saveAll(); if(isDirty) return false; }   // save failed → stay put
+  else { isDirty=false; document.getElementById('unsaved-dot')?.classList.remove('visible'); }
+  return true;
+}
+
+// ── 5-APPROVED grid: enter full editor from a tile, Back returns to the grid untouched ──
+async function openApprovedEditor(id){
+  approvedFromGrid=true;
+  hide('am-view'); activeGrid=null;
+  show('selector-bar');
+  const bb=document.getElementById('back-to-grid-btn'); if(bb) bb.style.display='';
+  buildSidebarNav('full');
+  loadCandidatesForMode('5a');   // fills the candidate combo in the background
+  await loadCandidate(id);       // shows the full editor: strip, sidebar subitems, all sections
+}
+async function backToApprovedGrid(){
+  if(!(await gateFullEditor())) return;
+  approvedFromGrid=false;
+  const bb=document.getElementById('back-to-grid-btn'); if(bb) bb.style.display='none';
+  resetForm();
+  hide('selector-bar'); hide('empty-state');
+  buildSidebarNav('blank');
+  document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
+  activeGrid='am';
+  show('am-view');
+  renderAllModels();   // same filters (state untouched), fresh data (store synced on save)
+}
+
+// ── Shared-store sync for FULL-EDITOR saves (so grids reflect edits without a Refresh) ──
+function syncStoreFromCv(itemId, cv){
+  if(typeof kanbanItems==='undefined'||!kanbanItems||!kanbanItems.length) return;
+  const m=kanbanItems.find(x=>String(x.id)===String(itemId)); if(!m) return;
+  try{
+    if(cv.label && cv.label.index!=null) m.statusIdx=Number(cv.label.index);
+    if(cv.long_text_mktg36ee && typeof cv.long_text_mktg36ee.text==='string'){ m.notes=cv.long_text_mktg36ee.text; m.notesLoaded=true; }
+    if(cv.lien_internet) m.twUrl=(cv.lien_internet.url||'').trim();
+    m.updated_at=new Date().toISOString();
+    const sn=document.getElementById('strip-name'); if(sn && sn.value.trim()) m.name=sn.value.trim();
+    if(m.f) for(const cid in cv){
+      const v=cv[cid];
+      if(AM_DD_KEY[cid] && v && Array.isArray(v.ids)) m.f[AM_DD_KEY[cid]]=v.ids.map(Number);
+      else if(AM_ST_KEY[cid]) m.f[AM_ST_KEY[cid]]=(v && v.index!=null)?Number(v.index):null;
+      else if(cid==='text_mknc1sps' && typeof v==='string'){ m.hRaw=v; m.hIn=parseHeightIn(v); }
+      else if(cid==='text_mm1yx2wg' && typeof v==='string'){ m.wRaw=v; m.wLb=parseWeightLb(v); }
+      else if(cid==='text_mm1y2znz' && typeof v==='string'){ m.cRaw=v; m.cIn=parseCockIn(v); }
+    }
+  }catch(e){ console.warn('store sync failed', e); }
+}
+
+// ── SHOOT TAGS (dropdown_mkyj8js9 — same id on staging and production) ──
+const SHOOT_COL='dropdown_mkyj8js9';
+let shootTags=[], shootTagsDirty=false;
+function renderShootChips(){
+  const c=document.getElementById('shoot-chips'); if(!c) return;
+  c.innerHTML = shootTags.length
+    ? shootTags.map((t,i)=>`<span class="shoot-chip" title="Click to remove" onclick="removeShootTag(${i})">${escapeHtml(t)} ✕</span>`).join('')
+    : '<span class="kb-empty">— no shoot tags —</span>';
+  const dl=document.getElementById('shoot-tag-datalist');
+  if(dl) dl.innerHTML=(boardDropdownOptions[SHOOT_COL]||[]).map(o=>`<option value="${escapeHtml(o.label)}">`).join('');
+}
+function addShootTag(){
+  const inp=document.getElementById('shoot-tag-input'); if(!inp) return;
+  const t=inp.value.trim(); if(!t) return;
+  if(!shootTags.some(x=>x.toLowerCase()===t.toLowerCase())){ shootTags.push(t); shootTagsDirty=true; markDirty(); renderShootChips(); }
+  inp.value='';
+}
+function removeShootTag(i){ shootTags.splice(i,1); shootTagsDirty=true; markDirty(); renderShootChips(); }
+async function refreshShootOptions(){
+  try{
+    const d=await gql(`{boards(ids:[${MAIN_BOARD_ID}]){columns(ids:["${SHOOT_COL}"]){id settings_str}}}`);
+    const col=d.boards[0].columns[0]; const s=JSON.parse(col.settings_str);
+    if(s.labels) boardDropdownOptions[SHOOT_COL]=s.labels.filter(l=>!l.is_deactivated).map(l=>({id:l.id,label:l.name||l.label}));
+    renderShootChips();
+    const host=document.getElementById('am-filterbtns'); if(host) host.dataset.scope='';   // rebuild filter popovers with new tags on next render
+  }catch(e){ console.warn('shoot options refresh failed', e); }
+}
+
+// ── Expandable long-text (duplicates review + general notes) ──
+function xnote(uid, parts){
+  const body=parts.map(p=>`<div class="xnote-part"><span class="xnote-lbl">${escapeHtml(p.label)}</span>${escapeHtml(p.text||'—')}</div>`).join('');
+  return `<button type="button" class="xnote-caret" onclick="toggleXnote('${uid}',this)">▾ full text</button><div class="xnote" id="xnote-${uid}">${body}</div>`;
+}
+function toggleXnote(uid,btn){
+  const el=document.getElementById('xnote-'+uid); if(!el) return;
+  const open=el.classList.toggle('open');
+  if(btn) btn.textContent=open?'▴ collapse':'▾ full text';
+}
+function toggleNotesExpand(taId,btn){
+  const ta=document.getElementById(taId); if(!ta) return;
+  const open=ta.classList.toggle('gn-expanded');
+  if(open){ ta.style.height='auto'; ta.style.height=Math.min(ta.scrollHeight+6,900)+'px'; if(btn) btn.textContent='▴ collapse'; }
+  else { ta.style.height=''; if(btn) btn.textContent='▾ expand'; }
+}
 async function openKanbanModal(id){
+  if(!(await gateKbModal())) return;   // opening over a dirty modal would wipe its edits
   const modal=document.getElementById('kb-modal');
   const body=document.getElementById('kb-modal-body');
   modal.classList.add('open');
@@ -2079,25 +2299,10 @@ async function saveKanbanCard(id){
     try{ await kbApplyHeadshot(id); }
     catch(e){ if(msg) msg.textContent='Headshot error: '+escapeHtml(e.message||String(e))+' — stopped; field changes not saved. Try Save again.'; return; }
   }
-  // 2) Diff and save any field changes.
-  const cols={};
-  let statusChanged=false, newStatusIdx=null, newGen=null, newTw=null;
-  for(const sec of KB_SECTIONS){
-    for(const f of sec.fields){
-      const [colId,,kind,multi]=f;
-      const cur=kbReadControl(f); if(cur===undefined) continue;
-      let changed;
-      if(kind==='dropdown') changed = JSON.stringify(cur)!==init[colId];
-      else if(kind==='status') changed = (cur!==init[colId]);
-      else changed = (String(cur)!==String(init[colId]==null?'':init[colId]));
-      if(!changed) continue;
-      if(kind==='phone'){ const country=(full._phoneCountry&&full._phoneCountry[colId])||'US'; cols[colId]={phone:cur||'',countryShortName:country}; }
-      else cols[colId]=kbBuildColVal(f,cur);
-      if(colId==='label'){ statusChanged=true; newStatusIdx=cur; }
-      if(colId==='long_text_mktg36ee') newGen=cur;
-      if(colId==='lien_internet') newTw=(cur||'').trim();
-    }
-  }
+  // 2) Diff and save any field changes (same diff the unsaved-changes gate uses).
+  const dcv=kbCollectChangedCols(full);
+  const cols=dcv.cols;
+  let statusChanged=dcv.statusChanged, newStatusIdx=dcv.newStatusIdx, newGen=dcv.newGen, newTw=dcv.newTw;
   // Metric ⇄ US pairing (v7.10): whichever side was edited drives its twin; US wins when both were.
   let measWarn='';
   const mcKB=metricCols(MAIN_BOARD_ID);
@@ -2164,7 +2369,7 @@ async function init(){
 }
 
 async function fetchBoardDropdownOptions(){
-  const data=await gql(`{boards(ids:[${BOARD_ID}]){columns(ids:["dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm1by5q0","dropdown_mm1zcar6","dropdown_mknb18b7","dropdown_mm26n6qx","dropdown_mm254xed","dropdown_mkx04tbr","dropdown_mm1ztytq","dropdown_mkncp6xy"]){id settings_str}}}`);
+  const data=await gql(`{boards(ids:[${BOARD_ID}]){columns(ids:["dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm1by5q0","dropdown_mm1zcar6","dropdown_mknb18b7","dropdown_mm26n6qx","dropdown_mm254xed","dropdown_mkx04tbr","dropdown_mm1ztytq","dropdown_mkncp6xy","dropdown_mkyj8js9"]){id settings_str}}}`);
   data.boards[0].columns.forEach(col=>{
     try{const s=JSON.parse(col.settings_str);if(s.labels)boardDropdownOptions[col.id]=s.labels.filter(l=>!l.is_deactivated).map(l=>({id:l.id,label:l.name||l.label}));}catch{}
   });
@@ -2273,6 +2478,10 @@ function buildAllDropdowns(){
 // ── MODE ──
 async function setMode(mode){
   closeDrawer();
+  // Unsaved-changes gates (v7.11): never tear down an editor with unsaved work silently.
+  if(!(await gateKbModal())){ try{const _mm=document.getElementById('mobile-mode-select'); if(_mm) _mm.value=currentMode;}catch(e){} return; }
+  kbModalForceClose();
+  if(!(await gateFullEditor())){ try{const _mm=document.getElementById('mobile-mode-select'); if(_mm) _mm.value=currentMode;}catch(e){} return; }
   try{ const _mm=document.getElementById('mobile-mode-select'); if(_mm && _mm.value!==mode) _mm.value=mode; }catch(e){}
   // Switch active board: batch tab → batch board, everything else → main board.
   const wantBoard = (mode === 'batch') ? BATCH_BOARD_ID : MAIN_BOARD_ID;
@@ -2286,6 +2495,8 @@ async function setMode(mode){
   hide('kanban-view');
   hide('am-view');
   activeGrid=null;
+  approvedFromGrid=false;
+  { const _bb=document.getElementById('back-to-grid-btn'); if(_bb) _bb.style.display='none'; }
   if(mode==='kanban'){
     hide('selector-bar');
     hide('candidate-strip');
@@ -2312,6 +2523,24 @@ async function setMode(mode){
     buildSidebarNav('blank');
     document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
     activeGrid='am';
+    setGridScope('all');
+    show('am-view');
+    if(kbLoadedOnce && kanbanItems.length){ renderAllModels(); } else { loadKanban(); }
+    return;
+  }
+  if(mode==='5a'){
+    // 5-APPROVED is now a photo grid (approved + all-star + exclusive); tiles open the FULL editor.
+    hide('selector-bar');
+    hide('candidate-strip');
+    hide('empty-state');
+    hide('full-view');
+    hide('interview-view');
+    hide('new-model-view');
+    hide('dup-view');
+    buildSidebarNav('blank');
+    document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
+    activeGrid='am';
+    setGridScope('5a');
     show('am-view');
     if(kbLoadedOnce && kanbanItems.length){ renderAllModels(); } else { loadKanban(); }
     return;
@@ -2646,10 +2875,16 @@ function maybeShowDraftBanner(id){
   const fa=document.getElementById('form-area'); if(fa) fa.insertBefore(bar, fa.firstChild);
 }
 setInterval(()=>{ if(currentItem && isDirty) captureDraft(); }, 30000);
-window.addEventListener('beforeunload', ()=>{ if(currentItem && isDirty) captureDraft(); });
+window.addEventListener('beforeunload', (e)=>{
+  if(currentItem && isDirty) captureDraft();
+  if(fullEditorDirty() || kbModalDirty()){ e.preventDefault(); e.returnValue=''; }
+});
 
 // ── LOAD CANDIDATE ──
 async function loadCandidate(itemId){
+  if(fullEditorDirty() && (!currentItem || String(itemId||'')!==String(currentItem.id))){
+    if(!(await gateFullEditor())) return;   // switching candidates with unsaved edits
+  }
   if(!itemId){
     resetForm();show('empty-state');
     document.getElementById('candidate-strip').classList.remove('visible');
@@ -2721,6 +2956,15 @@ function populateForm(item){
 
   // Metric measurement twins (v7.10) — real column ids vary per board; blank on boards without them
   guard('metric',()=>{ const mc=metricCols(BOARD_ID); ['h','w','c'].forEach(k=>setTxt('metric_'+k, mc?txt(mc[k]):'')); captureMeasBaseline(); });
+
+  // Shoot tags (5-APPROVED only) — labels come as comma-separated text
+  guard('shoot',()=>{
+    shootTagsDirty=false;
+    shootTags=(txt(SHOOT_COL)||'').split(',').map(s=>s.trim()).filter(Boolean);
+    const blk=document.getElementById('shoot-tags-block');
+    if(blk) blk.style.display=(currentMode==='5a')?'':'none';
+    renderShootChips();
+  });
 
   // Long text
   guard('longtext',()=>['long_text_mm1zsdyv','long_text_mm1zbe1t','long_text_mm1zshaw','long_text_mm1z9aeg',
@@ -3095,6 +3339,16 @@ async function saveRecord(){
     const cv=buildColumnValues();
     await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
       {i:currentItem.id,b:BOARD_ID,c:JSON.stringify(cv)});
+    syncStoreFromCv(currentItem.id, cv);   // grids reflect this save without a Refresh
+    // SHOOT TAGS: separate mutation so create_labels_if_missing:true is scoped to this column only
+    if(shootTagsDirty && currentMode==='5a' && String(BOARD_ID)===String(MAIN_BOARD_ID)){
+      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:true){id}}`,
+        {i:currentItem.id,b:BOARD_ID,c:JSON.stringify({[SHOOT_COL]:{labels:shootTags}})});
+      shootTagsDirty=false;
+      await refreshShootOptions();
+      const sm=kanbanItems&&kanbanItems.find(x=>String(x.id)===String(currentItem.id));
+      if(sm&&sm.f){ const opts=boardDropdownOptions[SHOOT_COL]||[]; sm.f.shoot=shootTags.map(t=>{const o=opts.find(x=>String(x.label).toLowerCase()===t.toLowerCase());return o?Number(o.id):null;}).filter(v=>v!=null); }
+    }
     // Apply pending headshot swap (old headshot → extras, chosen → headshot)
     if(pendingHeadshotAssetId){
       try { await applyHeadshotSwap(); loadCandidatePhotos(currentItem.id); }
@@ -3879,6 +4133,7 @@ function scrollToField(targetId){
 // ── RESET ──
 function resetForm(){
   currentItem=null;isDirty=false;statusValues={};selectValues={};multiValues={};
+  shootTags=[];shootTagsDirty=false;{const _st=document.getElementById('shoot-tags-block'); if(_st) _st.style.display='none';}
   compatSavedIds=new Set();
   pendingHeadshotAssetId=null;rechooseMode=false;candidatePhotos=[];closeLightbox();
   const pc=document.getElementById('photo-controls');if(pc)pc.style.display='none';
@@ -3993,6 +4248,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.11: unsaved-changes guard (Save/Discard/Keep-editing on every exit: modal ✕, tile/card clicks, tab switches, candidate switches, browser close; backdrop-close removed); 5-APPROVED is now a photo grid (own filters incl. Shoot Tags, search, sort) whose tiles open the FULL editor with a ← Back to grid button; SHOOT TAGS chips box in the approved editor (new tags created on Monday at Save); expandable full-text carets in duplicate merge review + General Notes.
    v7.10: metric ⇄ US — Height/Weight/Cock get paired US + metric boxes in every editor (kanban/all-models modal, full editor, interview, new model); fill either side, Save converts the other (US wins if both edited; cm integers, kg 1 decimal); #kb-modal moved out of kanban-view so All Models tiles open the editor (bug fix).
    ============================================================ */
 
@@ -4435,7 +4691,8 @@ function previewMerge(gid){
           const editable=EDITABLE.has(f.type);
           const ctl = editable ? editControl('fx-val',gid,f.colId,f.type,f.text,meta.labels?.[f.colId])
                                : `<span class="dup-fixed">"${escapeHtml(f.text.slice(0,80))}"</span>`;
-          return `<li class="dup-frow"><label class="dup-inc"><input type="checkbox" id="fx-inc-${gid}-${f.colId}" checked><b>${escapeHtml(f.title)}</b></label>${ctl}<span class="dim">from ${f.fromId}${editable?'':' · applied as-is'}</span></li>`;
+          const xn=(f.text&&f.text.length>60)?xnote('f-'+gid+'-'+f.colId,[{label:'Full value from duplicate',text:f.text}]):'';
+          return `<li class="dup-frow"><label class="dup-inc"><input type="checkbox" id="fx-inc-${gid}-${f.colId}" checked><b>${escapeHtml(f.title)}</b></label>${ctl}<span class="dim">from ${f.fromId}${editable?'':' · applied as-is'}</span>${xn}</li>`;
         }).join('')
       : '<li class="dim">No empty fields to fill.</li>';
     const confHtml = plan.conflicts.length
@@ -4446,7 +4703,8 @@ function previewMerge(gid){
                     `<option value="use">Use dup: "${escapeHtml(c.sourceText.slice(0,40))}"</option>`+
                     `${editable?'<option value="custom">Custom…</option>':''}</select>`;
           const input = editable ? `<input class="dup-edit" type="text" id="cf-val-${gid}-${c.colId}" value="${escapeHtml(c.sourceText)}" disabled>` : '';
-          return `<li class="dup-frow"><b>${escapeHtml(c.title)}</b>${sel}${input}<span class="dim">losing value → Notes</span></li>`;
+          const xn=((c.keeperText&&c.keeperText.length>40)||(c.sourceText&&c.sourceText.length>40))?xnote('c-'+gid+'-'+c.colId,[{label:'KEEP (current value)',text:c.keeperText},{label:'FROM DUPLICATE',text:c.sourceText}]):'';
+          return `<li class="dup-frow"><b>${escapeHtml(c.title)}</b>${sel}${input}<span class="dim">losing value → Notes</span>${xn}</li>`;
         }).join('')
       : '<li class="dim">None.</li>';
     const photoLine = `${plan.photo.portHeadshot?`Port headshot from id ${plan.photo.headFromId}; `:'Keep keeper\'s headshot; '}add ${plan.photo.addCount} extra photo(s)`+(plan.photo.orphan?`; ${plan.photo.orphan} orphaned skipped`:'');
