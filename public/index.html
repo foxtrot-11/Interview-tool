@@ -186,9 +186,20 @@
   .shoot-opt.create{color:#facc15}
   .shoot-opt.dim{color:var(--text-dim);cursor:default}
   /* ── Sidebar field search + scrollspy (v7.12) ── */
-  .qnav-search{display:none;width:calc(100% - 24px);margin:10px 12px 0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:11px;font-family:var(--font-mono)}
+  .qnav-search-wrap{display:none;position:relative;margin:10px 12px 0}
+  .qnav-search{display:block;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 26px 7px 9px;font-size:11px;font-family:var(--font-mono)}
+  .qnav-clear{position:absolute;right:5px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--text-dim);cursor:pointer;font-size:12px;padding:2px 4px}
+  .qnav-clear:hover{color:var(--danger)}
   .qnav-item.spy{color:var(--accent);background:var(--surface2);border-left-color:var(--accent)}
   .qnav-item.hit{color:#facc15}
+  /* ── Port to Casting Stack (v7.13) ── */
+  .port-list{max-height:44vh;overflow:auto;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;font-family:var(--font-mono);margin-top:6px}
+  .port-row{padding:3px 0}
+  .port-row b{color:var(--accent)}
+  .port-skip{color:var(--text-dim)}
+  .port-ok{color:#22c55e}
+  .port-err{color:var(--danger)}
+  #port-status a{color:var(--accent)}
   .kb-seths{position:absolute;bottom:4px;left:4px;right:4px;background:rgba(0,0,0,0.72);color:#fff;border:none;border-radius:4px;padding:5px;font-size:10px;font-family:var(--font-mono);cursor:pointer;opacity:0;transition:opacity .12s}
   .kb-photo:hover .kb-seths{opacity:1}
   .kb-hs-tag{position:absolute;bottom:4px;left:4px;background:var(--accent);color:var(--bg);border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700;font-family:var(--font-mono)}
@@ -283,6 +294,7 @@
   .dup-edit:disabled{opacity:0.45}
   .dup-fixed{color:var(--text);font-size:11px}
   .dup-refresh-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:var(--radius);padding:6px 14px;font-family:var(--font-mono);font-size:11px;cursor:pointer;margin-left:auto}
+  #back-to-grid-btn{margin-left:0}   /* v7.13: dup-refresh-btn's margin-left:auto floated it mid-bar; pin it beside Model Status */
   .dup-refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
 
   .save-area{display:flex;align-items:center;gap:10px;flex-shrink:0}
@@ -700,7 +712,10 @@
 <div class="main">
   <!-- SIDEBAR -->
   <nav class="sidebar" id="sidebar">
-    <input class="qnav-search" id="qnav-search" placeholder="⌕ Find a field…" autocomplete="off" oninput="qnavFilter(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();qnavEnter();}">
+    <span class="qnav-search-wrap" id="qnav-search-wrap">
+      <input class="qnav-search" id="qnav-search" placeholder="⌕ Find a field…" autocomplete="off" oninput="qnavFilter(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();qnavEnter();}">
+      <button class="qnav-clear" id="qnav-clear" style="display:none" title="Clear search" onclick="const s=document.getElementById('qnav-search');s.value='';qnavFilter('');s.focus()">✕</button>
+    </span>
     <div class="sidebar-nav" id="sidebar-nav">
       <!-- filled by JS based on mode -->
     </div>
@@ -1231,6 +1246,12 @@
           <option value="c-asc">Cock: smallest first</option>
         </select>
         <button class="am-clear" onclick="amClearFilters()">Clear</button>
+        <span id="port-wrap" style="display:none;align-items:center;gap:6px;margin-left:10px">
+          <select id="port-tag" class="am-sort" title="Shoot tag to port"></select>
+          <select id="port-row" class="am-sort" title="CASTING PRIORITY STACK row" style="max-width:230px"></select>
+          <button class="am-clear" title="Reload casting rows" onclick="portLoadRows(true)">↻</button>
+          <button class="am-clear" id="port-btn" style="border-color:var(--accent);color:var(--accent)" onclick="portOpen()">⇪ Port</button>
+        </span>
         <span class="am-count" id="am-count"></span>
       </div>
       <div id="am-loading" class="dup-loading" style="display:none"><span class="dup-spinner"></span><span id="am-load-status">Loading…</span></div>
@@ -1244,6 +1265,21 @@
       <div class="kb-modal-panel">
         <button class="kb-modal-close" onclick="closeKanbanModal()">✕</button>
         <div id="kb-modal-body"></div>
+      </div>
+    </div>
+
+    <!-- Port-to-casting preview modal (v7.13) -->
+    <div id="port-modal" class="unsaved-modal" style="z-index:9450">
+      <div class="unsaved-panel" style="max-width:600px;width:min(94vw,600px)">
+        <div class="unsaved-title">Port to CASTING PRIORITY STACK</div>
+        <div class="unsaved-text" id="port-sub"></div>
+        <div class="port-list" id="port-list"></div>
+        <div id="port-staging-note" style="display:none;font-size:11px;color:#facc15;margin-top:10px;line-height:1.5"></div>
+        <div class="unsaved-actions" style="margin-top:14px">
+          <button class="kb-save" id="port-confirm" onclick="portConfirm()">Confirm — write to Monday</button>
+          <button class="kb-hs-cancel" onclick="portClose()">Close</button>
+          <span class="am-count" id="port-status"></span>
+        </div>
       </div>
     </div>
 
@@ -1605,6 +1641,7 @@ function setGridScope(scope){
   const so=document.getElementById('am-sort'); if(so) so.value=st.sort;
   const t=document.getElementById('am-title'); if(t) t.textContent=GRID_SCOPES[scope].title;
   amBuildFilters(true);
+  portToggleUI();
 }
 let amSearchTimer=null;
 let amIO=null; const amPending=new Set(); let amFlushTimer=null;
@@ -2233,6 +2270,7 @@ function refreshHeadEverywhere(itemId){
 // ── Sidebar field search + scrollspy (v7.12) ──
 function qnavFilter(q){
   q=(q||'').trim().toLowerCase();
+  { const qc=document.getElementById('qnav-clear'); if(qc) qc.style.display=q?'':'none'; }
   const nav=document.getElementById('sidebar-nav'); if(!nav) return;
   nav.querySelectorAll('.qnav-item').forEach(it=>{
     const hit=!q||it.textContent.toLowerCase().includes(q);
@@ -2278,6 +2316,150 @@ function qnavSpy(){
 }
 document.getElementById('form-area')?.addEventListener('scroll', qnavSpy, {passive:true});
 document.addEventListener('click', e=>{ if(!e.target.closest('.shoot-picker-wrap')) closeShootPicker(); });
+
+// ── PORT TO CASTING STACK (v7.13) ──
+// Pushes every 5-APPROVED-scope model carrying a chosen shoot tag into a chosen
+// CASTING PRIORITY STACK row, one pre-labeled slot subitem each (TOP1/BOTTOM1/VERSE1/
+// ALTERNATE1…). Filling the MODEL NAME link auto-mirrors headshot/role/sizes/notes.
+// Empirically proven mechanics: slots read via BoardRelationValue.linked_item_ids;
+// link via change_multiple_column_values {item_ids:[…]}; the column ONLY accepts
+// PRODUCTION tracker items — staging model ids are rejected (itemsNotInConnectedBoards),
+// so Confirm is gated to production.
+const CASTING_BOARD_ID='8533133380', CASTING_SUBITEM_BOARD_ID='8533133826', CASTING_LINK_COL='connect_boards_mknb48ca';
+const PROD_TRACKER_ID='3636652411';
+let portRowsCache=null, portPlan=null;
+
+function portDecideType(roleLabels){
+  const L=(roleLabels||[]).map(x=>String(x).toUpperCase());
+  const hasTop=L.includes('TOP'), hasBottom=L.includes('BOTTOM'), hasVerse=L.includes('VERSE');
+  if(hasVerse || (hasTop&&hasBottom)) return 'VERSE';
+  if(hasTop) return 'TOP';
+  if(hasBottom) return 'BOTTOM';
+  return 'ALTERNATE';
+}
+function portBuildPlan(models, slots){
+  const parsed=[]; const linkedAll=new Set();
+  for(const s of slots){
+    (s.linked||[]).forEach(id=>linkedAll.add(String(id)));
+    const m=/^(TOP|BOTTOM|VERSE|ALTERNATE)(\d+)$/i.exec((s.name||'').trim());
+    if(m) parsed.push({id:s.id, name:s.name, type:m[1].toUpperCase(), num:parseInt(m[2],10), empty:!(s.linked&&s.linked.length)});
+  }
+  const maxNum={}; parsed.forEach(p=>{ maxNum[p.type]=Math.max(maxNum[p.type]||0,p.num); });
+  const claimed=new Set();
+  const actions=[], skipped=[];
+  for(const m of models){
+    if(linkedAll.has(String(m.id))){ skipped.push({model:m, reason:'already on this row'}); continue; }
+    const type=portDecideType(m.roleLabels);
+    const free=parsed.filter(p=>p.type===type && p.empty && !claimed.has(p.id)).sort((a,b)=>a.num-b.num)[0];
+    if(free){ claimed.add(free.id); actions.push({model:m, type, mode:'fill', slotId:free.id, slotName:free.name}); }
+    else { const n=(maxNum[type]||0)+1; maxNum[type]=n; actions.push({model:m, type, mode:'create', slotName:type+n}); }
+  }
+  return {actions, skipped};
+}
+
+function portToggleUI(){
+  const w=document.getElementById('port-wrap'); if(!w) return;
+  const on=(gridScope==='5a');
+  w.style.display=on?'inline-flex':'none';
+  if(on){ portPopulateTags(); portLoadRows(false); }
+}
+function portPopulateTags(){
+  const sel=document.getElementById('port-tag'); if(!sel) return;
+  const cur=sel.value;
+  const opts=(boardDropdownOptions[SHOOT_COL]||[]).slice().sort((a,b)=>String(a.label).localeCompare(String(b.label)));
+  sel.innerHTML='<option value="">Shoot tag…</option>'+opts.map(o=>`<option value="${o.id}">${escapeHtml(String(o.label))}</option>`).join('');
+  if(cur && opts.some(o=>String(o.id)===cur)) sel.value=cur;
+}
+async function portLoadRows(force){
+  const sel=document.getElementById('port-row'); if(!sel) return;
+  if(portRowsCache && !force){ portRenderRows(); return; }
+  sel.innerHTML='<option value="">Loading rows…</option>';
+  try{
+    const d=await gql(`{boards(ids:[${CASTING_BOARD_ID}]){items_page(limit:500){items{id name column_values(ids:["color_mkq0g0sq"]){id ... on StatusValue{index}}}}}}`);
+    const items=((d.boards[0]||{}).items_page||{}).items||[];
+    portRowsCache=items.filter(it=>{
+      const cv=(it.column_values||[])[0];
+      return cv && (cv.index===0 || cv.index===4);   // TYPE = CASTING(0) or CREW(4)
+    }).map(it=>({id:it.id,name:it.name})).sort((a,b)=>a.name.localeCompare(b.name));
+    portRenderRows();
+  }catch(e){ sel.innerHTML='<option value="">rows failed — ↻ to retry</option>'; console.warn('port rows load failed', e); }
+}
+function portRenderRows(){
+  const sel=document.getElementById('port-row'); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Casting row…</option>'+(portRowsCache||[]).map(r=>`<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+  if(cur && (portRowsCache||[]).some(r=>String(r.id)===cur)) sel.value=cur;
+}
+async function portOpen(){
+  const tagSel=document.getElementById('port-tag'), rowSel=document.getElementById('port-row');
+  const tagId=tagSel&&tagSel.value, rowId=rowSel&&rowSel.value;
+  if(!tagId){ showToast('Pick a shoot tag first','error'); return; }
+  if(!rowId){ showToast('Pick a casting row first','error'); return; }
+  const tagOpt=(boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.id)===String(tagId));
+  const rowName=((portRowsCache||[]).find(r=>String(r.id)===String(rowId))||{}).name||rowId;
+  const roleOpts=boardDropdownOptions['dropdown_mknbe0p0']||[];
+  const scopeIds=GRID_SCOPES['5a'].ids;
+  const models=kanbanItems
+    .filter(m=>scopeIds.includes(m.statusIdx) && m.f && Array.isArray(m.f.shoot) && m.f.shoot.includes(Number(tagId)))
+    .map(m=>({id:m.id, name:m.name, roleLabels:(m.f.role||[]).map(rid=>{const o=roleOpts.find(x=>Number(x.id)===Number(rid)); return o?String(o.label):'';}).filter(Boolean)}))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  const modal=document.getElementById('port-modal'); modal.classList.add('open');
+  const list=document.getElementById('port-list'), sub=document.getElementById('port-sub'), st=document.getElementById('port-status');
+  const btn=document.getElementById('port-confirm');
+  btn.disabled=true; btn.textContent='Confirm — write to Monday'; st.textContent='';
+  sub.textContent=`Tag “${tagOpt?tagOpt.label:tagId}” → row “${rowName}”`;
+  portPlan=null;
+  if(!models.length){ list.innerHTML='<div class="port-skip">No approved models carry this shoot tag. Tag people in the editor first, then port.</div>'; return; }
+  list.innerHTML='<div class="port-skip">Reading row slots…</div>';
+  try{
+    const d=await gql(`{items(ids:[${rowId}]){subitems{id name column_values(ids:["${CASTING_LINK_COL}"]){id ... on BoardRelationValue{linked_item_ids}}}}}`);
+    const slots=(((d.items||[])[0]||{}).subitems||[]).map(s=>({id:s.id,name:s.name,linked:(((s.column_values||[])[0])||{}).linked_item_ids||[]}));
+    const plan=portBuildPlan(models, slots);
+    portPlan={rowId, rowName, actions:plan.actions, skipped:plan.skipped};
+    const rows=plan.actions.map(a=>`<div class="port-row">${escapeHtml(a.model.name)} <span class="port-skip">→ ${a.type}</span> ${a.mode==='fill'?`fills <b>${escapeHtml(a.slotName)}</b>`:`creates <b>${escapeHtml(a.slotName)}</b>`}</div>`).join('');
+    const skips=plan.skipped.map(s=>`<div class="port-row port-skip">${escapeHtml(s.model.name)} — skipped (${s.reason})</div>`).join('');
+    list.innerHTML=(rows+skips)||'<div class="port-skip">Nothing to do.</div>';
+    const note=document.getElementById('port-staging-note');
+    if(String(MAIN_BOARD_ID)!==PROD_TRACKER_ID){
+      note.style.display='';
+      note.textContent='⚠ STAGING: the MODEL NAME column only accepts items from the PRODUCTION tracker, so Confirm is disabled here (staging model ids are rejected by Monday). This preview is fully real — ports write for real once this version is promoted to production.';
+      btn.disabled=true;
+    } else {
+      note.style.display='none';
+      btn.disabled=!plan.actions.length;
+    }
+  }catch(e){ list.innerHTML='<div class="port-err">Error reading row: '+escapeHtml(e.message||String(e))+'</div>'; }
+}
+async function portConfirm(){
+  if(!portPlan||!portPlan.actions.length) return;
+  const st=document.getElementById('port-status'), btn=document.getElementById('port-confirm');
+  const list=document.getElementById('port-list');
+  btn.disabled=true;
+  let ok=0, errs=0;
+  for(let i=0;i<portPlan.actions.length;i++){
+    const a=portPlan.actions[i];
+    st.textContent=`${i+1}/${portPlan.actions.length}…`;
+    try{
+      let slotId=a.slotId;
+      if(a.mode==='create'){
+        const cr=await gql(`mutation($p:ID!,$n:String!){create_subitem(parent_item_id:$p,item_name:$n){id}}`,{p:portPlan.rowId,n:a.slotName});
+        slotId=cr.create_subitem.id;
+      }
+      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+        {i:slotId,b:CASTING_SUBITEM_BOARD_ID,c:JSON.stringify({[CASTING_LINK_COL]:{item_ids:[Number(a.model.id)]}})});
+      a.done=true; ok++;
+    }catch(e){ a.err=e.message||String(e); errs++; }
+  }
+  list.innerHTML=portPlan.actions.map(a=>`<div class="port-row ${a.done?'port-ok':'port-err'}">${a.done?'✓':'✗'} ${escapeHtml(a.model.name)} → ${escapeHtml(a.slotName)}${a.err?' — '+escapeHtml(a.err):''}</div>`).join('')
+    + portPlan.skipped.map(s=>`<div class="port-row port-skip">${escapeHtml(s.model.name)} — skipped</div>`).join('');
+  st.innerHTML=`${ok} ported${errs?`, ${errs} failed`:''} — <a href="https://carnalmedia-team.monday.com/boards/${CASTING_BOARD_ID}/pulses/${portPlan.rowId}" target="_blank" rel="noopener">open row in Monday</a>`;
+  btn.textContent='Done';
+}
+function portClose(){
+  document.getElementById('port-modal').classList.remove('open');
+  portPlan=null;
+  const b=document.getElementById('port-confirm'); if(b){ b.textContent='Confirm — write to Monday'; b.disabled=false; }
+}
 
 function kbModalForceClose(){ document.getElementById('kb-modal').classList.remove('open'); }
 async function closeKanbanModal(){ if(await gateKbModal()) kbModalForceClose(); }
@@ -2447,6 +2629,7 @@ async function refreshShootOptions(){
     if(s.labels) boardDropdownOptions[SHOOT_COL]=s.labels.filter(l=>!l.is_deactivated).map(l=>({id:l.id,label:l.name||l.label}));
     renderShootChips();
     const host=document.getElementById('am-filterbtns'); if(host) host.dataset.scope='';   // rebuild filter popovers with new tags on next render
+    if(typeof portPopulateTags==='function') portPopulateTags();
   }catch(e){ console.warn('shoot options refresh failed', e); }
 }
 
@@ -2832,7 +3015,11 @@ function buildSidebarNav(type){
   const nav=document.getElementById('sidebar-nav');
   nav.innerHTML='';
   const qs=document.getElementById('qnav-search');
-  if(qs){ qs.style.display=(type==='full')?'block':'none'; qs.value=''; }
+  if(qs){ qs.value=''; }
+  const qw=document.getElementById('qnav-search-wrap');
+  if(qw){ qw.style.display=(type==='full')?'block':'none'; }
+  const qc=document.getElementById('qnav-clear');
+  if(qc){ qc.style.display='none'; }
   if(type==='full'){
     // One-scroll layout: list every question; clicking scrolls the form to it.
     FULL_QUESTION_MAP.forEach(([section, questions])=>{
@@ -4360,7 +4547,7 @@ function scrollToField(targetId){
   // brief flash
   if(fieldBox.classList){
     fieldBox.classList.add('flash');
-    setTimeout(()=>fieldBox.classList.remove('flash'), 1200);
+    setTimeout(()=>fieldBox.classList.remove('flash'), 3000);
   }
   // mark the clicked nav item active
   document.querySelectorAll('#sidebar-nav .qnav-item').forEach(n=>n.classList.toggle('active', n.dataset.target===targetId));
@@ -4484,6 +4671,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.13: PORT TO CASTING — in the 5-APPROVED grid pick a shoot tag + a CASTING PRIORITY STACK row, preview who fills which slot (TOP/BOTTOM/VERSE/ALTERNATE from Role: VERSE or TOP+BOTTOM → VERSE slots; lowest empty slot, else creates TYPE<n+1>; already-linked models skipped; tag untouched), then Confirm writes each MODEL NAME link (mirrors auto-fill). Confirm is production-only (Monday rejects staging model ids). Polish: ✕ clears the sidebar field search; field flash holds 3s; ← Back to grid pinned beside Model Status.
    v7.12: approved-editor polish — Back-to-grid button moved next to Model Status; fixed invisible candidate strip (name/headshot/photo grid now show when opening a tile); ✂ Recrop Headshot (drag a square selection, crop becomes the headshot, original kept in Extra pictures; new same-origin /asset-bytes server route for canvas pixels); SHOOT TAGS as compat-style boxes + searchable "+ Add tag" picker (create-on-the-fly kept); sidebar scrollspy highlights where you are; sidebar field search (Enter jumps to first match).
    v7.11: unsaved-changes guard (Save/Discard/Keep-editing on every exit: modal ✕, tile/card clicks, tab switches, candidate switches, browser close; backdrop-close removed); 5-APPROVED is now a photo grid (own filters incl. Shoot Tags, search, sort) whose tiles open the FULL editor with a ← Back to grid button; SHOOT TAGS chips box in the approved editor (new tags created on Monday at Save); expandable full-text carets in duplicate merge review + General Notes.
    v7.10: metric ⇄ US — Height/Weight/Cock get paired US + metric boxes in every editor (kanban/all-models modal, full editor, interview, new model); fill either side, Save converts the other (US wins if both edited; cm integers, kg 1 decimal); #kb-modal moved out of kanban-view so All Models tiles open the editor (bug fix).
