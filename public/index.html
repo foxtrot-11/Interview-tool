@@ -116,7 +116,11 @@
   .kb-hs-prog{flex:1 1 100%;height:9px;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;overflow:hidden}
   .kb-hs-prog-bar{height:100%;width:8%;background:var(--accent);transition:width .5s ease}
   /* ── ALL MODELS grid ── */
-  .am-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .am-toolbar{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .am-toolbar-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+  .am-title{font-family:var(--font-display);font-size:20px;font-weight:700}
+  .tb-label{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:0.12em;color:var(--text-muted);text-transform:uppercase;white-space:nowrap}
+  .tb-sep{width:1px;height:22px;background:var(--border);margin:0 2px;flex:none}
   #am-filterbtns{display:contents}
   .am-fwrap{position:relative}
   .am-fbtn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:7px 10px;font-family:var(--font-mono);font-size:11px;cursor:pointer;white-space:nowrap}
@@ -200,7 +204,7 @@
   .port-ok{color:#22c55e}
   .port-err{color:var(--danger)}
   #port-status a{color:var(--accent)}
-  .port-label{font-family:var(--font-display);font-weight:800;font-size:13px;letter-spacing:0.09em;color:var(--accent);white-space:nowrap;border-left:3px solid var(--accent);padding-left:10px;text-transform:uppercase}
+  /* v7.16: .port-label retired — port row uses the shared .tb-label so it reads as a section label, not a header */
   .port-row-wrap{position:relative;display:inline-block}
   .port-row-picker{width:320px}
   #port-row-search{width:100%;margin-bottom:6px}
@@ -1235,23 +1239,30 @@
 
     <div id="am-view" style="display:none">
       <div class="am-toolbar">
-        <div style="font-family:var(--font-display);font-size:20px;font-weight:700" id="am-title">All Models</div>
-        <button class="dup-refresh-btn" onclick="loadKanban()">↺ Refresh</button>
-        <input type="text" id="am-search" class="dup-search-input" placeholder="Search name…" oninput="amOnSearch()" onfocus="this.select()" autocomplete="off" style="max-width:200px">
-        <span id="am-filterbtns"></span>
-        <select id="am-sort" class="am-sort" onchange="renderAllModels()">
-          <option value="name-asc">Sort: Name A→Z</option>
-          <option value="name-desc">Sort: Name Z→A</option>
-          <option value="h-desc">Height: tallest first</option>
-          <option value="h-asc">Height: shortest first</option>
-          <option value="w-desc">Weight: heaviest first</option>
-          <option value="w-asc">Weight: lightest first</option>
-          <option value="c-desc">Cock: biggest first</option>
-          <option value="c-asc">Cock: smallest first</option>
-        </select>
-        <button class="am-clear" onclick="amClearFilters()">Clear</button>
-        <span id="port-wrap" style="display:none;align-items:center;gap:6px;margin-left:10px">
-          <span class="port-label">PORT SHOOT TAG TO MONDAY</span>
+        <div class="am-toolbar-row">
+          <div class="am-title" id="am-title">All Models</div>
+          <span class="am-count" id="am-count"></span>
+          <button class="dup-refresh-btn" onclick="loadKanban()">↺ Refresh</button>
+        </div>
+        <div class="am-toolbar-row">
+          <span class="tb-label">Sort</span>
+          <select id="am-sort" class="am-sort" onchange="renderAllModels()">
+            <option value="name-asc">Name A→Z</option>
+            <option value="name-desc">Name Z→A</option>
+            <option value="h-desc">Height: tallest first</option>
+            <option value="h-asc">Height: shortest first</option>
+            <option value="w-desc">Weight: heaviest first</option>
+            <option value="w-asc">Weight: lightest first</option>
+            <option value="c-desc">Cock: biggest first</option>
+            <option value="c-asc">Cock: smallest first</option>
+          </select>
+          <span class="tb-sep"></span>
+          <input type="text" id="am-search" class="dup-search-input" placeholder="Search name…" oninput="amOnSearch()" onfocus="this.select()" autocomplete="off" style="max-width:200px">
+          <span id="am-filterbtns"></span>
+          <button class="am-clear" onclick="amClearFilters()">Clear</button>
+        </div>
+        <div class="am-toolbar-row" id="port-wrap" style="display:none">
+          <span class="tb-label">Port shoot tag to Monday</span>
           <select id="port-tag" class="am-sort" title="Shoot tag to port"></select>
           <span class="port-row-wrap">
             <button type="button" id="port-row-btn" class="am-sort" style="max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="event.stopPropagation();toggleRowPicker()">Casting row… ▾</button>
@@ -1262,8 +1273,7 @@
           </span>
           <button class="am-clear" title="Reload casting rows" onclick="portLoadRows(true)">↻</button>
           <button class="am-clear" id="port-btn" style="border-color:var(--accent);color:var(--accent)" onclick="portOpen()">⇪ Port</button>
-        </span>
-        <span class="am-count" id="am-count"></span>
+        </div>
       </div>
       <div id="am-loading" class="dup-loading" style="display:none"><span class="dup-spinner"></span><span id="am-load-status">Loading…</span></div>
       <div class="am-count" id="am-note" style="margin-bottom:8px"></div>
@@ -1639,8 +1649,8 @@ AM_FILTERS.forEach(f=>{ (f.kind==='dropdown'?AM_DD_KEY:AM_ST_KEY)[f.col]=f.key; 
 let amFilters={};            // filter key -> Set of selected option ids (live set for the CURRENT scope)
 // Grid scopes: the same grid view serves ALL MODELS and 5-APPROVED, each with its own filters/search/sort.
 let gridScope='all';
-const GRID_SCOPES={ all:{title:'All Models', ids:null}, '5a':{title:'5-APPROVED', ids:[2,4,105]} };
-let amState={ all:{filters:{},search:'',sort:'name-asc'}, '5a':{filters:{},search:'',sort:'name-asc'} };
+const GRID_SCOPES={ all:{title:'All Models', ids:null}, '2':{title:'2-POTENTIAL', ids:[10], full:true}, '4':{title:'4-REVIEW', ids:[9], full:true}, '5a':{title:'5-APPROVED', ids:[2,4,105], full:true} };
+let amState={ all:{filters:{},search:'',sort:'name-asc'}, '2':{filters:{},search:'',sort:'name-asc'}, '4':{filters:{},search:'',sort:'name-asc'}, '5a':{filters:{},search:'',sort:'name-asc'} };
 let approvedFromGrid=false;
 function setGridScope(scope){
   if(gridScope===scope) return;
@@ -1733,7 +1743,7 @@ function renderAllModels(){
     const cached = m.head && kbHeadCache[m.head];
     const inner = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : `<span class="am-mono">${escapeHtml((m.name[0]||'?').toUpperCase())}</span>`;
     const sub = SF ? (m[SF.raw]||'—') : '';
-    const openFn = (gridScope==='5a') ? 'openApprovedEditor' : 'openKanbanModal';
+    const openFn = (GRID_SCOPES[gridScope] && GRID_SCOPES[gridScope].full) ? 'openApprovedEditor' : 'openKanbanModal';
     return `<div class="am-tile" onclick="${openFn}('${m.id}')"><span class="am-caret">▾</span><div class="am-thumb" id="amthumb-${m.id}"${m.head?` data-head="${m.head}"`:''}>${inner}</div><div class="am-name">${escapeHtml(m.name)}</div><div class="am-sub">${escapeHtml(sub)}</div></div>`;
   }).join('');
   amObserve();
@@ -2372,7 +2382,7 @@ function portBuildPlan(models, slots){
 function portToggleUI(){
   const w=document.getElementById('port-wrap'); if(!w) return;
   const on=(gridScope==='5a');
-  w.style.display=on?'inline-flex':'none';
+  w.style.display=on?'flex':'none';
   if(on){ portPopulateTags(); portLoadRows(false); }
 }
 function portPopulateTags(){
@@ -2395,7 +2405,7 @@ async function portLoadRows(force){
   if(portRowsCache && !force){ portRenderRowBtn(); portRenderRowList(); return; }
   btn.textContent='Loading rows…';
   try{
-    const d=await gql(`{boards(ids:[${CASTING_BOARD_ID}]){items_page(limit:500){items{id name group{id} column_values(ids:["color_mkq0g0sq"]){id ... on StatusValue{index}}}}}`);
+    const d=await gql(`{boards(ids:[${CASTING_BOARD_ID}]){items_page(limit:500){items{id name group{id} column_values(ids:["color_mkq0g0sq"]){id ... on StatusValue{index}}}}}}`);
     portRowsCache=portFilterRows(((d.boards[0]||{}).items_page||{}).items||[]);
     if(portSelectedRowId && !portRowsCache.some(r=>String(r.id)===String(portSelectedRowId))){ portSelectedRowId=''; portSelectedRowName=''; }
     portRenderRowBtn(); portRenderRowList();
@@ -2567,7 +2577,7 @@ async function openApprovedEditor(id){
   show('selector-bar');
   const bb=document.getElementById('back-to-grid-btn'); if(bb) bb.style.display='';
   buildSidebarNav('full');
-  loadCandidatesForMode('5a');   // fills the candidate combo in the background
+  loadCandidatesForMode(currentMode==='2'||currentMode==='4'?currentMode:'5a');   // fills the candidate combo in the background
   await loadCandidate(id);       // shows the full editor: strip, sidebar subitems, all sections
 }
 async function backToApprovedGrid(){
@@ -2977,8 +2987,8 @@ async function setMode(mode){
     if(kbLoadedOnce && kanbanItems.length){ renderAllModels(); } else { loadKanban(); }
     return;
   }
-  if(mode==='5a'){
-    // 5-APPROVED is now a photo grid (approved + all-star + exclusive); tiles open the FULL editor.
+  if(mode==='5a'||mode==='2'||mode==='4'){
+    // 5-APPROVED / 2-POTENTIAL / 4-REVIEW are photo grids; tiles open the FULL editor (v7.16 added 2 + 4).
     hide('selector-bar');
     hide('candidate-strip');
     hide('empty-state');
@@ -2989,7 +2999,7 @@ async function setMode(mode){
     buildSidebarNav('blank');
     document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
     activeGrid='am';
-    setGridScope('5a');
+    setGridScope(mode);
     show('am-view');
     if(kbLoadedOnce && kanbanItems.length){ renderAllModels(); } else { loadKanban(); }
     return;
@@ -4705,6 +4715,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.16: 2-POTENTIAL + 4-REVIEW are now photo grids like 5-APPROVED (same filters/search/sort with per-tab memory, tiles open the FULL editor, ← Back to grid, unsaved-changes guard) — shoot-tags UI stays 5-APPROVED-only (editor block, filter, and Port row all hidden in 2/4). Toolbar tidied into rows: title+count+Refresh, then SORT + search + filters + Clear, then the Port row (label restyled to match SORT, quiet mono small-caps). FIX: casting-row fetch was a malformed GraphQL string (one missing closing brace, shipped in v7.15) → server parse() rejected it → "rows failed"; one brace added, query verified with the real graphql parser.
    v7.15: casting-row picker — searchable dropdown (type to filter, Enter picks first match, ↻ still reloads) showing ONLY active rows from the board’s top "REQUESTS" group; COMPLETED/HOLD/CANCELLED rows are hidden.
    v7.14: Port unblocked — the server /api security allow-list was rejecting the casting board (that was the "rows failed"); it now permits reads/writes on CASTING PRIORITY STACK (8533133380) + its subitem board (8533133826) and the create_subitem mutation, nothing else widened. Port controls now carry a big "PORT SHOOT TAG TO MONDAY" label so they don't read as filters. TWO-FILE release (server.js + index.html).
    v7.13: PORT TO CASTING — in the 5-APPROVED grid pick a shoot tag + a CASTING PRIORITY STACK row, preview who fills which slot (TOP/BOTTOM/VERSE/ALTERNATE from Role: VERSE or TOP+BOTTOM → VERSE slots; lowest empty slot, else creates TYPE<n+1>; already-linked models skipped; tag untouched), then Confirm writes each MODEL NAME link (mirrors auto-fill). Confirm is production-only (Monday rejects staging model ids). Polish: ✕ clears the sidebar field search; field flash holds 3s; ← Back to grid pinned beside Model Status.
