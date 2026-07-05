@@ -121,6 +121,26 @@
   .am-title{font-family:var(--font-display);font-size:20px;font-weight:700}
   .tb-label{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:0.12em;color:var(--text-muted);text-transform:uppercase;white-space:nowrap}
   .tb-sep{width:1px;height:22px;background:var(--border);margin:0 2px;flex:none}
+  /* ── CASTING SANDBOX (v7.17) ── */
+  .mode-btn.sb-btn{border-color:#8657d4;color:#b18ae8}
+  .mode-btn.sb-btn.active{background:#8657d4;color:#fff;border-color:#8657d4}
+  .sb-hint{font-size:11px;color:var(--text-muted);line-height:1.5;max-width:900px}
+  .sb-board{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:14px;align-items:start}
+  .sb-colhead{font-family:var(--font-display);font-weight:800;font-size:14px;letter-spacing:0.06em;padding:8px 10px;border:1px solid var(--border);border-radius:8px 8px 0 0;background:var(--surface);display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+  .sb-althead{font-family:var(--font-mono);font-weight:700;font-size:10px;letter-spacing:0.12em;color:var(--text-muted);padding:6px 10px 2px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+  .sb-cnt{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);font-weight:400}
+  .sb-zone{min-height:110px;border:1px dashed var(--border);border-top:none;border-radius:0 0 8px 8px;padding:8px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;background:rgba(255,255,255,.015)}
+  .sb-zone.sb-altzone{border:1px dashed var(--border);border-radius:8px;min-height:74px;opacity:.9}
+  .sb-zone.over{border-color:var(--accent);background:rgba(255,120,60,.06)}
+  .sb-tile{width:86px;cursor:grab;user-select:none;border:2px solid transparent;border-radius:8px;padding:3px;text-align:center}
+  .sb-tile:active{cursor:grabbing}
+  .sb-tile.sel{border-color:var(--accent);background:rgba(255,120,60,.10)}
+  .sb-thumb{width:80px;height:80px;border-radius:6px;overflow:hidden;background:var(--surface);margin:0 auto}
+  .sb-thumb img{width:100%;height:100%;object-fit:cover;pointer-events:none}
+  .sb-name{font-size:10px;line-height:1.25;margin-top:3px;word-break:break-word;max-height:26px;overflow:hidden}
+  .port-name-input{background:var(--surface);border:1px solid var(--border);border-radius:5px;color:inherit;font:inherit;font-size:12px;padding:2px 6px;width:130px}
+  .port-name-input:focus{border-color:var(--accent);outline:none}
+  @media (max-width:760px){ .sb-board{grid-template-columns:1fr} }
   #am-filterbtns{display:contents}
   .am-fwrap{position:relative}
   .am-fbtn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:7px 10px;font-family:var(--font-mono);font-size:11px;cursor:pointer;white-space:nowrap}
@@ -672,6 +692,7 @@
     <button class="mode-btn batch-btn" data-mode="batch" onclick="setMode('batch')">EVERNOTE BATCH IMPORT</button>
     <button class="mode-btn kanban-btn" data-mode="kanban" onclick="setMode('kanban')">KANBAN</button>
     <button class="mode-btn dup-btn" data-mode="dup" onclick="setMode('dup')">DUPLICATES</button>
+    <button class="mode-btn sb-btn" data-mode="sb" onclick="setMode('sb')">CASTING SANDBOX</button>
   </div>
 
   <div class="save-area">
@@ -1281,6 +1302,37 @@
       <div id="am-empty" class="am-empty" style="display:none">No matching results</div>
     </div>
 
+    <!-- CASTING SANDBOX (v7.17): visual drag-to-arrange per shoot tag; share via #sb= link; port with per-column types -->
+    <div id="sb-view" style="display:none">
+      <div class="am-toolbar">
+        <div class="am-toolbar-row">
+          <div class="am-title">Casting Sandbox</div>
+          <span class="am-count" id="sb-count"></span>
+          <button class="dup-refresh-btn" onclick="loadKanban()">↺ Refresh</button>
+        </div>
+        <div class="am-toolbar-row">
+          <span class="tb-label">Shoot tag</span>
+          <select id="sb-tag" class="am-sort" onchange="sbTagChanged()"></select>
+          <span class="tb-sep"></span>
+          <button class="am-clear" onclick="sbCopyLink()">🔗 Copy share link</button>
+          <span class="tb-sep"></span>
+          <span class="tb-label">Port to</span>
+          <span class="port-row-wrap">
+            <button type="button" id="sb-row-btn" class="am-sort" style="max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="event.stopPropagation();sbToggleRowPicker()">Casting row… ▾</button>
+            <div class="shoot-picker port-row-picker" id="sb-row-picker" onclick="event.stopPropagation()">
+              <input type="text" id="sb-row-search" placeholder="Search active rows…" autocomplete="off" oninput="sbRenderRowList()" onkeydown="if(event.key==='Enter'){event.preventDefault();sbRowEnter();}">
+              <div class="shoot-picker-list" id="sb-row-list"></div>
+            </div>
+          </span>
+          <button class="am-clear" title="Reload casting rows" onclick="portLoadRows(true)">↻</button>
+          <button class="am-clear" style="border-color:var(--accent);color:var(--accent)" onclick="sbPortOpen()">⇪ Port this arrangement</button>
+        </div>
+        <div class="sb-hint">Drag tiles between columns (or tap a tile, then tap a column). Nothing is written to Monday until you Port — the subitem TYPE comes from the column each person sits in <i>here</i>, not their profile. “Copy share link” encodes this exact arrangement into the link; anyone with the app passphrase can open it, adjust, and send a link back.</div>
+      </div>
+      <div id="sb-empty" class="am-empty">Pick a shoot tag to load its people.</div>
+      <div id="sb-board" class="sb-board" style="display:none"></div>
+    </div>
+
     <!-- Kanban/All-Models editor modal — top-level so it renders from ANY tab (was nested inside kanban-view, which display:none'd it on the All Models tab) -->
     <div id="kb-modal" class="kb-modal">
       <div class="kb-modal-panel">
@@ -1667,7 +1719,7 @@ function setGridScope(scope){
 let amSearchTimer=null;
 let amIO=null; const amPending=new Set(); let amFlushTimer=null;
 let activeGrid=null;         // 'kanban' | 'am' | null — which board-wide view is on screen
-function refreshActiveView(){ if(activeGrid==='kanban') renderKanban(); else if(activeGrid==='am') renderAllModels(); }
+function refreshActiveView(){ if(activeGrid==='kanban') renderKanban(); else if(activeGrid==='am') renderAllModels(); else if(activeGrid==='sb') renderSandbox(); }
 
 // Pure filter+sort. Multiple picks within a filter = match ANY; across filters = must match ALL; search stacks on top.
 // Measurement sorts put models with no value at the end in BOTH directions; ties break alphabetically.
@@ -2098,7 +2150,7 @@ function kbRenderPhotoActions(){
   } else if(kbRechooseMode){
     el.innerHTML = `<button class="kb-hs-cancel" onclick="kbCancelRechoose()">Cancel</button><span class="kb-hint">Click the photo you want as the headshot.</span>`;
   } else {
-    el.innerHTML = `<button class="kb-change-hs" onclick="kbStartRechoose()">★ Change headshot</button>` + upload;
+    el.innerHTML = `<button class="kb-change-hs" onclick="kbStartRechoose()">★ Change headshot</button><button class="kb-change-hs" onclick="kbOpenRecrop()">✂ Recrop</button>` + upload;
   }
 }
 function kbPhotoClick(n){
@@ -2192,10 +2244,21 @@ async function kbUploadPhoto(kind, input){
 
 // ── Headshot recrop (v7.12): drag a square, the crop becomes the new headshot; original kept in Extra pictures ──
 let rcState=null;
-async function openRecrop(){
-  const hs=(candidatePhotos||[]).find(p=>p.isHeadshot);
+function kbOpenRecrop(){
+  const hs=(kbModalPhotos||[]).find(p=>p.isHeadshot);
   if(!hs){ showToast('No headshot to recrop','error'); return; }
-  if(!currentItem) return;
+  openRecrop(kbModalItemId, hs.assetId);
+}
+async function openRecrop(itemIdArg, headIdArg){
+  // v7.17: callable from the kanban/all-models modal too — pass itemId + headshot assetId
+  // explicitly; with no args it derives them from the full editor's state as before.
+  let itemId=null, headId=null;
+  if(itemIdArg!=null){ itemId=String(itemIdArg); headId=headIdArg; }
+  else {
+    const hs=(candidatePhotos||[]).find(p=>p.isHeadshot);
+    if(hs && currentItem){ itemId=String(currentItem.id); headId=hs.assetId; }
+  }
+  if(!itemId || !headId){ showToast('No headshot to recrop','error'); return; }
   const modal=document.getElementById('recrop-modal'); modal.classList.add('open');
   const img=document.getElementById('recrop-img'); const st=document.getElementById('recrop-status');
   st.textContent='Loading image…'; img.removeAttribute('src');
@@ -2204,7 +2267,7 @@ async function openRecrop(){
   try{
     // S3 public_url has no CORS headers → canvas would be tainted. /asset-bytes streams the
     // same bytes from OUR origin so the pixels are readable.
-    const r=await fetch('/asset-bytes?assetId='+hs.assetId,{headers:{'X-App-Auth':APP_PW}});
+    const r=await fetch('/asset-bytes?assetId='+headId,{headers:{'X-App-Auth':APP_PW}});
     if(!r.ok) throw new Error('image fetch failed ('+r.status+')');
     const blob=await r.blob();
     if(rcState&&rcState.url) URL.revokeObjectURL(rcState.url);
@@ -2214,7 +2277,7 @@ async function openRecrop(){
     const dw=img.clientWidth, dh=img.clientHeight;
     if(!dw||!dh) throw new Error('image failed to lay out');
     const s=Math.round(Math.min(dw,dh)*0.8);
-    rcState={url, itemId:currentItem.id, headId:hs.assetId, dw, dh, box:{x:Math.round((dw-s)/2), y:Math.round((dh-s)/2), s}, drag:null};
+    rcState={url, itemId, headId, dw, dh, box:{x:Math.round((dw-s)/2), y:Math.round((dh-s)/2), s}, drag:null};
     document.getElementById('recrop-box').style.display='';
     rcApply(); st.textContent=''; document.getElementById('recrop-save').disabled=false;
   }catch(e){ st.textContent='Error: '+(e.message||String(e)); }
@@ -2271,15 +2334,24 @@ async function saveRecrop(){
     st.textContent='Setting as headshot on Monday… (a few seconds)';
     await rearrangePhotos(itemId,[newId],[oldHead,...extrasBefore].filter(x=>x!=null));
     st.textContent='Refreshing…';
-    await loadCandidatePhotos(itemId);
-    refreshHeadEverywhere(itemId);
+    const kbOpen=document.getElementById('kb-modal').classList.contains('open') && String(kbModalItemId)===String(itemId);
+    if(kbOpen){
+      await kbLoadModalPhotos(itemId);   // re-renders the modal photo grid from Monday
+      const hs2=(kbModalPhotos||[]).find(p=>p.isHeadshot);
+      refreshHeadEverywhere(itemId, hs2);
+      const th=document.querySelector('#kb-modal .kb-modal-thumb'); if(th&&hs2) th.innerHTML=`<img src="${escapeHtml(hs2.url)}" alt="">`;
+    } else {
+      await loadCandidatePhotos(itemId);
+      refreshHeadEverywhere(itemId);
+    }
     closeRecrop();
     showToast('Headshot recropped ✓ (original kept in Extra pictures)','success');
   }catch(e){ st.textContent='Error: '+(e.message||String(e)); btn.disabled=false; }
 }
 // After a recrop/photo change, update the shared store + any grid/kanban tiles for this item.
-function refreshHeadEverywhere(itemId){
-  const hs=(candidatePhotos||[]).find(p=>p.isHeadshot);
+// hsOpt (v7.17): pass the headshot explicitly when the full editor's candidatePhotos isn't the source of truth.
+function refreshHeadEverywhere(itemId, hsOpt){
+  const hs=hsOpt||((candidatePhotos||[]).find(p=>p.isHeadshot));
   const m=(typeof kanbanItems!=='undefined'&&kanbanItems)?kanbanItems.find(x=>String(x.id)===String(itemId)):null;
   if(m) m.head=hs?hs.assetId:null;
   if(hs){
@@ -2359,7 +2431,7 @@ function portDecideType(roleLabels){
   if(hasBottom) return 'BOTTOM';
   return 'ALTERNATE';
 }
-function portBuildPlan(models, slots){
+function portBuildPlan(models, slots, typeOf){
   const parsed=[]; const linkedAll=new Set();
   for(const s of slots){
     (s.linked||[]).forEach(id=>linkedAll.add(String(id)));
@@ -2371,7 +2443,7 @@ function portBuildPlan(models, slots){
   const actions=[], skipped=[];
   for(const m of models){
     if(linkedAll.has(String(m.id))){ skipped.push({model:m, reason:'already on this row'}); continue; }
-    const type=portDecideType(m.roleLabels);
+    const type=typeOf ? typeOf(m) : portDecideType(m.roleLabels);
     const free=parsed.filter(p=>p.type===type && p.empty && !claimed.has(p.id)).sort((a,b)=>a.num-b.num)[0];
     if(free){ claimed.add(free.id); actions.push({model:m, type, mode:'fill', slotId:free.id, slotName:free.name}); }
     else { const n=(maxNum[type]||0)+1; maxNum[type]=n; actions.push({model:m, type, mode:'create', slotName:type+n}); }
@@ -2402,26 +2474,28 @@ function portFilterRows(items){
 let portSelectedRowId='', portSelectedRowName='', portRowOpts=[];
 async function portLoadRows(force){
   const btn=document.getElementById('port-row-btn'); if(!btn) return;
-  if(portRowsCache && !force){ portRenderRowBtn(); portRenderRowList(); return; }
+  if(portRowsCache && !force){ portRenderRowBtn(); portRenderRowList(); sbRenderRowList(); return; }
   btn.textContent='Loading rows…';
   try{
     const d=await gql(`{boards(ids:[${CASTING_BOARD_ID}]){items_page(limit:500){items{id name group{id} column_values(ids:["color_mkq0g0sq"]){id ... on StatusValue{index}}}}}}`);
     portRowsCache=portFilterRows(((d.boards[0]||{}).items_page||{}).items||[]);
     if(portSelectedRowId && !portRowsCache.some(r=>String(r.id)===String(portSelectedRowId))){ portSelectedRowId=''; portSelectedRowName=''; }
-    portRenderRowBtn(); portRenderRowList();
-  }catch(e){ btn.textContent='rows failed — ↻ to retry'; console.warn('port rows load failed', e); }
+    portRenderRowBtn(); portRenderRowList(); sbRenderRowList();
+  }catch(e){ ['port-row-btn','sb-row-btn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.textContent='rows failed — ↻ to retry'; }); console.warn('port rows load failed', e); }
 }
 function portRenderRowBtn(){
-  const btn=document.getElementById('port-row-btn'); if(!btn) return;
-  btn.textContent=portSelectedRowName||'Casting row… ▾';
-  btn.title=portSelectedRowName||'Pick a CASTING PRIORITY STACK row (active/REQUESTS group only)';
+  ['port-row-btn','sb-row-btn'].forEach(id=>{
+    const btn=document.getElementById(id); if(!btn) return;
+    btn.textContent=portSelectedRowName||'Casting row… ▾';
+    btn.title=portSelectedRowName||'Pick a CASTING PRIORITY STACK row (active/REQUESTS group only)';
+  });
 }
 function toggleRowPicker(){
   const p=document.getElementById('port-row-picker'); if(!p) return;
   const open=p.classList.toggle('open');
   if(open){ const s=document.getElementById('port-row-search'); if(s){ s.value=''; s.focus(); } portRenderRowList(); }
 }
-function closeRowPicker(){ const p=document.getElementById('port-row-picker'); if(p) p.classList.remove('open'); }
+function closeRowPicker(){ ['port-row-picker','sb-row-picker'].forEach(id=>{ const p=document.getElementById(id); if(p) p.classList.remove('open'); }); }
 function portRenderRowList(){
   const list=document.getElementById('port-row-list'); if(!list) return;
   const q=((document.getElementById('port-row-search')||{}).value||'').trim().toLowerCase();
@@ -2434,6 +2508,122 @@ function portRowPick(n){
   portRenderRowBtn(); closeRowPicker();
 }
 function portRowEnter(){ if(portRowOpts.length) portRowPick(0); }
+
+/* ══ CASTING SANDBOX (v7.17) ══════════════════════════════════════════════
+   Visual-only arrangement per shoot tag. Three columns (BOTTOM/VERS/TOP) each
+   with an ALTERNATES zone below. Drag tiles (or tap tile → tap column) to move.
+   NOTHING is written to Monday until ⇪ Port — and then the subitem TYPE comes
+   from the column the person sits in HERE (shoot-specific), not their profile.
+   Share: the whole arrangement is encoded into a #sb= URL — stateless, so it
+   survives server restarts; the recipient logs in with the app passphrase,
+   sees it, can adjust, and can copy a new link back. */
+let sbState={tag:null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}};
+let sbPending=null, sbSelected=null;
+const SB_MAIN=[['b','BOTTOM'],['v','VERS'],['t','TOP']];
+const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',ab:'ALTERNATE',av:'ALTERNATE',at:'ALTERNATE'};
+function sbEncode(){ const p={t:sbState.tag,z:sbState.zones}; return btoa(unescape(encodeURIComponent(JSON.stringify(p)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function sbDecode(s){ try{ return JSON.parse(decodeURIComponent(escape(atob(String(s||'').replace(/-/g,'+').replace(/_/g,'/'))))); }catch(e){ return null; } }
+function sbInitUI(){
+  const sel=document.getElementById('sb-tag'); if(!sel) return;
+  const cur=sel.value;
+  const opts=(boardDropdownOptions[SHOOT_COL]||[]).slice().sort((a,b)=>String(a.label).localeCompare(String(b.label)));
+  sel.innerHTML='<option value="">Shoot tag…</option>'+opts.map(o=>`<option value="${o.id}">${escapeHtml(String(o.label))}</option>`).join('');
+  if(cur) sel.value=cur; else if(sbState.tag) sel.value=String(sbState.tag);
+  portLoadRows(false);
+}
+function sbMembers(tagId){
+  const roleOpts=boardDropdownOptions['dropdown_mknbe0p0']||[];
+  return kanbanItems
+    .filter(m=>GRID_SCOPES['5a'].ids.includes(m.statusIdx) && m.f && Array.isArray(m.f.shoot) && m.f.shoot.includes(Number(tagId)))
+    .map(m=>({id:String(m.id), name:m.name, head:m.head, roleLabels:(m.f.role||[]).map(rid=>{const o=roleOpts.find(x=>Number(x.id)===Number(rid)); return o?String(o.label):'';}).filter(Boolean)}))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+}
+function sbDefaultZone(roleLabels){ const t=portDecideType(roleLabels); return t==='VERSE'?'v':t==='TOP'?'t':t==='BOTTOM'?'b':'av'; }
+function sbTagChanged(){
+  const v=document.getElementById('sb-tag').value;
+  sbState={tag:v||null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}};
+  sbSelected=null;
+  renderSandbox();
+}
+// Keep zones consistent with reality: drop ids that lost the tag/status, dedupe, default-place new ones.
+function sbSyncMembership(){
+  if(!sbState.tag) return [];
+  const mem=sbMembers(sbState.tag); const byId={}; mem.forEach(m=>byId[m.id]=m);
+  const seen=new Set();
+  for(const z of Object.keys(sbState.zones)){
+    sbState.zones[z]=(sbState.zones[z]||[]).map(String).filter(id=>{ if(!byId[id]||seen.has(id)) return false; seen.add(id); return true; });
+  }
+  mem.forEach(m=>{ if(!seen.has(m.id)) sbState.zones[sbDefaultZone(m.roleLabels)].push(m.id); });
+  return mem;
+}
+async function renderSandbox(){
+  const board=document.getElementById('sb-board'), empty=document.getElementById('sb-empty'); if(!board) return;
+  if(!kanbanItems.length){ empty.style.display=''; empty.textContent='Loading board…'; board.style.display='none'; return; }
+  if(sbPending){
+    const p=sbPending; sbPending=null;
+    sbState={tag:(p&&p.t)?String(p.t):null, zones:Object.assign({b:[],v:[],t:[],ab:[],av:[],at:[]}, (p&&p.z)||{})};
+    const sel=document.getElementById('sb-tag'); if(sel&&sbState.tag) sel.value=String(sbState.tag);
+  }
+  if(!sbState.tag){ empty.style.display=''; empty.textContent='Pick a shoot tag to load its people.'; board.style.display='none'; const c=document.getElementById('sb-count'); if(c)c.textContent=''; return; }
+  const mem=sbSyncMembership(); const byId={}; mem.forEach(m=>byId[m.id]=m);
+  const c=document.getElementById('sb-count'); if(c) c.textContent=mem.length?mem.length+' people':'';
+  if(!mem.length){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag (approved statuses only). Tag people in the 5-APPROVED editor first.'; board.style.display='none'; return; }
+  empty.style.display='none'; board.style.display='';
+  const tile=id=>{ const m=byId[id]; const url=(m&&m.head)?(kbHeadCache[String(m.head)]||''):''; return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div></div>`; };
+  board.innerHTML=SB_MAIN.map(([z,label])=>`
+    <div class="sb-colwrap">
+      <div class="sb-colhead" data-zone="${z}" onclick="sbZoneClick('${z}')">${label} <span class="sb-cnt">${sbState.zones[z].length}</span></div>
+      <div class="sb-zone" data-zone="${z}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event)" onclick="sbZoneClick('${z}')">${sbState.zones[z].map(tile).join('')}</div>
+      <div class="sb-althead" data-zone="a${z}" onclick="sbZoneClick('a${z}')">ALTERNATES <span class="sb-cnt">${sbState.zones['a'+z].length}</span></div>
+      <div class="sb-zone sb-altzone" data-zone="a${z}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event)" onclick="sbZoneClick('a${z}')">${sbState.zones['a'+z].map(tile).join('')}</div>
+    </div>`).join('');
+  const missing=mem.filter(m=>m.head && !kbHeadCache[String(m.head)]).map(m=>m.head);
+  if(missing.length){ try{ await fetchAssetUrls(missing); renderSandbox(); }catch(e){} }
+}
+function sbDragStart(e){ const t=e.target.closest('.sb-tile'); if(!t) return; e.dataTransfer.setData('text/plain', t.dataset.id); e.dataTransfer.effectAllowed='move'; }
+function sbDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('over'); e.dataTransfer.dropEffect='move'; }
+function sbDragLeave(e){ e.currentTarget.classList.remove('over'); }
+function sbDrop(e){ e.preventDefault(); e.currentTarget.classList.remove('over'); const id=e.dataTransfer.getData('text/plain'); sbMove(id, e.currentTarget.dataset.zone); }
+function sbMove(id,zone){
+  if(!id || !sbState.zones[zone]) return;
+  for(const z of Object.keys(sbState.zones)) sbState.zones[z]=sbState.zones[z].filter(x=>String(x)!==String(id));
+  sbState.zones[zone].push(String(id));
+  sbSelected=null;
+  renderSandbox();
+}
+function sbTileClick(e,id){ e.stopPropagation(); sbSelected=(sbSelected===id)?null:id; renderSandbox(); }   // tap-to-move fallback (touch)
+function sbZoneClick(zone){ if(sbSelected) sbMove(sbSelected, zone); }
+function sbCopyLink(){
+  if(!sbState.tag){ showToast('Pick a shoot tag first','error'); return; }
+  const url=location.origin+location.pathname+'#sb='+sbEncode();
+  const fallback=()=>{ try{ prompt('Copy this link:', url); }catch(e){} };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(()=>showToast('Share link copied ✓','success')).catch(fallback);
+  else fallback();
+}
+// Sandbox row picker — thin wrappers over the shared picker state, with sb- element ids.
+function sbToggleRowPicker(){
+  const p=document.getElementById('sb-row-picker'); if(!p) return;
+  const open=p.classList.toggle('open');
+  if(open){ const s=document.getElementById('sb-row-search'); if(s){ s.value=''; s.focus(); } sbRenderRowList(); }
+}
+function sbRenderRowList(){
+  const list=document.getElementById('sb-row-list'); if(!list) return;
+  const q=((document.getElementById('sb-row-search')||{}).value||'').trim().toLowerCase();
+  portRowOpts=(portRowsCache||[]).filter(r=>!q||r.name.toLowerCase().includes(q));
+  list.innerHTML=portRowOpts.map((r,n)=>`<div class="shoot-opt${String(r.id)===String(portSelectedRowId)?' sel':''}" onclick="portRowPick(${n})">${String(r.id)===String(portSelectedRowId)?'✓ ':''}${escapeHtml(r.name)}</div>`).join('')||'<div class="shoot-opt dim">no matching active rows</div>';
+}
+function sbRowEnter(){ if(portRowOpts.length) portRowPick(0); }
+async function sbPortOpen(){
+  if(!sbState.tag){ showToast('Pick a shoot tag first','error'); return; }
+  if(!portSelectedRowId){ showToast('Pick a casting row first','error'); return; }
+  const mem=sbSyncMembership(); const byId={}; mem.forEach(m=>byId[m.id]=m);
+  const order=['b','v','t','ab','av','at'];
+  const entries=[]; order.forEach(z=>sbState.zones[z].forEach(id=>{ const m=byId[id]; if(m) entries.push({model:m, type:SB_TYPE[z]}); }));
+  if(!entries.length){ showToast('Nothing to port','error'); return; }
+  const typeById={}; entries.forEach(en=>typeById[String(en.model.id)]=en.type);
+  const tagOpt=(boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.id)===String(sbState.tag));
+  await portShowPlan(entries.map(en=>en.model), m=>typeById[String(m.id)], `Sandbox “${tagOpt?tagOpt.label:sbState.tag}” → row “${portSelectedRowName||portSelectedRowId}”`);
+}
 async function portOpen(){
   const tagSel=document.getElementById('port-tag');
   const tagId=tagSel&&tagSel.value, rowId=portSelectedRowId;
@@ -2447,20 +2637,36 @@ async function portOpen(){
     .filter(m=>scopeIds.includes(m.statusIdx) && m.f && Array.isArray(m.f.shoot) && m.f.shoot.includes(Number(tagId)))
     .map(m=>({id:m.id, name:m.name, roleLabels:(m.f.role||[]).map(rid=>{const o=roleOpts.find(x=>Number(x.id)===Number(rid)); return o?String(o.label):'';}).filter(Boolean)}))
     .sort((a,b)=>a.name.localeCompare(b.name));
+  if(!models.length){
+    const modal=document.getElementById('port-modal'); modal.classList.add('open');
+    document.getElementById('port-sub').textContent=`Tag “${tagOpt?tagOpt.label:tagId}” → row “${rowName}”`;
+    document.getElementById('port-status').textContent='';
+    document.getElementById('port-confirm').disabled=true;
+    document.getElementById('port-list').innerHTML='<div class="port-skip">No approved models carry this shoot tag. Tag people in the editor first, then port.</div>';
+    portPlan=null; return;
+  }
+  await portShowPlan(models, null, `Tag “${tagOpt?tagOpt.label:tagId}” → row “${rowName}”`);
+}
+
+// Shared preview builder: reads the row's slots, plans, and renders the confirm modal.
+// typeOf (optional) forces the subitem TYPE per model (used by the sandbox — column placement wins).
+// Every planned subitem name is an editable input; edits apply at Confirm (v7.17).
+async function portShowPlan(models, typeOf, subtitle){
+  const rowId=portSelectedRowId, rowName=portSelectedRowName||rowId;
   const modal=document.getElementById('port-modal'); modal.classList.add('open');
   const list=document.getElementById('port-list'), sub=document.getElementById('port-sub'), st=document.getElementById('port-status');
   const btn=document.getElementById('port-confirm');
   btn.disabled=true; btn.textContent='Confirm — write to Monday'; st.textContent='';
-  sub.textContent=`Tag “${tagOpt?tagOpt.label:tagId}” → row “${rowName}”`;
+  sub.textContent=subtitle;
   portPlan=null;
-  if(!models.length){ list.innerHTML='<div class="port-skip">No approved models carry this shoot tag. Tag people in the editor first, then port.</div>'; return; }
   list.innerHTML='<div class="port-skip">Reading row slots…</div>';
   try{
     const d=await gql(`{items(ids:[${rowId}]){subitems{id name column_values(ids:["${CASTING_LINK_COL}"]){id ... on BoardRelationValue{linked_item_ids}}}}}`);
     const slots=(((d.items||[])[0]||{}).subitems||[]).map(s=>({id:s.id,name:s.name,linked:(((s.column_values||[])[0])||{}).linked_item_ids||[]}));
-    const plan=portBuildPlan(models, slots);
+    const plan=portBuildPlan(models, slots, typeOf);
+    plan.actions.forEach(a=>{ a.origName=a.slotName; });
     portPlan={rowId, rowName, actions:plan.actions, skipped:plan.skipped};
-    const rows=plan.actions.map(a=>`<div class="port-row">${escapeHtml(a.model.name)} <span class="port-skip">→ ${a.type}</span> ${a.mode==='fill'?`fills <b>${escapeHtml(a.slotName)}</b>`:`creates <b>${escapeHtml(a.slotName)}</b>`}</div>`).join('');
+    const rows=plan.actions.map((a,i)=>`<div class="port-row">${escapeHtml(a.model.name)} <span class="port-skip">→ ${a.type}</span> ${a.mode==='fill'?'fills':'creates'} <input class="port-name-input" data-pi="${i}" value="${escapeHtml(a.slotName)}" maxlength="60" title="Edit the subitem name before confirming">${a.mode==='fill'?'':' <span class="port-skip">(new)</span>'}</div>`).join('');
     const skips=plan.skipped.map(s=>`<div class="port-row port-skip">${escapeHtml(s.model.name)} — skipped (${s.reason})</div>`).join('');
     list.innerHTML=(rows+skips)||'<div class="port-skip">Nothing to do.</div>';
     const note=document.getElementById('port-staging-note');
@@ -2476,6 +2682,12 @@ async function portOpen(){
 }
 async function portConfirm(){
   if(!portPlan||!portPlan.actions.length) return;
+  // Pull any name edits from the preview inputs before writing (v7.17).
+  document.querySelectorAll('#port-list .port-name-input').forEach(inp=>{
+    const i=Number(inp.dataset.pi); const v=(inp.value||'').trim();
+    if(portPlan.actions[i] && v) portPlan.actions[i].slotName=v;
+    inp.disabled=true;
+  });
   const st=document.getElementById('port-status'), btn=document.getElementById('port-confirm');
   const list=document.getElementById('port-list');
   btn.disabled=true;
@@ -2489,8 +2701,10 @@ async function portConfirm(){
         const cr=await gql(`mutation($p:ID!,$n:String!){create_subitem(parent_item_id:$p,item_name:$n){id}}`,{p:portPlan.rowId,n:a.slotName});
         slotId=cr.create_subitem.id;
       }
+      const cvObj={[CASTING_LINK_COL]:{item_ids:[Number(a.model.id)]}};
+      if(a.mode==='fill' && a.origName!==a.slotName) cvObj.name=a.slotName;   // rename an existing slot the user edited
       await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
-        {i:slotId,b:CASTING_SUBITEM_BOARD_ID,c:JSON.stringify({[CASTING_LINK_COL]:{item_ids:[Number(a.model.id)]}})});
+        {i:slotId,b:CASTING_SUBITEM_BOARD_ID,c:JSON.stringify(cvObj)});
       a.done=true; ok++;
     }catch(e){ a.err=e.message||String(e); errs++; }
   }
@@ -2821,6 +3035,11 @@ async function init(){
     buildAllDropdowns();
     // Candidates load on first mode click (per-mode lazy cache)
     hide('loading-screen');
+    // v7.17: a #sb= share link opens straight into the Casting Sandbox with that arrangement.
+    if((location.hash||'').startsWith('#sb=')){
+      const p=sbDecode(location.hash.slice(4));
+      if(p){ sbPending=p; setMode('sb'); }
+    }
   }catch(e){
     document.querySelector('#loading-screen .loading-text').textContent='Connection failed: '+e.message;
     console.error(e);
@@ -2953,6 +3172,7 @@ async function setMode(mode){
   resetForm();
   hide('kanban-view');
   hide('am-view');
+  hide('sb-view');
   activeGrid=null;
   approvedFromGrid=false;
   { const _bb=document.getElementById('back-to-grid-btn'); if(_bb) _bb.style.display='none'; }
@@ -2985,6 +3205,23 @@ async function setMode(mode){
     setGridScope('all');
     show('am-view');
     if(kbLoadedOnce && kanbanItems.length){ renderAllModels(); } else { loadKanban(); }
+    return;
+  }
+  if(mode==='sb'){
+    // CASTING SANDBOX (v7.17): visual-only drag arrangement per shoot tag; nothing written until Port.
+    hide('selector-bar');
+    hide('candidate-strip');
+    hide('empty-state');
+    hide('full-view');
+    hide('interview-view');
+    hide('new-model-view');
+    hide('dup-view');
+    buildSidebarNav('blank');
+    document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
+    activeGrid='sb';
+    show('sb-view');
+    sbInitUI();
+    if(kbLoadedOnce && kanbanItems.length){ renderSandbox(); } else { loadKanban(); }
     return;
   }
   if(mode==='5a'||mode==='2'||mode==='4'){
@@ -4715,6 +4952,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.17: CASTING SANDBOX tab — pick a shoot tag, drag people between BOTTOM/VERS/TOP columns (+ per-column ALTERNATES); visual only until ⇪ Port, where the subitem TYPE comes from the column each person sits in HERE (shoot-specific casting); share the exact arrangement via a copy-link (#sb= encoded, needs the app passphrase to open); port preview subitem names are now EDITABLE before Confirm (create uses the edited name, fill renames the existing slot); ✂ Recrop added to the Kanban/All-Models editor modal (2-POTENTIAL/4-REVIEW already had it via the full editor).
    v7.16: 2-POTENTIAL + 4-REVIEW are now photo grids like 5-APPROVED (same filters/search/sort with per-tab memory, tiles open the FULL editor, ← Back to grid, unsaved-changes guard) — shoot-tags UI stays 5-APPROVED-only (editor block, filter, and Port row all hidden in 2/4). Toolbar tidied into rows: title+count+Refresh, then SORT + search + filters + Clear, then the Port row (label restyled to match SORT, quiet mono small-caps). FIX: casting-row fetch was a malformed GraphQL string (one missing closing brace, shipped in v7.15) → server parse() rejected it → "rows failed"; one brace added, query verified with the real graphql parser.
    v7.15: casting-row picker — searchable dropdown (type to filter, Enter picks first match, ↻ still reloads) showing ONLY active rows from the board’s top "REQUESTS" group; COMPLETED/HOLD/CANCELLED rows are hidden.
    v7.14: Port unblocked — the server /api security allow-list was rejecting the casting board (that was the "rows failed"); it now permits reads/writes on CASTING PRIORITY STACK (8533133380) + its subitem board (8533133826) and the create_subitem mutation, nothing else widened. Port controls now carry a big "PORT SHOOT TAG TO MONDAY" label so they don't read as filters. TWO-FILE release (server.js + index.html).

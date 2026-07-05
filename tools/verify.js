@@ -126,8 +126,29 @@ lacks(`class="port-label"`, 'old loud port-label markup removed');
 has(`StatusValue{index}}}}}}\``, 'casting query has the fixed brace count (6 closers)');
 has(`loadCandidatesForMode(currentMode==='2'||currentMode==='4'?currentMode:'5a')`, 'approved editor combo loads per-mode');
 has('v7.16:', 'v7.16 deploy marker present');
+/* v7.17 asserts */
+has('v7.17:', 'v7.17 deploy marker present');
+has(`if(mode==='sb'){`, 'setMode routes CASTING SANDBOX');
+has(`hide('sb-view');`, 'setMode common section hides sb-view');
+has(`else if(activeGrid==='sb') renderSandbox();`, 'refreshActiveView refreshes sandbox');
+has(`data-mode="sb"`, 'CASTING SANDBOX tab button present');
+has(`function portBuildPlan(models, slots, typeOf)`, 'portBuildPlan accepts typeOf override');
+has(`const type=typeOf ? typeOf(m) : portDecideType(m.roleLabels);`, 'typed override falls back to role-based decision');
+has(`async function portShowPlan(models, typeOf, subtitle)`, 'shared portShowPlan exists');
+has(`await portShowPlan(models, null,`, 'portOpen routes through portShowPlan (role-based)');
+has(`m=>typeById[String(m.id)]`, 'sandbox port forces column-based types');
+has(`.port-name-input`, 'port preview names are editable inputs'); 
+has(`if(a.mode==='fill' && a.origName!==a.slotName) cvObj.name=a.slotName;`, 'fill-mode rename on edited names');
+has(`function kbOpenRecrop()`, 'kanban-modal recrop entry exists');
+has(`✂ Recrop</button>`, 'kanban-modal has the ✂ Recrop button');
+has(`async function openRecrop(itemIdArg, headIdArg)`, 'openRecrop generalized for modal callers');
+has(`function refreshHeadEverywhere(itemId, hsOpt)`, 'refreshHeadEverywhere accepts explicit headshot');
+has(`const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',ab:'ALTERNATE',av:'ALTERNATE',at:'ALTERNATE'};`, 'sandbox column→TYPE map (VERSE naming kept)');
+has(`location.hash||'').startsWith('#sb=')`, 'share-link boot hook present');
+has(`sbRenderRowList(); return;`, 'portLoadRows refreshes the sandbox picker too');
 // Guard against duplicate element ids from the toolbar rebuild:
-['am-title','am-search','am-sort','am-count','am-filterbtns','port-wrap','port-tag','port-btn','port-row-btn','port-row-picker','port-row-search','port-row-list'].forEach(id=>{
+['am-title','am-search','am-sort','am-count','am-filterbtns','port-wrap','port-tag','port-btn','port-row-btn','port-row-picker','port-row-search','port-row-list',
+ 'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list'].forEach(id=>{
   const c = (src.match(new RegExp('id="' + id + '"', 'g')) || []).length;
   c === 1 ? ok(`id "${id}" unique`) : bad(`id "${id}" appears ${c} times`);
 });
