@@ -146,9 +146,22 @@ has(`function refreshHeadEverywhere(itemId, hsOpt)`, 'refreshHeadEverywhere acce
 has(`const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',ab:'ALTERNATE',av:'ALTERNATE',at:'ALTERNATE'};`, 'sandbox column→TYPE map (VERSE naming kept)');
 has(`location.hash||'').startsWith('#sb=')`, 'share-link boot hook present');
 has(`sbRenderRowList(); return;`, 'portLoadRows refreshes the sandbox picker too');
+/* v7.18 asserts */
+has('v7.18:', 'v7.18 deploy marker present');
+has('async function fetchAssetUrls(assetIds, opts)', 'fetchAssetUrls takes optional opts');
+has('if(opts.onProgress){ try{ opts.onProgress(done, need.length); }catch(e){} }', 'fetchAssetUrls reports progress per chunk');
+has('{chunkSize:12, onProgress:(done,total)=>{ sbFillThumbs(byId); sbProgress(done,total); }}', 'sandbox streams thumbs with progress');
+has('function sbFillThumbs(byId)', 'sbFillThumbs exists (fill-by-id, no re-render)');
+has('function sbProgress(done,total)', 'sbProgress exists');
+has('id="sbthumb-${id}"', 'sandbox thumbs have stable ids');
+has('id="sb-progress"', 'progress-bar element present');
+lacks('await fetchAssetUrls(missing); renderSandbox();', 'old full-re-render-after-fetch path removed');
+has('<textarea class="dup-edit dup-edit-multi" rows="2"', 'dup editable rows are multi-line textareas');
+has('.dup-preview-actions .merge-btn{padding:12px 26px', 'dup Confirm button enlarged');
+has('.dup-edit-multi{', 'multi-line row CSS present');
 // Guard against duplicate element ids from the toolbar rebuild:
 ['am-title','am-search','am-sort','am-count','am-filterbtns','port-wrap','port-tag','port-btn','port-row-btn','port-row-picker','port-row-search','port-row-list',
- 'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list'].forEach(id=>{
+ 'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list','sb-progress'].forEach(id=>{
   const c = (src.match(new RegExp('id="' + id + '"', 'g')) || []).length;
   c === 1 ? ok(`id "${id}" unique`) : bad(`id "${id}" appears ${c} times`);
 });

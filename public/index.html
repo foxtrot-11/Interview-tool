@@ -125,6 +125,10 @@
   .mode-btn.sb-btn{border-color:#8657d4;color:#b18ae8}
   .mode-btn.sb-btn.active{background:#8657d4;color:#fff;border-color:#8657d4}
   .sb-hint{font-size:11px;color:var(--text-muted);line-height:1.5;max-width:900px}
+  .sb-progress{display:inline-flex;align-items:center;gap:8px}
+  .sb-progress-track{width:120px;height:6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+  .sb-progress-bar{display:block;height:100%;width:0;background:var(--accent);transition:width .2s ease}
+  .sb-progress-txt{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);white-space:nowrap}
   .sb-board{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:14px;align-items:start}
   .sb-colhead{font-family:var(--font-display);font-weight:800;font-size:14px;letter-spacing:0.06em;padding:8px 10px;border:1px solid var(--border);border-radius:8px 8px 0 0;background:var(--surface);display:flex;justify-content:space-between;align-items:center;cursor:pointer}
   .sb-althead{font-family:var(--font-mono);font-weight:700;font-size:10px;letter-spacing:0.12em;color:var(--text-muted);padding:6px 10px 2px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
@@ -307,7 +311,9 @@
   .dup-preview-sec{margin-top:8px;color:var(--text-muted)}
   .dup-preview-sec ul,.dup-verify-box ul{margin:4px 0 0;padding-left:16px;color:var(--text)}
   .dup-preview-sec li,.dup-verify-box li{margin-bottom:3px;font-size:11px;line-height:1.5}
-  .dup-preview-actions{margin-top:12px;display:flex;gap:8px}
+  .dup-preview-actions{margin-top:16px;display:flex;gap:10px}
+  .dup-preview-actions .merge-btn{padding:12px 26px;font-size:12.5px;border-radius:8px}
+  .dup-preview-actions .skip-btn{padding:12px 20px;font-size:12.5px;border-radius:8px}
   .dup-verify-box.pass{border-color:#4ade8060}
   .dup-verify-box.fail{border-color:#facc1560}
   .dup-verify-box .vok{color:var(--success)}
@@ -317,9 +323,11 @@
   .dup-frow{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
   .dup-inc{display:flex;align-items:center;gap:5px;cursor:pointer}
   .dup-inc input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
-  .dup-edit{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 7px;font-family:var(--font-mono);font-size:11px;min-width:120px;max-width:280px}
+  .dup-edit{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 8px;font-family:var(--font-mono);font-size:12.5px;min-width:120px;max-width:280px}
   .dup-edit:focus{outline:none;border-color:var(--accent)}
   .dup-edit:disabled{opacity:0.45}
+  .dup-edit-multi{width:100%;max-width:440px;min-height:36px;line-height:1.45;resize:vertical;white-space:pre-wrap;word-break:break-word}
+  .dup-frow>.dup-edit-multi{flex:1 1 260px}
   .dup-fixed{color:var(--text);font-size:11px}
   .dup-refresh-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:var(--radius);padding:6px 14px;font-family:var(--font-mono);font-size:11px;cursor:pointer;margin-left:auto}
   #back-to-grid-btn{margin-left:0}   /* v7.13: dup-refresh-btn's margin-left:auto floated it mid-bar; pin it beside Model Status */
@@ -1308,6 +1316,7 @@
         <div class="am-toolbar-row">
           <div class="am-title">Casting Sandbox</div>
           <span class="am-count" id="sb-count"></span>
+          <span id="sb-progress" class="sb-progress" style="display:none"><span class="sb-progress-track"><span class="sb-progress-bar"></span></span><span class="sb-progress-txt"></span></span>
           <button class="dup-refresh-btn" onclick="loadKanban()">↺ Refresh</button>
         </div>
         <div class="am-toolbar-row">
@@ -1831,11 +1840,13 @@ function amFillThumb(el){
 }
 
 // Shared asset-URL fetcher: fills kbHeadCache, 40 ids per query, up to 4 queries in flight (both Kanban and All Models use this).
-async function fetchAssetUrls(assetIds){
+async function fetchAssetUrls(assetIds, opts){
+  opts=opts||{};
   const need=[...new Set((assetIds||[]).filter(a=>a && !kbHeadCache[a]))];
-  if(!need.length) return;
-  const chunks=[]; for(let i=0;i<need.length;i+=40) chunks.push(need.slice(i,i+40));
-  let next=0;
+  if(!need.length){ if(opts.onProgress) opts.onProgress(0,0); return; }
+  const size=opts.chunkSize||40;
+  const chunks=[]; for(let i=0;i<need.length;i+=size) chunks.push(need.slice(i,i+size));
+  let next=0, done=0;
   async function worker(){
     while(next<chunks.length){
       const chunk=chunks[next++];
@@ -1843,6 +1854,8 @@ async function fetchAssetUrls(assetIds){
         const data=await gql(`{assets(ids:[${chunk.join(',')}]){id public_url}}`);
         (data.assets||[]).forEach(a=>{ if(a && a.public_url) kbHeadCache[String(a.id)]=a.public_url; });
       }catch(e){}
+      done+=chunk.length;
+      if(opts.onProgress){ try{ opts.onProgress(done, need.length); }catch(e){} }
     }
   }
   await Promise.all(Array.from({length:Math.min(4,chunks.length)},()=>worker()));
@@ -2569,7 +2582,7 @@ async function renderSandbox(){
   const c=document.getElementById('sb-count'); if(c) c.textContent=mem.length?mem.length+' people':'';
   if(!mem.length){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag (approved statuses only). Tag people in the 5-APPROVED editor first.'; board.style.display='none'; return; }
   empty.style.display='none'; board.style.display='';
-  const tile=id=>{ const m=byId[id]; const url=(m&&m.head)?(kbHeadCache[String(m.head)]||''):''; return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div></div>`; };
+  const tile=id=>{ const m=byId[id]; const url=(m&&m.head)?(kbHeadCache[String(m.head)]||''):''; return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div></div>`; };
   board.innerHTML=SB_MAIN.map(([z,label])=>`
     <div class="sb-colwrap">
       <div class="sb-colhead" data-zone="${z}" onclick="sbZoneClick('${z}')">${label} <span class="sb-cnt">${sbState.zones[z].length}</span></div>
@@ -2577,8 +2590,33 @@ async function renderSandbox(){
       <div class="sb-althead" data-zone="a${z}" onclick="sbZoneClick('a${z}')">ALTERNATES <span class="sb-cnt">${sbState.zones['a'+z].length}</span></div>
       <div class="sb-zone sb-altzone" data-zone="a${z}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event)" onclick="sbZoneClick('a${z}')">${sbState.zones['a'+z].map(tile).join('')}</div>
     </div>`).join('');
+  // Thumbnails stream in (smaller chunks → the 4 parallel workers engage and photos paint in waves),
+  // filled by id so we never rebuild the board mid-load. A progress bar shows it's working.
   const missing=mem.filter(m=>m.head && !kbHeadCache[String(m.head)]).map(m=>m.head);
-  if(missing.length){ try{ await fetchAssetUrls(missing); renderSandbox(); }catch(e){} }
+  if(missing.length){
+    sbProgress(0, missing.length);
+    try{ await fetchAssetUrls(missing, {chunkSize:12, onProgress:(done,total)=>{ sbFillThumbs(byId); sbProgress(done,total); }}); }catch(e){}
+    sbFillThumbs(byId); sbProgress(missing.length, missing.length);
+  } else { sbProgress(0,0); }
+}
+// Fill any empty thumb placeholders whose photo URL is now cached (no re-render).
+function sbFillThumbs(byId){
+  for(const z of Object.keys(sbState.zones)){
+    for(const id of sbState.zones[z]){
+      const m=byId[id]; if(!m||!m.head) continue;
+      const url=kbHeadCache[String(m.head)]; if(!url) continue;
+      const el=document.getElementById('sbthumb-'+id);
+      if(el && !el.firstChild) el.innerHTML=`<img loading="lazy" src="${escapeHtml(url)}" alt="">`;
+    }
+  }
+}
+function sbProgress(done,total){
+  const wrap=document.getElementById('sb-progress'); if(!wrap) return;
+  const bar=wrap.querySelector('.sb-progress-bar'), txt=wrap.querySelector('.sb-progress-txt');
+  if(!total || done>=total){ wrap.style.display='none'; if(bar) bar.style.width='0%'; return; }
+  wrap.style.display='inline-flex';
+  if(bar) bar.style.width=Math.round(done/total*100)+'%';
+  if(txt) txt.textContent='Loading photos… '+done+'/'+total;
 }
 function sbDragStart(e){ const t=e.target.closest('.sb-tile'); if(!t) return; e.dataTransfer.setData('text/plain', t.dataset.id); e.dataTransfer.effectAllowed='move'; }
 function sbDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('over'); e.dataTransfer.dropEffect='move'; }
@@ -4952,6 +4990,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.18: Casting Sandbox loads faster + shows a status bar — headshots stream in as they arrive (smaller fetch chunks so the 4 parallel workers actually engage) and fill by id with no full re-render; a progress bar reports "Loading photos… n/total" while it works. Duplicate preview polish: Confirm/Cancel buttons larger + rounder; editable row values are now multi-line textareas (bigger type, long values wrap instead of scrolling in a one-line box).
    v7.17: CASTING SANDBOX tab — pick a shoot tag, drag people between BOTTOM/VERS/TOP columns (+ per-column ALTERNATES); visual only until ⇪ Port, where the subitem TYPE comes from the column each person sits in HERE (shoot-specific casting); share the exact arrangement via a copy-link (#sb= encoded, needs the app passphrase to open); port preview subitem names are now EDITABLE before Confirm (create uses the edited name, fill renames the existing slot); ✂ Recrop added to the Kanban/All-Models editor modal (2-POTENTIAL/4-REVIEW already had it via the full editor).
    v7.16: 2-POTENTIAL + 4-REVIEW are now photo grids like 5-APPROVED (same filters/search/sort with per-tab memory, tiles open the FULL editor, ← Back to grid, unsaved-changes guard) — shoot-tags UI stays 5-APPROVED-only (editor block, filter, and Port row all hidden in 2/4). Toolbar tidied into rows: title+count+Refresh, then SORT + search + filters + Clear, then the Port row (label restyled to match SORT, quiet mono small-caps). FIX: casting-row fetch was a malformed GraphQL string (one missing closing brace, shipped in v7.15) → server parse() rejected it → "rows failed"; one brace added, query verified with the real graphql parser.
    v7.15: casting-row picker — searchable dropdown (type to filter, Enter picks first match, ↻ still reloads) showing ONLY active rows from the board’s top "REQUESTS" group; COMPLETED/HOLD/CANCELLED rows are hidden.
@@ -5328,8 +5367,8 @@ function editControl(prefix, gid, colId, type, text, labels){
   }
   if(type==='date')     return `<input class="dup-edit" type="date" ${idAttr} value="${v}">`;
   if(type==='numbers')  return `<input class="dup-edit" type="number" step="any" ${idAttr} value="${v}">`;
-  if(type==='dropdown') return `<input class="dup-edit" type="text" ${idAttr} value="${v}" title="comma-separated labels">`;
-  return `<input class="dup-edit" type="text" ${idAttr} value="${v}">`;
+  const title = (type==='dropdown') ? ' title="comma-separated labels"' : '';
+  return `<textarea class="dup-edit dup-edit-multi" rows="2" ${idAttr}${title}>${v}</textarea>`;
 }
 function cfToggle(gid, colId){
   const sel=document.getElementById(`cf-choice-${gid}-${colId}`); const inp=document.getElementById(`cf-val-${gid}-${colId}`);
@@ -5412,7 +5451,7 @@ function previewMerge(gid){
                     `<option value="keep" selected>Keep: "${escapeHtml(c.keeperText.slice(0,40))}"</option>`+
                     `<option value="use">Use dup: "${escapeHtml(c.sourceText.slice(0,40))}"</option>`+
                     `${editable?'<option value="custom">Custom…</option>':''}</select>`;
-          const input = editable ? `<input class="dup-edit" type="text" id="cf-val-${gid}-${c.colId}" value="${escapeHtml(c.sourceText)}" disabled>` : '';
+          const input = editable ? `<textarea class="dup-edit dup-edit-multi" rows="2" id="cf-val-${gid}-${c.colId}" disabled>${escapeHtml(c.sourceText)}</textarea>` : '';
           const xn=((c.keeperText&&c.keeperText.length>40)||(c.sourceText&&c.sourceText.length>40))?xnote('c-'+gid+'-'+c.colId,[{label:'KEEP (current value)',text:c.keeperText},{label:'FROM DUPLICATE',text:c.sourceText}]):'';
           return `<li class="dup-frow"><b>${escapeHtml(c.title)}</b>${sel}${input}<span class="dim">losing value → Notes</span>${xn}</li>`;
         }).join('')
