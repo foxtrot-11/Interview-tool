@@ -159,9 +159,17 @@ lacks('await fetchAssetUrls(missing); renderSandbox();', 'old full-re-render-aft
 has('<textarea class="dup-edit dup-edit-multi" rows="2"', 'dup editable rows are multi-line textareas');
 has('.dup-preview-actions .merge-btn{padding:12px 26px', 'dup Confirm button enlarged');
 has('.dup-edit-multi{', 'multi-line row CSS present');
+/* v7.19 asserts */
+has('v7.19:', 'v7.19 deploy marker present');
+has("['kanban-loading','am-loading','sb-loading']", 'loadKanban drives the sandbox loader');
+has("['kanban-load-status','am-load-status','sb-load-status']", 'loadKanban sets the sandbox status text');
+has('id="sb-loading"', 'sandbox loader element present');
+has('id="sb-load-status"', 'sandbox load-status element present');
+has('if(!kanbanItems.length){ if(ld) ld.style.display=\'\'; empty.style.display=\'none\'; board.style.display=\'none\'; return; }', 'renderSandbox defers to the spinner during load');
+lacks("empty.textContent='Loading board…'", 'old static "Loading board…" removed');
 // Guard against duplicate element ids from the toolbar rebuild:
 ['am-title','am-search','am-sort','am-count','am-filterbtns','port-wrap','port-tag','port-btn','port-row-btn','port-row-picker','port-row-search','port-row-list',
- 'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list','sb-progress'].forEach(id=>{
+ 'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list','sb-progress','sb-loading','sb-load-status'].forEach(id=>{
   const c = (src.match(new RegExp('id="' + id + '"', 'g')) || []).length;
   c === 1 ? ok(`id "${id}" unique`) : bad(`id "${id}" appears ${c} times`);
 });

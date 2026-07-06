@@ -1338,6 +1338,7 @@
         </div>
         <div class="sb-hint">Drag tiles between columns (or tap a tile, then tap a column). Nothing is written to Monday until you Port — the subitem TYPE comes from the column each person sits in <i>here</i>, not their profile. “Copy share link” encodes this exact arrangement into the link; anyone with the app passphrase can open it, adjust, and send a link back.</div>
       </div>
+      <div id="sb-loading" class="dup-loading" style="display:none"><span class="dup-spinner"></span><span id="sb-load-status">Loading…</span></div>
       <div id="sb-empty" class="am-empty">Pick a shoot tag to load its people.</div>
       <div id="sb-board" class="sb-board" style="display:none"></div>
     </div>
@@ -1863,8 +1864,8 @@ async function fetchAssetUrls(assetIds, opts){
 
 async function loadKanban(){
   const board=document.getElementById('kanban-board');
-  const loaders=['kanban-loading','am-loading'].map(i=>document.getElementById(i)).filter(Boolean);
-  const setLoad=t=>{['kanban-load-status','am-load-status'].forEach(i=>{const el=document.getElementById(i); if(el) el.textContent=t;});};
+  const loaders=['kanban-loading','am-loading','sb-loading'].map(i=>document.getElementById(i)).filter(Boolean);
+  const setLoad=t=>{['kanban-load-status','am-load-status','sb-load-status'].forEach(i=>{const el=document.getElementById(i); if(el) el.textContent=t;});};
   board.innerHTML='';
   const amg=document.getElementById('am-grid'); if(amg) amg.innerHTML='';
   const ame=document.getElementById('am-empty'); if(ame) ame.style.display='none';
@@ -2571,7 +2572,11 @@ function sbSyncMembership(){
 }
 async function renderSandbox(){
   const board=document.getElementById('sb-board'), empty=document.getElementById('sb-empty'); if(!board) return;
-  if(!kanbanItems.length){ empty.style.display=''; empty.textContent='Loading board…'; board.style.display='none'; return; }
+  const ld=document.getElementById('sb-loading');
+  // While the shared board store is still loading, let the spinner + "Loading models… N loaded"
+  // status (driven by loadKanban) do the talking — same loader the Kanban/All-Models views use.
+  if(!kanbanItems.length){ if(ld) ld.style.display=''; empty.style.display='none'; board.style.display='none'; return; }
+  if(ld) ld.style.display='none';
   if(sbPending){
     const p=sbPending; sbPending=null;
     sbState={tag:(p&&p.t)?String(p.t):null, zones:Object.assign({b:[],v:[],t:[],ab:[],av:[],at:[]}, (p&&p.z)||{})};
@@ -4990,6 +4995,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.19: Casting Sandbox now shows the real loading status bar (spinner + "Loading models… N loaded", same component as Kanban/All-Models) while the shared board store loads — the earlier static "Loading board…" gave no progress because the sandbox wasn't wired into loadKanban's loader list. The slow part on a cold first load is that full board fetch (~950 records); it's now visible/honest instead of looking frozen, and the per-tag photo progress bar (v7.18) still runs once the board is in.
    v7.18: Casting Sandbox loads faster + shows a status bar — headshots stream in as they arrive (smaller fetch chunks so the 4 parallel workers actually engage) and fill by id with no full re-render; a progress bar reports "Loading photos… n/total" while it works. Duplicate preview polish: Confirm/Cancel buttons larger + rounder; editable row values are now multi-line textareas (bigger type, long values wrap instead of scrolling in a one-line box).
    v7.17: CASTING SANDBOX tab — pick a shoot tag, drag people between BOTTOM/VERS/TOP columns (+ per-column ALTERNATES); visual only until ⇪ Port, where the subitem TYPE comes from the column each person sits in HERE (shoot-specific casting); share the exact arrangement via a copy-link (#sb= encoded, needs the app passphrase to open); port preview subitem names are now EDITABLE before Confirm (create uses the edited name, fill renames the existing slot); ✂ Recrop added to the Kanban/All-Models editor modal (2-POTENTIAL/4-REVIEW already had it via the full editor).
    v7.16: 2-POTENTIAL + 4-REVIEW are now photo grids like 5-APPROVED (same filters/search/sort with per-tab memory, tiles open the FULL editor, ← Back to grid, unsaved-changes guard) — shoot-tags UI stays 5-APPROVED-only (editor block, filter, and Port row all hidden in 2/4). Toolbar tidied into rows: title+count+Refresh, then SORT + search + filters + Clear, then the Port row (label restyled to match SORT, quiet mono small-caps). FIX: casting-row fetch was a malformed GraphQL string (one missing closing brace, shipped in v7.15) → server parse() rejected it → "rows failed"; one brace added, query verified with the real graphql parser.
