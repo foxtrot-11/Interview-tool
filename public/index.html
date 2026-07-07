@@ -125,17 +125,27 @@
   .mode-btn.sb-btn{border-color:#8657d4;color:#b18ae8}
   .mode-btn.sb-btn.active{background:#8657d4;color:#fff;border-color:#8657d4}
   .sb-hint{font-size:11px;color:var(--text-muted);line-height:1.5;max-width:900px}
+  .sb-saves-list{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-width:0}
+  .sb-save-tab{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:4px 12px;font-size:11px;color:var(--text);cursor:pointer;max-width:230px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:inherit}
+  .sb-save-tab:hover{border-color:#8657d4;color:#b18ae8}
+  .sb-saves-empty{font-size:11px;color:var(--text-muted)}
   .sb-progress{display:inline-flex;align-items:center;gap:8px}
   .sb-progress-track{width:120px;height:6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;overflow:hidden}
   .sb-progress-bar{display:block;height:100%;width:0;background:var(--accent);transition:width .2s ease}
   .sb-progress-txt{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);white-space:nowrap}
-  .sb-board{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:14px;align-items:start}
-  .sb-colhead{font-family:var(--font-display);font-weight:800;font-size:14px;letter-spacing:0.06em;padding:8px 10px;border:1px solid var(--border);border-radius:8px 8px 0 0;background:var(--surface);display:flex;justify-content:space-between;align-items:center;cursor:pointer}
-  .sb-althead{font-family:var(--font-mono);font-weight:700;font-size:10px;letter-spacing:0.12em;color:var(--text-muted);padding:6px 10px 2px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+  .sb-board{display:block}
+  .sb-cols{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:14px;align-items:start}
+  .sb-colhead{font-family:var(--font-display);font-weight:800;font-size:14px;letter-spacing:0.06em;padding:8px 10px;border:1px solid var(--border);border-radius:8px 8px 0 0;background:var(--surface);display:flex;justify-content:space-between;align-items:center}
+  .sb-althead2{font-family:var(--font-display);font-weight:800;font-size:13px;letter-spacing:0.06em;padding:8px 10px;border:1px solid var(--border);border-radius:8px 8px 0 0;background:var(--surface);display:flex;justify-content:space-between;align-items:center}
+  .sb-altsection{margin-top:16px}
   .sb-cnt{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);font-weight:400}
-  .sb-zone{min-height:110px;border:1px dashed var(--border);border-top:none;border-radius:0 0 8px 8px;padding:8px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;background:rgba(255,255,255,.015)}
-  .sb-zone.sb-altzone{border:1px dashed var(--border);border-radius:8px;min-height:74px;opacity:.9}
+  .sb-zone{border:1px dashed var(--border);border-top:none;border-radius:0 0 8px 8px;padding:8px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;background:rgba(255,255,255,.015)}
   .sb-zone.over{border-color:var(--accent);background:rgba(255,120,60,.06)}
+  .sb-slot{position:relative;width:92px;min-height:112px;border:1px dashed transparent;border-radius:8px;display:flex;align-items:flex-start;justify-content:center;padding-top:2px}
+  .sb-slot.empty{border-color:var(--border);background:rgba(255,255,255,.02)}
+  .sb-slot.empty:hover,.sb-slot.over{border-color:var(--accent);background:rgba(255,120,60,.06)}
+  .sb-slotnum{position:absolute;top:2px;left:4px;font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--text-muted);opacity:.7;pointer-events:none;z-index:1}
+  .sb-slot.empty .sb-slotnum{position:static;margin:auto;opacity:.5;font-size:11px;letter-spacing:.08em}
   .sb-tile{width:86px;cursor:grab;user-select:none;border:2px solid transparent;border-radius:8px;padding:3px;text-align:center}
   .sb-tile:active{cursor:grabbing}
   .sb-tile.sel{border-color:var(--accent);background:rgba(255,120,60,.10)}
@@ -144,7 +154,7 @@
   .sb-name{font-size:10px;line-height:1.25;margin-top:3px;word-break:break-word;max-height:26px;overflow:hidden}
   .port-name-input{background:var(--surface);border:1px solid var(--border);border-radius:5px;color:inherit;font:inherit;font-size:12px;padding:2px 6px;width:130px}
   .port-name-input:focus{border-color:var(--accent);outline:none}
-  @media (max-width:760px){ .sb-board{grid-template-columns:1fr} }
+  @media (max-width:760px){ .sb-cols{grid-template-columns:1fr} }
   #am-filterbtns{display:contents}
   .am-fwrap{position:relative}
   .am-fbtn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:7px 10px;font-family:var(--font-mono);font-size:11px;cursor:pointer;white-space:nowrap}
@@ -1324,6 +1334,7 @@
           <select id="sb-tag" class="am-sort" onchange="sbTagChanged()"></select>
           <span class="tb-sep"></span>
           <button class="am-clear" onclick="sbCopyLink()">🔗 Copy share link</button>
+          <button class="am-clear" onclick="sbSaveState()">💾 Save state</button>
           <span class="tb-sep"></span>
           <span class="tb-label">Port to</span>
           <span class="port-row-wrap">
@@ -1336,7 +1347,12 @@
           <button class="am-clear" title="Reload casting rows" onclick="portLoadRows(true)">↻</button>
           <button class="am-clear" style="border-color:var(--accent);color:var(--accent)" onclick="sbPortOpen()">⇪ Port this arrangement</button>
         </div>
-        <div class="sb-hint">Drag tiles between columns (or tap a tile, then tap a column). Nothing is written to Monday until you Port — the subitem TYPE comes from the column each person sits in <i>here</i>, not their profile. “Copy share link” encodes this exact arrangement into the link; anyone with the app passphrase can open it, adjust, and send a link back.</div>
+        <div class="sb-hint">Drag tiles between columns (or tap a tile, then tap a column). Nothing is written to Monday until you Port — the subitem TYPE comes from the column each person sits in <i>here</i>, not their profile. “Copy share link” encodes this exact arrangement into the link; anyone with the app passphrase can open it, adjust, and send a link back. “Save state” stores it on Monday so any coworker can load it.</div>
+        <div class="am-toolbar-row" id="sb-saves-row">
+          <span class="tb-label">Saved states</span>
+          <button class="am-clear" title="Refresh saved states" onclick="sbLoadSaves(true)">↻</button>
+          <span id="sb-saves-list" class="sb-saves-list"><span class="sb-saves-empty">…</span></span>
+        </div>
       </div>
       <div id="sb-loading" class="dup-loading" style="display:none"><span class="dup-spinner"></span><span id="sb-load-status">Loading…</span></div>
       <div id="sb-empty" class="am-empty">Pick a shoot tag to load its people.</div>
@@ -2531,10 +2547,18 @@ function portRowEnter(){ if(portRowOpts.length) portRowPick(0); }
    Share: the whole arrangement is encoded into a #sb= URL — stateless, so it
    survives server restarts; the recipient logs in with the app passphrase,
    sees it, can adjust, and can copy a new link back. */
-let sbState={tag:null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}};
+let sbState={tag:null, zones:{b:[],v:[],t:[],alt:[]}};
 let sbPending=null, sbSelected=null;
 const SB_MAIN=[['b','BOTTOM'],['v','VERS'],['t','TOP']];
-const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',ab:'ALTERNATE',av:'ALTERNATE',at:'ALTERNATE'};
+const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',alt:'ALTERNATE'};
+const SB_MIN_SLOTS=8;   // every column shows at least this many slots so the grid stays consistent (v7.20)
+// Coerce any incoming zones (fresh, share-link, or old per-column-alt shape) to {b,v,t,alt} arrays of ids.
+function sbNormalizeZones(z){
+  z=z||{}; const out={b:[],v:[],t:[],alt:[]};
+  ['b','v','t','alt'].forEach(k=>{ if(Array.isArray(z[k])) out[k]=z[k].map(String); });
+  ['ab','av','at'].forEach(k=>{ if(Array.isArray(z[k])) out.alt=out.alt.concat(z[k].map(String)); }); // migrate v7.17 per-column alternates
+  return out;
+}
 function sbEncode(){ const p={t:sbState.tag,z:sbState.zones}; return btoa(unescape(encodeURIComponent(JSON.stringify(p)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
 function sbDecode(s){ try{ return JSON.parse(decodeURIComponent(escape(atob(String(s||'').replace(/-/g,'+').replace(/_/g,'/'))))); }catch(e){ return null; } }
 function sbInitUI(){
@@ -2544,6 +2568,7 @@ function sbInitUI(){
   sel.innerHTML='<option value="">Shoot tag…</option>'+opts.map(o=>`<option value="${o.id}">${escapeHtml(String(o.label))}</option>`).join('');
   if(cur) sel.value=cur; else if(sbState.tag) sel.value=String(sbState.tag);
   portLoadRows(false);
+  sbLoadSaves(false);
 }
 function sbMembers(tagId){
   const roleOpts=boardDropdownOptions['dropdown_mknbe0p0']||[];
@@ -2552,10 +2577,10 @@ function sbMembers(tagId){
     .map(m=>({id:String(m.id), name:m.name, head:m.head, roleLabels:(m.f.role||[]).map(rid=>{const o=roleOpts.find(x=>Number(x.id)===Number(rid)); return o?String(o.label):'';}).filter(Boolean)}))
     .sort((a,b)=>a.name.localeCompare(b.name));
 }
-function sbDefaultZone(roleLabels){ const t=portDecideType(roleLabels); return t==='VERSE'?'v':t==='TOP'?'t':t==='BOTTOM'?'b':'av'; }
+function sbDefaultZone(roleLabels){ const t=portDecideType(roleLabels); return t==='VERSE'?'v':t==='TOP'?'t':t==='BOTTOM'?'b':'alt'; }
 function sbTagChanged(){
   const v=document.getElementById('sb-tag').value;
-  sbState={tag:v||null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}};
+  sbState={tag:v||null, zones:{b:[],v:[],t:[],alt:[]}};
   sbSelected=null;
   renderSandbox();
 }
@@ -2579,7 +2604,7 @@ async function renderSandbox(){
   if(ld) ld.style.display='none';
   if(sbPending){
     const p=sbPending; sbPending=null;
-    sbState={tag:(p&&p.t)?String(p.t):null, zones:Object.assign({b:[],v:[],t:[],ab:[],av:[],at:[]}, (p&&p.z)||{})};
+    sbState={tag:(p&&p.t)?String(p.t):null, zones:sbNormalizeZones(p&&p.z)};
     const sel=document.getElementById('sb-tag'); if(sel&&sbState.tag) sel.value=String(sbState.tag);
   }
   if(!sbState.tag){ empty.style.display=''; empty.textContent='Pick a shoot tag to load its people.'; board.style.display='none'; const c=document.getElementById('sb-count'); if(c)c.textContent=''; return; }
@@ -2588,13 +2613,21 @@ async function renderSandbox(){
   if(!mem.length){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag (approved statuses only). Tag people in the 5-APPROVED editor first.'; board.style.display='none'; return; }
   empty.style.display='none'; board.style.display='';
   const tile=id=>{ const m=byId[id]; const url=(m&&m.head)?(kbHeadCache[String(m.head)]||''):''; return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div></div>`; };
-  board.innerHTML=SB_MAIN.map(([z,label])=>`
-    <div class="sb-colwrap">
-      <div class="sb-colhead" data-zone="${z}" onclick="sbZoneClick('${z}')">${label} <span class="sb-cnt">${sbState.zones[z].length}</span></div>
-      <div class="sb-zone" data-zone="${z}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event)" onclick="sbZoneClick('${z}')">${sbState.zones[z].map(tile).join('')}</div>
-      <div class="sb-althead" data-zone="a${z}" onclick="sbZoneClick('a${z}')">ALTERNATES <span class="sb-cnt">${sbState.zones['a'+z].length}</span></div>
-      <div class="sb-zone sb-altzone" data-zone="a${z}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event)" onclick="sbZoneClick('a${z}')">${sbState.zones['a'+z].map(tile).join('')}</div>
-    </div>`).join('');
+  // A zone renders as fixed numbered slots (min 8, grows if fuller). Slot position = subitem number at Port.
+  const slots=z=>{ const ids=sbState.zones[z]||[]; const n=Math.max(SB_MIN_SLOTS, ids.length); let h='';
+    for(let i=0;i<n;i++){ const id=ids[i];
+      h+=`<div class="sb-slot ${id!=null?'filled':'empty'}" data-zone="${z}" data-index="${i}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDropSlot(event)" onclick="sbSlotClick(event,'${z}',${i})"><span class="sb-slotnum">${SB_TYPE[z].slice(0,1)}${i+1}</span>${id!=null?tile(id):''}</div>`; }
+    return h; };
+  board.innerHTML=
+    `<div class="sb-cols">`+SB_MAIN.map(([z,label])=>`
+      <div class="sb-colwrap">
+        <div class="sb-colhead">${label} <span class="sb-cnt">${sbState.zones[z].length}</span></div>
+        <div class="sb-zone" data-zone="${z}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event)" onclick="sbZoneClick('${z}')">${slots(z)}</div>
+      </div>`).join('')+`</div>`+
+    `<div class="sb-altsection">
+       <div class="sb-althead2">ALTERNATES <span class="sb-cnt">${sbState.zones.alt.length}</span></div>
+       <div class="sb-zone sb-altrow" data-zone="alt" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event)" onclick="sbZoneClick('alt')">${slots('alt')}</div>
+     </div>`;
   // Thumbnails stream in (smaller chunks → the 4 parallel workers engage and photos paint in waves),
   // filled by id so we never rebuild the board mid-load. A progress bar shows it's working.
   const missing=mem.filter(m=>m.head && !kbHeadCache[String(m.head)]).map(m=>m.head);
@@ -2626,22 +2659,92 @@ function sbProgress(done,total){
 function sbDragStart(e){ const t=e.target.closest('.sb-tile'); if(!t) return; e.dataTransfer.setData('text/plain', t.dataset.id); e.dataTransfer.effectAllowed='move'; }
 function sbDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('over'); e.dataTransfer.dropEffect='move'; }
 function sbDragLeave(e){ e.currentTarget.classList.remove('over'); }
-function sbDrop(e){ e.preventDefault(); e.currentTarget.classList.remove('over'); const id=e.dataTransfer.getData('text/plain'); sbMove(id, e.currentTarget.dataset.zone); }
-function sbMove(id,zone){
-  if(!id || !sbState.zones[zone]) return;
-  for(const z of Object.keys(sbState.zones)) sbState.zones[z]=sbState.zones[z].filter(x=>String(x)!==String(id));
-  sbState.zones[zone].push(String(id));
-  sbSelected=null;
-  renderSandbox();
+function sbDrop(e){ e.preventDefault(); e.currentTarget.classList.remove('over'); const id=e.dataTransfer.getData('text/plain'); sbMove(id, e.currentTarget.dataset.zone, null); }        // dropped on the column → append
+function sbDropSlot(e){ e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.remove('over'); const id=e.dataTransfer.getData('text/plain'); sbMove(id, e.currentTarget.dataset.zone, Number(e.currentTarget.dataset.index)); }  // dropped on a slot → that position
+// Move id into zone at index (null = append). Position within a zone = priority = subitem number at Port.
+function sbMove(id,zone,index){
+  id=String(id); if(!sbState.zones[zone]) return;
+  let origZone=null, origIdx=-1;
+  for(const z of Object.keys(sbState.zones)){ const k=sbState.zones[z].indexOf(id); if(k>=0){ origZone=z; origIdx=k; } }
+  for(const z of Object.keys(sbState.zones)) sbState.zones[z]=sbState.zones[z].filter(x=>x!==id);
+  const target=sbState.zones[zone];
+  let idx=(index==null)?target.length:index;
+  if(origZone===zone && origIdx>=0 && origIdx<idx) idx--;      // account for the just-removed slot shifting indices
+  if(idx<0) idx=0; if(idx>target.length) idx=target.length;    // dropping on an empty slot past the end = append
+  target.splice(idx,0,id);
+  sbSelected=null; renderSandbox();
 }
 function sbTileClick(e,id){ e.stopPropagation(); sbSelected=(sbSelected===id)?null:id; renderSandbox(); }   // tap-to-move fallback (touch)
-function sbZoneClick(zone){ if(sbSelected) sbMove(sbSelected, zone); }
+function sbSlotClick(e,zone,index){ e.stopPropagation(); if(sbSelected) sbMove(sbSelected, zone, index); }
+function sbZoneClick(zone){ if(sbSelected) sbMove(sbSelected, zone, null); }
 function sbCopyLink(){
   if(!sbState.tag){ showToast('Pick a shoot tag first','error'); return; }
   const url=location.origin+location.pathname+'#sb='+sbEncode();
   const fallback=()=>{ try{ prompt('Copy this link:', url); }catch(e){} };
   if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(()=>showToast('Share link copied ✓','success')).catch(fallback);
   else fallback();
+}
+
+/* ══ SAVE STATES (v7.21) — persisted on Monday board 18420711215 so ANY coworker sees them ═══════════
+   Each save = one item on that board; the arrangement JSON lives in its Long Text column (discovered by
+   type at runtime, so there's no column id to hardcode/break). Save always creates a new item → a running
+   list. Cookies/localStorage were rejected: they're per-device, so a coworker on another machine would
+   never see them; Render's disk is ephemeral; Monday is the shared, persistent store we already use. */
+const SANDBOX_SAVES_BOARD_ID='18420711215';
+let sbSavesColId=null, sbSaves=[];
+async function sbEnsureSavesCol(){
+  if(sbSavesColId) return sbSavesColId;
+  const d=await gql(`{boards(ids:[${SANDBOX_SAVES_BOARD_ID}]){columns{id title type}}}`);
+  const cols=(((d.boards||[])[0])||{}).columns||[];
+  const pick=cols.find(c=>c.type==='long_text' && /sandbox|arrangement|data/i.test(c.title||'')) || cols.find(c=>c.type==='long_text');
+  sbSavesColId = pick ? pick.id : null;
+  return sbSavesColId;
+}
+async function sbLoadSaves(force){
+  const wrap=document.getElementById('sb-saves-list'); if(!wrap) return;
+  if(sbSaves.length && !force){ sbRenderSaves(); return; }
+  wrap.innerHTML='<span class="sb-saves-empty">Loading…</span>';
+  try{
+    const col=await sbEnsureSavesCol();
+    if(!col){ wrap.innerHTML='<span class="sb-saves-empty">No “Long Text” column on the Save-States board yet — add one to enable saving.</span>'; return; }
+    const d=await gql(`{boards(ids:[${SANDBOX_SAVES_BOARD_ID}]){items_page(limit:200){items{id name updated_at column_values(ids:["${col}"]){text}}}}}`);
+    const items=(((d.boards||[])[0]||{}).items_page||{}).items||[];
+    sbSaves=items.map(it=>{ let data=null; try{ data=JSON.parse((it.column_values&&it.column_values[0]&&it.column_values[0].text)||'null'); }catch(e){} return {id:it.id, name:it.name, updated:it.updated_at||'', data}; })
+      .filter(s=>s.data && s.data.zones)
+      .sort((a,b)=>(b.updated||'').localeCompare(a.updated||''));
+    sbRenderSaves();
+  }catch(e){ wrap.innerHTML='<span class="sb-saves-empty">Couldn’t load saves ('+escapeHtml(e.message||String(e))+')</span>'; }
+}
+function sbRenderSaves(){
+  const wrap=document.getElementById('sb-saves-list'); if(!wrap) return;
+  wrap.innerHTML = sbSaves.length
+    ? sbSaves.map(s=>`<button class="sb-save-tab" onclick="sbLoadSave('${s.id}')" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</button>`).join('')
+    : '<span class="sb-saves-empty">No saved states yet — arrange, then “Save state”.</span>';
+}
+function sbLoadSave(id){
+  const s=sbSaves.find(x=>String(x.id)===String(id)); if(!s||!s.data){ showToast('Could not load that save','error'); return; }
+  sbState={tag:s.data.tag?String(s.data.tag):null, zones:sbNormalizeZones(s.data.zones)};
+  const sel=document.getElementById('sb-tag'); if(sel&&sbState.tag) sel.value=String(sbState.tag);
+  sbSelected=null; renderSandbox();
+  showToast('Loaded “'+(s.name||'')+'”','success');
+}
+async function sbSaveState(){
+  if(!sbState.tag){ showToast('Pick a shoot tag first','error'); return; }
+  const col=await sbEnsureSavesCol();
+  if(!col){ showToast('Add a Long Text column to the Save-States board first','error'); return; }
+  sbSyncMembership();   // make sure zones reflect current membership before snapshotting
+  const tagOpt=(boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.id)===String(sbState.tag));
+  const label=tagOpt?String(tagOpt.label):('tag '+sbState.tag);
+  const now=new Date();
+  const dflt=label+' — '+now.toLocaleDateString([], {month:'short',day:'numeric'})+' '+now.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+  const name=prompt('Name this saved arrangement:', dflt); if(name===null) return;
+  const payload=JSON.stringify({v:1, tag:sbState.tag, tagLabel:label, zones:sbState.zones, savedAt:now.toISOString()});
+  try{
+    await gql(`mutation($b:ID!,$n:String!,$c:JSON!){create_item(board_id:$b,item_name:$n,column_values:$c){id}}`,
+      {b:SANDBOX_SAVES_BOARD_ID, n:(name||dflt).slice(0,255), c:JSON.stringify({[col]:{text:payload}})});
+    showToast('Saved to Monday ✓','success');
+    sbLoadSaves(true);
+  }catch(e){ showToast('Save failed: '+(e.message||String(e)),'error'); }
 }
 // Sandbox row picker — thin wrappers over the shared picker state, with sb- element ids.
 function sbToggleRowPicker(){
@@ -2660,12 +2763,32 @@ async function sbPortOpen(){
   if(!sbState.tag){ showToast('Pick a shoot tag first','error'); return; }
   if(!portSelectedRowId){ showToast('Pick a casting row first','error'); return; }
   const mem=sbSyncMembership(); const byId={}; mem.forEach(m=>byId[m.id]=m);
-  const order=['b','v','t','ab','av','at'];
-  const entries=[]; order.forEach(z=>sbState.zones[z].forEach(id=>{ const m=byId[id]; if(m) entries.push({model:m, type:SB_TYPE[z]}); }));
+  // Walk each zone in position order; position i (1-based) → subitem TYPE{i}. Order here = priority on Monday.
+  const entries=[];
+  ['b','v','t','alt'].forEach(z=>(sbState.zones[z]||[]).forEach((id,i)=>{ const m=byId[id]; if(m) entries.push({model:m, type:SB_TYPE[z], num:i+1}); }));
   if(!entries.length){ showToast('Nothing to port','error'); return; }
-  const typeById={}; entries.forEach(en=>typeById[String(en.model.id)]=en.type);
   const tagOpt=(boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.id)===String(sbState.tag));
-  await portShowPlan(entries.map(en=>en.model), m=>typeById[String(m.id)], `Sandbox “${tagOpt?tagOpt.label:sbState.tag}” → row “${portSelectedRowName||portSelectedRowId}”`);
+  await portShowPlan(null, null, `Sandbox “${tagOpt?tagOpt.label:sbState.tag}” → row “${portSelectedRowName||portSelectedRowId}” (order = subitem number)`, slots=>sbBuildPlan(entries, slots));
+}
+// Order-based plan: each entry targets the EXACT slot TYPE{num}. Fill/create; relinking a slot that holds
+// someone else is shown as "(replaces X)". A person already sitting in their target slot is skipped.
+function sbBuildPlan(entries, slots){
+  const byName={}; slots.forEach(s=>{ byName[(s.name||'').trim().toUpperCase()]=s; });
+  const actions=[], skipped=[];
+  entries.forEach(en=>{
+    const desired=en.type+en.num, mid=String(en.model.id);
+    const slot=byName[desired.toUpperCase()];
+    if(slot){
+      const linked=(slot.linked||[]).map(String);
+      if(linked.includes(mid)){ skipped.push({model:en.model, reason:'already in '+desired}); return; }
+      const others=linked.filter(x=>x!==mid);
+      let rep; if(others.length){ const k=kanbanItems.find(it=>String(it.id)===others[0]); rep=k?k.name:('id '+others[0]); }
+      actions.push({model:en.model, type:en.type, mode:'fill', slotId:slot.id, slotName:slot.name, replaces:rep});
+    } else {
+      actions.push({model:en.model, type:en.type, mode:'create', slotName:desired});
+    }
+  });
+  return {actions, skipped};
 }
 async function portOpen(){
   const tagSel=document.getElementById('port-tag');
@@ -2694,7 +2817,7 @@ async function portOpen(){
 // Shared preview builder: reads the row's slots, plans, and renders the confirm modal.
 // typeOf (optional) forces the subitem TYPE per model (used by the sandbox — column placement wins).
 // Every planned subitem name is an editable input; edits apply at Confirm (v7.17).
-async function portShowPlan(models, typeOf, subtitle){
+async function portShowPlan(models, typeOf, subtitle, planFn){
   const rowId=portSelectedRowId, rowName=portSelectedRowName||rowId;
   const modal=document.getElementById('port-modal'); modal.classList.add('open');
   const list=document.getElementById('port-list'), sub=document.getElementById('port-sub'), st=document.getElementById('port-status');
@@ -2706,10 +2829,10 @@ async function portShowPlan(models, typeOf, subtitle){
   try{
     const d=await gql(`{items(ids:[${rowId}]){subitems{id name column_values(ids:["${CASTING_LINK_COL}"]){id ... on BoardRelationValue{linked_item_ids}}}}}`);
     const slots=(((d.items||[])[0]||{}).subitems||[]).map(s=>({id:s.id,name:s.name,linked:(((s.column_values||[])[0])||{}).linked_item_ids||[]}));
-    const plan=portBuildPlan(models, slots, typeOf);
+    const plan= planFn ? planFn(slots) : portBuildPlan(models, slots, typeOf);
     plan.actions.forEach(a=>{ a.origName=a.slotName; });
     portPlan={rowId, rowName, actions:plan.actions, skipped:plan.skipped};
-    const rows=plan.actions.map((a,i)=>`<div class="port-row">${escapeHtml(a.model.name)} <span class="port-skip">→ ${a.type}</span> ${a.mode==='fill'?'fills':'creates'} <input class="port-name-input" data-pi="${i}" value="${escapeHtml(a.slotName)}" maxlength="60" title="Edit the subitem name before confirming">${a.mode==='fill'?'':' <span class="port-skip">(new)</span>'}</div>`).join('');
+    const rows=plan.actions.map((a,i)=>`<div class="port-row">${escapeHtml(a.model.name)} <span class="port-skip">→ ${a.type}</span> ${a.mode==='fill'?'fills':'creates'} <input class="port-name-input" data-pi="${i}" value="${escapeHtml(a.slotName)}" maxlength="60" title="Edit the subitem name before confirming">${a.mode==='fill'?'':' <span class="port-skip">(new)</span>'}${a.replaces?` <span class="port-skip">(replaces ${escapeHtml(a.replaces)})</span>`:''}</div>`).join('');
     const skips=plan.skipped.map(s=>`<div class="port-row port-skip">${escapeHtml(s.model.name)} — skipped (${s.reason})</div>`).join('');
     list.innerHTML=(rows+skips)||'<div class="port-skip">Nothing to do.</div>';
     const note=document.getElementById('port-staging-note');
@@ -4995,6 +5118,8 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.21: Casting Sandbox "Save state" — arrangements persist on Monday board 18420711215 (JSON in a Long Text column, discovered by type at runtime) so ANY coworker can load them, not just the maker; a "Saved states" strip lists every save (running list, newest first) and clicking one loads it. Chosen over cookies/localStorage (per-device, invisible to coworkers) and server files (Render disk is ephemeral). server.js: saves board added to ALLOWED_BOARD_IDS (create_item + reads already allowed).
+   v7.20: Casting Sandbox columns now show fixed numbered slots (min 8 each: BOTTOM/VERS/TOP + one ALTERNATES row of 8) so the grid is consistent regardless of dragging; position within a column IS the priority and maps directly to the ported subitem number (slot 1 → TYPE1, etc.) — rearranging changes the numbers, and re-porting relinks a slot to whoever now sits there (shown as "replaces X" in the preview). Drop onto a specific slot to insert at that position; drop on the column to append. (Single ALTERNATES zone replaces the old per-column alternates; old share links auto-migrate.)
    v7.19: Casting Sandbox now shows the real loading status bar (spinner + "Loading models… N loaded", same component as Kanban/All-Models) while the shared board store loads — the earlier static "Loading board…" gave no progress because the sandbox wasn't wired into loadKanban's loader list. The slow part on a cold first load is that full board fetch (~950 records); it's now visible/honest instead of looking frozen, and the per-tag photo progress bar (v7.18) still runs once the board is in.
    v7.18: Casting Sandbox loads faster + shows a status bar — headshots stream in as they arrive (smaller fetch chunks so the 4 parallel workers actually engage) and fill by id with no full re-render; a progress bar reports "Loading photos… n/total" while it works. Duplicate preview polish: Confirm/Cancel buttons larger + rounder; editable row values are now multi-line textareas (bigger type, long values wrap instead of scrolling in a one-line box).
    v7.17: CASTING SANDBOX tab — pick a shoot tag, drag people between BOTTOM/VERS/TOP columns (+ per-column ALTERNATES); visual only until ⇪ Port, where the subitem TYPE comes from the column each person sits in HERE (shoot-specific casting); share the exact arrangement via a copy-link (#sb= encoded, needs the app passphrase to open); port preview subitem names are now EDITABLE before Confirm (create uses the edited name, fill renames the existing slot); ✂ Recrop added to the Kanban/All-Models editor modal (2-POTENTIAL/4-REVIEW already had it via the full editor).

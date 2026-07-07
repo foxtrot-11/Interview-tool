@@ -134,16 +134,16 @@ has(`else if(activeGrid==='sb') renderSandbox();`, 'refreshActiveView refreshes 
 has(`data-mode="sb"`, 'CASTING SANDBOX tab button present');
 has(`function portBuildPlan(models, slots, typeOf)`, 'portBuildPlan accepts typeOf override');
 has(`const type=typeOf ? typeOf(m) : portDecideType(m.roleLabels);`, 'typed override falls back to role-based decision');
-has(`async function portShowPlan(models, typeOf, subtitle)`, 'shared portShowPlan exists');
+has(`async function portShowPlan(models, typeOf, subtitle, planFn)`, 'shared portShowPlan exists (with plan builder)');
 has(`await portShowPlan(models, null,`, 'portOpen routes through portShowPlan (role-based)');
-has(`m=>typeById[String(m.id)]`, 'sandbox port forces column-based types');
+has(`slots=>sbBuildPlan(entries, slots)`, 'sandbox port uses order-based plan (column placement = type)');
 has(`.port-name-input`, 'port preview names are editable inputs'); 
 has(`if(a.mode==='fill' && a.origName!==a.slotName) cvObj.name=a.slotName;`, 'fill-mode rename on edited names');
 has(`function kbOpenRecrop()`, 'kanban-modal recrop entry exists');
 has(`✂ Recrop</button>`, 'kanban-modal has the ✂ Recrop button');
 has(`async function openRecrop(itemIdArg, headIdArg)`, 'openRecrop generalized for modal callers');
 has(`function refreshHeadEverywhere(itemId, hsOpt)`, 'refreshHeadEverywhere accepts explicit headshot');
-has(`const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',ab:'ALTERNATE',av:'ALTERNATE',at:'ALTERNATE'};`, 'sandbox column→TYPE map (VERSE naming kept)');
+has(`const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',alt:'ALTERNATE'};`, 'sandbox column→TYPE map (VERSE naming kept)');
 has(`location.hash||'').startsWith('#sb=')`, 'share-link boot hook present');
 has(`sbRenderRowList(); return;`, 'portLoadRows refreshes the sandbox picker too');
 /* v7.18 asserts */
@@ -167,6 +167,35 @@ has('id="sb-loading"', 'sandbox loader element present');
 has('id="sb-load-status"', 'sandbox load-status element present');
 has('if(!kanbanItems.length){ if(ld) ld.style.display=\'\'; empty.style.display=\'none\'; board.style.display=\'none\'; return; }', 'renderSandbox defers to the spinner during load');
 lacks("empty.textContent='Loading board…'", 'old static "Loading board…" removed');
+/* v7.20 asserts */
+has('v7.20:', 'v7.20 deploy marker present');
+has('const SB_MIN_SLOTS=8;', 'fixed 8-slot minimum');
+has("zones:{b:[],v:[],t:[],alt:[]}", 'single ALTERNATES zone model');
+has("const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',alt:'ALTERNATE'};", 'zone→TYPE map has single alt');
+has('function sbNormalizeZones(z)', 'zone normalizer present');
+has("['ab','av','at'].forEach(k=>{ if(Array.isArray(z[k])) out.alt=out.alt.concat", 'old per-column alts migrate to alt');
+has('function sbBuildPlan(entries, slots)', 'order-based sandbox plan builder present');
+has('function sbMove(id,zone,index)', 'sbMove is index-aware');
+has('function sbDropSlot(e)', 'per-slot drop target present');
+has('async function portShowPlan(models, typeOf, subtitle, planFn)', 'portShowPlan accepts a plan builder');
+has('slots=>sbBuildPlan(entries, slots)', 'sandbox port uses the order-based plan');
+has('a.replaces?` <span class="port-skip">(replaces', 'preview shows relink replacements');
+has('class="sb-slot ', 'fixed slot elements rendered');
+has('.sb-slotnum{', 'slot number badge CSS present');
+lacks('sb-altzone', 'old per-column alternate zones removed');
+lacks("zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}", 'old six-zone model removed');
+/* v7.21 asserts (save states) */
+has('v7.21:', 'v7.21 deploy marker present');
+has("const SANDBOX_SAVES_BOARD_ID='18420711215';", 'saves board id present (client)');
+has('async function sbEnsureSavesCol()', 'saves column auto-discovery present');
+has("c.type==='long_text'", 'discovers a long_text column by type');
+has('async function sbSaveState()', 'save-state function present');
+has('create_item(board_id:$b,item_name:$n,column_values:$c)', 'save creates a Monday item');
+has('function sbLoadSaves(force)', 'saved-states loader present');
+has('function sbLoadSave(id)', 'load-a-save present');
+has('onclick="sbSaveState()"', 'Save state button wired');
+has('id="sb-saves-list"', 'saved-states strip present');
+has('sbLoadSaves(false);', 'saves load when sandbox opens');
 // Guard against duplicate element ids from the toolbar rebuild:
 ['am-title','am-search','am-sort','am-count','am-filterbtns','port-wrap','port-tag','port-btn','port-row-btn','port-row-picker','port-row-search','port-row-list',
  'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list','sb-progress','sb-loading','sb-load-status'].forEach(id=>{

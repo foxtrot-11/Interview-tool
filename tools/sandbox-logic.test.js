@@ -67,6 +67,31 @@ eq(p2.actions.map(a => [a.model.id, a.type, a.mode, a.slotName]),
   'forced types route to those columns\' slots (a life-verse can be THIS-shoot bottom)');
 truthy(p2.skipped.length === 1 && p2.skipped[0].model.id === '111', 'already-linked still skipped under override');
 
+console.log('[5] v7.20 order-based sandbox plan (sbBuildPlan)');
+const sbEval = new Function('kanbanItems',
+  extractFn('sbBuildPlan') + '\nreturn {sbBuildPlan};');
+// occupant "Bob" (id 900) sits in TOP1 already; TOP2 exists empty; TOP3 does not exist.
+const kb = [{ id: '900', name: 'Bob' }];
+const sbSlots = [
+  { id: 'st1', name: 'TOP1', linked: ['900'] },
+  { id: 'st2', name: 'TOP2', linked: [] },
+  { id: 'sb1', name: 'BOTTOM1', linked: ['700'] },   // Alice(700) already here
+];
+const { sbBuildPlan } = sbEval(kb);
+// entries: Alice(700) placed at TOP position 1 (was BOTTOM1); Carol(701) at TOP position 2; Dan(702) TOP3; Alice also as-is at BOTTOM1 to test skip
+const sbEntries = [
+  { model: { id: '700', name: 'Alice' }, type: 'TOP', num: 1 },   // TOP1 occupied by Bob → relink, replaces Bob
+  { model: { id: '701', name: 'Carol' }, type: 'TOP', num: 2 },   // TOP2 empty → fill
+  { model: { id: '702', name: 'Dan' },   type: 'TOP', num: 3 },   // TOP3 missing → create
+  { model: { id: '700', name: 'Alice' }, type: 'BOTTOM', num: 1 },// BOTTOM1 already Alice → skip
+];
+const sp = sbBuildPlan(sbEntries, sbSlots);
+eq(sp.actions.map(a => [a.model.name, a.slotName, a.mode, a.replaces || null]),
+  [['Alice','TOP1','fill','Bob'], ['Carol','TOP2','fill',null], ['Dan','TOP3','create',null]],
+  'position→TYPE{num}: relink (replaces Bob), fill empty, create missing');
+eq(sp.skipped.map(s => [s.model.name, s.reason]), [['Alice','already in BOTTOM1']],
+  'person already sitting in their exact target slot is skipped');
+
 console.log('[4] share-link codec round-trip');
 const codecEval = new Function('btoa', 'atob',
   'let sbState={tag:"18", zones:{b:["1"],v:["2","3"],t:[],ab:[],av:["4"],at:[]}};\n' +

@@ -109,7 +109,11 @@ const BATCH_BOARD_ID = process.env.BATCH_BOARD_ID || '18416230588';
 // link column itself only accepts production-tracker items — Monday enforces that.
 const CASTING_BOARD_ID = '8533133380';
 const CASTING_SUBITEM_BOARD_ID = '8533133826';
-const ALLOWED_BOARD_IDS = new Set([MAIN_BOARD_ID, BATCH_BOARD_ID, CASTING_BOARD_ID, CASTING_SUBITEM_BOARD_ID]); // whichever boards this environment uses + casting stack
+// v7.21: Casting Sandbox "save states" board — one item per saved arrangement (JSON in a Long Text
+// column). Same id in every environment (saves are app data, not per-environment), so unconditional.
+// Only needs reads (boards/items) + create_item, both already in the root allow-lists.
+const SANDBOX_SAVES_BOARD_ID = '18420711215';
+const ALLOWED_BOARD_IDS = new Set([MAIN_BOARD_ID, BATCH_BOARD_ID, CASTING_BOARD_ID, CASTING_SUBITEM_BOARD_ID, SANDBOX_SAVES_BOARD_ID]); // whichever boards this environment uses + casting stack + sandbox saves
 const ALLOWED_QUERY_ROOTS = new Set(['boards', 'items', 'assets']);
 const ALLOWED_MUTATION_ROOTS = new Set([
   'change_multiple_column_values',
