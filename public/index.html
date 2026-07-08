@@ -129,6 +129,11 @@
   .sb-save-tab{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:4px 12px;font-size:11px;color:var(--text);cursor:pointer;max-width:230px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:inherit}
   .sb-save-tab:hover{border-color:#8657d4;color:#b18ae8}
   .sb-saves-empty{font-size:11px;color:var(--text-muted)}
+  .sb-save-chip{display:inline-flex;align-items:stretch;border:1px solid var(--border);border-radius:14px;overflow:hidden}
+  .sb-save-chip:hover{border-color:#8657d4}
+  .sb-save-chip .sb-save-tab{border:none;border-radius:0;max-width:210px}
+  .sb-save-del{border:none;border-left:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;padding:0 9px;font-size:11px}
+  .sb-save-del:hover{background:var(--danger);color:#fff}
   .sb-progress{display:inline-flex;align-items:center;gap:8px}
   .sb-progress-track{width:120px;height:6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;overflow:hidden}
   .sb-progress-bar{display:block;height:100%;width:0;background:var(--accent);transition:width .2s ease}
@@ -785,6 +790,7 @@
         <div class="status-dd-menu" id="status-dd-menu"></div>
       </div>
       <button class="dup-refresh-btn" id="back-to-grid-btn" style="display:none" onclick="backToApprovedGrid()">← Back to grid</button>
+      <button class="dup-refresh-btn" id="copy-model-link-btn" style="display:none" onclick="copyModelLink()" title="Copy a link that opens this model's page">🔗 Copy link</button>
       <button class="save-btn" id="save-btn" onclick="saveAll()" disabled style="margin-left:auto">Save Changes</button>
       <div id="save-progress-bar" style="display:none;position:absolute;bottom:0;left:0;height:3px;background:var(--accent);border-radius:2px;width:0%;transition:width 0.3s ease"></div>
     </div>
@@ -1289,6 +1295,8 @@
           <select id="am-sort" class="am-sort" onchange="renderAllModels()">
             <option value="name-asc">Name A→Z</option>
             <option value="name-desc">Name Z→A</option>
+            <option value="date-desc">Date added: newest first</option>
+            <option value="date-asc">Date added: oldest first</option>
             <option value="h-desc">Height: tallest first</option>
             <option value="h-asc">Height: shortest first</option>
             <option value="w-desc">Weight: heaviest first</option>
@@ -1379,6 +1387,18 @@
           <button class="kb-save" id="port-confirm" onclick="portConfirm()">Confirm — write to Monday</button>
           <button class="kb-hs-cancel" onclick="portClose()">Close</button>
           <span class="am-count" id="port-status"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="sb-del-modal" class="unsaved-modal" style="z-index:9600">
+      <div class="unsaved-panel" style="max-width:440px;width:min(94vw,440px)">
+        <div class="unsaved-title">Delete saved state?</div>
+        <div class="unsaved-text" id="sb-del-text"></div>
+        <div class="unsaved-actions" style="margin-top:14px">
+          <button class="kb-hs-cancel" onclick="sbDelClose()">Cancel</button>
+          <button class="kb-save" id="sb-del-confirm" style="background:var(--danger);border-color:var(--danger)" onclick="sbDoDeleteSave()">Delete permanently</button>
+          <span class="am-count" id="sb-del-status"></span>
         </div>
       </div>
     </div>
@@ -1722,7 +1742,7 @@ const AM_FILTERS=[
  {key:'tat',  col:'color_mm1zghx9',    label:'Tattoos', kind:'status'},
  {key:'shoot',col:'dropdown_mkyj8js9', label:'Shoot Tags', kind:'dropdown', scope:'5a'}
 ];
-const AM_SORT_FIELDS={h:{key:'hIn',raw:'hRaw',label:'height'},w:{key:'wLb',raw:'wRaw',label:'weight'},c:{key:'cIn',raw:'cRaw',label:'cock size'}};
+const AM_SORT_FIELDS={h:{key:'hIn',raw:'hRaw',label:'height'},w:{key:'wLb',raw:'wRaw',label:'weight'},c:{key:'cIn',raw:'cRaw',label:'cock size'},date:{key:'addedTs',raw:'addedLabel',label:'date added'}};
 const AM_DD_KEY={}, AM_ST_KEY={};
 AM_FILTERS.forEach(f=>{ (f.kind==='dropdown'?AM_DD_KEY:AM_ST_KEY)[f.col]=f.key; });
 let amFilters={};            // filter key -> Set of selected option ids (live set for the CURRENT scope)
@@ -1879,6 +1899,20 @@ async function fetchAssetUrls(assetIds, opts){
   await Promise.all(Array.from({length:Math.min(4,chunks.length)},()=>worker()));
 }
 
+// v7.23: "Date added" sort. The Evernote import wrote a DATE INPUT column; Monday-native records don't have
+// it. We discover that column by title once per board (its id differs across staging/prod, like the metric
+// cols), fetch it + created_at in the bulk load, and treat DATE INPUT ?? created_at as one "date added".
+let dateInputColId; // undefined = not resolved yet, null = board has none
+async function resolveDateInputCol(){
+  if(dateInputColId!==undefined) return dateInputColId;
+  try{
+    const d=await gql(`{boards(ids:[${MAIN_BOARD_ID}]){columns{id title type}}}`);
+    const cols=(((d.boards||[])[0])||{}).columns||[];
+    const c=cols.find(x=>x.type==='date' && /date\s*input/i.test(x.title||''));
+    dateInputColId = c ? c.id : null;
+  }catch(e){ dateInputColId=null; }
+  return dateInputColId;
+}
 async function loadKanban(){
   const board=document.getElementById('kanban-board');
   const loaders=['kanban-loading','am-loading','sb-loading'].map(i=>document.getElementById(i)).filter(Boolean);
@@ -1890,10 +1924,14 @@ async function loadKanban(){
   document.getElementById('kanban-summary').textContent='';
   try{
     setLoad('Loading models… (first load can take ~30–60s on a cold start)');
+    const dateCol = await resolveDateInputCol();
+    const colIds = ["label","lien_internet","files_mkncw5nm","dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm254xed","dropdown_mkncp6xy","dropdown_mm1by5q0","dropdown_mm1zcar6","color_mm1zk5e2","color_mm1zghx9","text_mknc1sps","text_mm1yx2wg","text_mm1y2znz","dropdown_mkyj8js9"];
+    if(dateCol) colIds.push(dateCol);
+    const colIdsJson = JSON.stringify(colIds);
     const items=[]; let cursor=null, pages=0;
     do{
       const cp = cursor ? `cursor:"${cursor}"` : 'limit:200';
-      const data = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name updated_at column_values(ids:["label","lien_internet","files_mkncw5nm","dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm254xed","dropdown_mkncp6xy","dropdown_mm1by5q0","dropdown_mm1zcar6","color_mm1zk5e2","color_mm1zghx9","text_mknc1sps","text_mm1yx2wg","text_mm1y2znz","dropdown_mkyj8js9"]){id value}}}}}`);
+      const data = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name created_at updated_at column_values(ids:${colIdsJson}){id value}}}}}`);
       const page = data.boards[0].items_page;
       page.items.forEach(it=>{
         const cv={}; (it.column_values||[]).forEach(c=>cv[c.id]=c);
@@ -1905,7 +1943,14 @@ async function loadKanban(){
         let head=null; const fv=pv('files_mkncw5nm'); if(fv&&fv.files&&fv.files.length) head=fv.files[0].assetId;
         const twUrl=(pv('lien_internet')||{}).url||'';
         const hRaw=tx('text_mknc1sps'), wRaw=tx('text_mm1yx2wg'), cRaw=tx('text_mm1y2znz');
-        items.push({id:it.id, name:(it.name||'').trim(), updated_at:it.updated_at||'', statusIdx, notes:'', notesLoaded:false, twUrl, head,
+        // Unified "date added": DATE INPUT (Evernote import) if present, else Monday created_at.
+        const diVal = dateCol ? pv(dateCol) : null;
+        const diStr = (diVal && diVal.date) ? diVal.date : '';
+        let addedTs = diStr ? Date.parse(diStr) : NaN;
+        if(!isFinite(addedTs)) addedTs = Date.parse(it.created_at||'');
+        addedTs = isFinite(addedTs) ? addedTs : null;
+        items.push({id:it.id, name:(it.name||'').trim(), created_at:it.created_at||'', updated_at:it.updated_at||'', statusIdx, notes:'', notesLoaded:false, twUrl, head,
+          addedTs, addedLabel: addedTs ? new Date(addedTs).toISOString().slice(0,10) : '',
           f:{type:dd('dropdown_mm1zzwcg'),role:dd('dropdown_mknbe0p0'),loc:dd('dropdown_mm254xed'),site:dd('dropdown_mkncp6xy'),sex:dd('dropdown_mm1by5q0'),eth:dd('dropdown_mm1zcar6'),shoot:dd('dropdown_mkyj8js9'),ftm:st('color_mm1zk5e2'),tat:st('color_mm1zghx9')},
           hRaw,wRaw,cRaw,hIn:parseHeightIn(hRaw),wLb:parseWeightLb(wRaw),cIn:parseCockIn(cRaw)});
       });
@@ -2717,7 +2762,7 @@ async function sbLoadSaves(force){
 function sbRenderSaves(){
   const wrap=document.getElementById('sb-saves-list'); if(!wrap) return;
   wrap.innerHTML = sbSaves.length
-    ? sbSaves.map(s=>`<button class="sb-save-tab" onclick="sbLoadSave('${s.id}')" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</button>`).join('')
+    ? sbSaves.map(s=>`<span class="sb-save-chip"><button class="sb-save-tab" onclick="sbLoadSave('${s.id}')" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</button><button class="sb-save-del" title="Delete this saved state" onclick="event.stopPropagation();sbAskDeleteSave('${s.id}')">🗑</button></span>`).join('')
     : '<span class="sb-saves-empty">No saved states yet — arrange, then “Save state”.</span>';
 }
 function sbLoadSave(id){
@@ -2726,6 +2771,28 @@ function sbLoadSave(id){
   const sel=document.getElementById('sb-tag'); if(sel&&sbState.tag) sel.value=String(sbState.tag);
   sbSelected=null; renderSandbox();
   showToast('Loaded “'+(s.name||'')+'”','success');
+}
+// Delete a saved state — deliberately gated behind a confirm box (delete_item is irreversible + shared).
+let sbDelId=null;
+function sbAskDeleteSave(id){
+  const s=sbSaves.find(x=>String(x.id)===String(id)); if(!s) return;
+  sbDelId=id;
+  document.getElementById('sb-del-text').textContent='“'+(s.name||'this saved state')+'” will be permanently deleted from the Monday board — for every coworker, not just you. This cannot be undone.';
+  document.getElementById('sb-del-status').textContent='';
+  const b=document.getElementById('sb-del-confirm'); if(b) b.disabled=false;
+  document.getElementById('sb-del-modal').classList.add('open');
+}
+function sbDelClose(){ document.getElementById('sb-del-modal')?.classList.remove('open'); sbDelId=null; }
+async function sbDoDeleteSave(){
+  if(!sbDelId) return;
+  const b=document.getElementById('sb-del-confirm'), st=document.getElementById('sb-del-status');
+  if(b) b.disabled=true; if(st) st.textContent='Deleting…';
+  try{
+    await gql(`mutation($i:ID!){delete_item(item_id:$i){id}}`, {i:sbDelId});
+    sbDelClose();
+    showToast('Saved state deleted ✓','success');
+    sbLoadSaves(true);
+  }catch(e){ if(st) st.textContent='Delete failed: '+(e.message||String(e)); if(b) b.disabled=false; }
 }
 async function sbSaveState(){
   if(!sbState.tag){ showToast('Pick a shoot tag first','error'); return; }
@@ -3207,6 +3274,11 @@ async function init(){
     if((location.hash||'').startsWith('#sb=')){
       const p=sbDecode(location.hash.slice(4));
       if(p){ sbPending=p; setMode('sb'); }
+    }
+    // v7.23: a #model=<id> link opens that model's full page directly.
+    else if((location.hash||'').startsWith('#model=')){
+      const mid=location.hash.slice(7).trim();
+      if(/^\d+$/.test(mid)) openModelDeepLink(mid);
     }
   }catch(e){
     document.querySelector('#loading-screen .loading-text').textContent='Connection failed: '+e.message;
@@ -3751,6 +3823,23 @@ window.addEventListener('beforeunload', (e)=>{
 });
 
 // ── LOAD CANDIDATE ──
+// v7.23: deep link to a model's full page. copyModelLink() copies a #model=<id> URL; on boot, that hash
+// opens the model straight in the full editor (recipient still needs the app passphrase).
+function copyModelLink(){
+  if(!currentItem){ showToast('Open a model first','error'); return; }
+  const url=location.origin+location.pathname+'#model='+currentItem.id;
+  const fallback=()=>{ try{ prompt('Copy this link:', url); }catch(e){} };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(()=>showToast('Model link copied ✓','success')).catch(fallback);
+  else fallback();
+}
+async function openModelDeepLink(id){
+  show('selector-bar');
+  const bb=document.getElementById('back-to-grid-btn'); if(bb) bb.style.display='none';   // arrived via link, no grid to go back to
+  approvedFromGrid=false;
+  buildSidebarNav('full');
+  try{ await loadCandidate(id); }
+  catch(e){ showToast('Could not open that model','error'); }
+}
 async function loadCandidate(itemId){
   if(fullEditorDirty() && (!currentItem || String(itemId||'')!==String(currentItem.id))){
     if(!(await gateFullEditor())) return;   // switching candidates with unsaved edits
@@ -3759,11 +3848,14 @@ async function loadCandidate(itemId){
     resetForm();show('empty-state');
     document.getElementById('candidate-strip').classList.remove('visible');
   const ssb=document.getElementById('sticky-status-bar');if(ssb)ssb.style.display='none';
-    document.getElementById('save-btn').disabled=true;currentItem=null;return;
+    document.getElementById('save-btn').disabled=true;currentItem=null;
+    document.getElementById('copy-model-link-btn')?.style.setProperty('display','none');
+    return;
   }
   showToast('Loading...','saving');
   const data=await gql(`{items(ids:[${itemId}]){id name column_values{id text value}}}`);
   currentItem=data.items[0];
+  document.getElementById('copy-model-link-btn')?.style.setProperty('display','');
   // Show the correct view FIRST so the form is visible no matter what
   hide('empty-state');
   hide('new-model-view');
@@ -5120,6 +5212,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.23: Three additions — (1) each saved sandbox state gets a 🗑 delete button gated behind a confirm box (delete_item; irreversible + shared, so it warns it removes for everyone). (2) In the full editor (Approved / All Models / 2 / 4), a "🔗 Copy link" button copies a #model=<id> URL that opens that model's page directly on load (recipient needs the app passphrase). (3) All Models sort adds "Date added" (newest/oldest): unified date = DATE INPUT column (Evernote import, discovered by title per board) if present, else Monday created_at — one timeline across both systems.
    v7.22: Casting Sandbox alternates are per-column again — BOTTOM, VERS, TOP each get their own ALTERNATES section (3 columns × 2 sections), reverting v7.20's single alternates row. Fixed numbered slots kept (main ≥8, alt ≥4). Port numbering: mains stay TYPE{position}; alternates from all three columns collapse to ALTERNATE and are numbered in column order (BOTTOM→VERSE→TOP), since Monday has one ALTERNATE subitem type. Old single-ALTERNATES saves/links migrate into VERSE alternates.
    v7.21: Casting Sandbox "Save state" — arrangements persist on Monday board 18420711215 (JSON in a Long Text column, discovered by type at runtime) so ANY coworker can load them, not just the maker; a "Saved states" strip lists every save (running list, newest first) and clicking one loads it. Chosen over cookies/localStorage (per-device, invisible to coworkers) and server files (Render disk is ephemeral). server.js: saves board added to ALLOWED_BOARD_IDS (create_item + reads already allowed).
    v7.20: Casting Sandbox columns now show fixed numbered slots (min 8 each: BOTTOM/VERS/TOP + one ALTERNATES row of 8) so the grid is consistent regardless of dragging; position within a column IS the priority and maps directly to the ported subitem number (slot 1 → TYPE1, etc.) — rearranging changes the numbers, and re-porting relinks a slot to whoever now sits there (shown as "replaces X" in the preview). Drop onto a specific slot to insert at that position; drop on the column to append. (Single ALTERNATES zone replaces the old per-column alternates; old share links auto-migrate.)

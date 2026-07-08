@@ -41,6 +41,7 @@ console.log('[1] saves board — the app\'s real queries pass');
 expect('read saves columns', `{boards(ids:[${SAVES}]){columns{id title type}}}`, {}, true);
 expect('read saves items', `{boards(ids:[${SAVES}]){items_page(limit:200){items{id name updated_at column_values(ids:["long_text_x"]){text}}}}}`, {}, true);
 expect('create_item on saves (vars)', `mutation($b:ID!,$n:String!,$c:JSON!){create_item(board_id:$b,item_name:$n,column_values:$c){id}}`, {b:SAVES,n:'x',c:'{}'}, true);
+expect('delete_item (saved state)', `mutation($i:ID!){delete_item(item_id:$i){id}}`, {i:'123'}, true);
 
 console.log('[2] negatives still rejected');
 expect('read a random board', `{boards(ids:[999999]){items_page{items{id}}}}`, {}, false);

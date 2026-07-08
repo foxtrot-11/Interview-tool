@@ -202,6 +202,23 @@ has('const SB_MIN_SLOTS=8, SB_ALT_MIN=4;', 'main/alt slot minimums');
 has('${label} ALTERNATES', 'each column renders its own ALTERNATES header');
 has("['ab','av','at'].forEach(z=>(sbState.zones[z]||[]).forEach(id=>{ const m=byId[id]; if(m){ altNum++;", 'alternates numbered globally in column order at port');
 has('const slots=(z,alt)=>', 'slot renderer takes an alt flag');
+/* v7.23 asserts */
+has('v7.23:', 'v7.23 deploy marker present');
+has('function sbAskDeleteSave(id)', 'save delete-confirm present');
+has('async function sbDoDeleteSave()', 'save delete executor present');
+has('delete_item(item_id:$i)', 'delete uses delete_item');
+has('id="sb-del-modal"', 'delete-confirm box present');
+has('onclick="event.stopPropagation();sbAskDeleteSave', 'delete button per saved state');
+has('function copyModelLink()', 'model deep-link copy present');
+has('async function openModelDeepLink(id)', 'model deep-link open present');
+has("startsWith('#model=')", 'boot handles #model= links');
+has('id="copy-model-link-btn"', 'copy-link button present');
+has("date:{key:'addedTs',raw:'addedLabel',label:'date added'}", 'date-added sort field present');
+has('async function resolveDateInputCol()', 'DATE INPUT column discovery present');
+has("x.type==='date' && /date\\s*input/i.test", 'discovers DATE INPUT by title/type');
+has('if(!isFinite(addedTs)) addedTs = Date.parse(it.created_at', 'date falls back to created_at');
+has('items{id name created_at updated_at column_values', 'bulk load fetches created_at');
+has('<option value="date-desc">', 'date sort option in dropdown');
 // Guard against duplicate element ids from the toolbar rebuild:
 ['am-title','am-search','am-sort','am-count','am-filterbtns','port-wrap','port-tag','port-btn','port-row-btn','port-row-picker','port-row-search','port-row-list',
  'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list','sb-progress','sb-loading','sb-load-status'].forEach(id=>{
