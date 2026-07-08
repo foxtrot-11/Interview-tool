@@ -136,10 +136,11 @@
   .sb-board{display:block}
   .sb-cols{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:14px;align-items:start}
   .sb-colhead{font-family:var(--font-display);font-weight:800;font-size:14px;letter-spacing:0.06em;padding:8px 10px;border:1px solid var(--border);border-radius:8px 8px 0 0;background:var(--surface);display:flex;justify-content:space-between;align-items:center}
-  .sb-althead2{font-family:var(--font-display);font-weight:800;font-size:13px;letter-spacing:0.06em;padding:8px 10px;border:1px solid var(--border);border-radius:8px 8px 0 0;background:var(--surface);display:flex;justify-content:space-between;align-items:center}
-  .sb-altsection{margin-top:16px}
+  .sb-althead{font-family:var(--font-mono);font-weight:700;font-size:9px;letter-spacing:.14em;color:var(--text-muted);padding:8px 10px 4px;display:flex;justify-content:space-between;align-items:center}
+  .sb-altsection{margin-top:0}
   .sb-cnt{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);font-weight:400}
-  .sb-zone{border:1px dashed var(--border);border-top:none;border-radius:0 0 8px 8px;padding:8px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;background:rgba(255,255,255,.015)}
+  .sb-zone{border:1px dashed var(--border);border-top:none;padding:8px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;background:rgba(255,255,255,.015);min-height:60px}
+  .sb-altzone{border-radius:0 0 8px 8px;background:rgba(134,87,212,.05)}
   .sb-zone.over{border-color:var(--accent);background:rgba(255,120,60,.06)}
   .sb-slot{position:relative;width:92px;min-height:112px;border:1px dashed transparent;border-radius:8px;display:flex;align-items:flex-start;justify-content:center;padding-top:2px}
   .sb-slot.empty{border-color:var(--border);background:rgba(255,255,255,.02)}
@@ -1347,7 +1348,7 @@
           <button class="am-clear" title="Reload casting rows" onclick="portLoadRows(true)">↻</button>
           <button class="am-clear" style="border-color:var(--accent);color:var(--accent)" onclick="sbPortOpen()">⇪ Port this arrangement</button>
         </div>
-        <div class="sb-hint">Drag tiles between columns (or tap a tile, then tap a column). Nothing is written to Monday until you Port — the subitem TYPE comes from the column each person sits in <i>here</i>, not their profile. “Copy share link” encodes this exact arrangement into the link; anyone with the app passphrase can open it, adjust, and send a link back. “Save state” stores it on Monday so any coworker can load it.</div>
+        <div class="sb-hint">Drag tiles between columns and between each column's main and ALTERNATES section (or tap a tile, then tap a slot). Position = priority = subitem number when ported (slot 1 → TYPE1). Alternates from all three columns port as ALTERNATE in column order. Nothing is written to Monday until you Port. “Copy share link” encodes this arrangement; “Save state” stores it on Monday so any coworker can load it.</div>
         <div class="am-toolbar-row" id="sb-saves-row">
           <span class="tb-label">Saved states</span>
           <button class="am-clear" title="Refresh saved states" onclick="sbLoadSaves(true)">↻</button>
@@ -2547,16 +2548,17 @@ function portRowEnter(){ if(portRowOpts.length) portRowPick(0); }
    Share: the whole arrangement is encoded into a #sb= URL — stateless, so it
    survives server restarts; the recipient logs in with the app passphrase,
    sees it, can adjust, and can copy a new link back. */
-let sbState={tag:null, zones:{b:[],v:[],t:[],alt:[]}};
+let sbState={tag:null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}};
 let sbPending=null, sbSelected=null;
 const SB_MAIN=[['b','BOTTOM'],['v','VERS'],['t','TOP']];
-const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',alt:'ALTERNATE'};
-const SB_MIN_SLOTS=8;   // every column shows at least this many slots so the grid stays consistent (v7.20)
-// Coerce any incoming zones (fresh, share-link, or old per-column-alt shape) to {b,v,t,alt} arrays of ids.
+const SB_ALT={b:'ab',v:'av',t:'at'};                                  // each main column's alternates zone (v7.22)
+const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',ab:'ALTERNATE',av:'ALTERNATE',at:'ALTERNATE'};
+const SB_MIN_SLOTS=8, SB_ALT_MIN=4;   // main columns show ≥8 slots, alternates ≥4; both grow if fuller
+// Coerce incoming zones (fresh, share-link, save) to the 6-zone shape {b,v,t,ab,av,at}.
 function sbNormalizeZones(z){
-  z=z||{}; const out={b:[],v:[],t:[],alt:[]};
-  ['b','v','t','alt'].forEach(k=>{ if(Array.isArray(z[k])) out[k]=z[k].map(String); });
-  ['ab','av','at'].forEach(k=>{ if(Array.isArray(z[k])) out.alt=out.alt.concat(z[k].map(String)); }); // migrate v7.17 per-column alternates
+  z=z||{}; const out={b:[],v:[],t:[],ab:[],av:[],at:[]};
+  ['b','v','t','ab','av','at'].forEach(k=>{ if(Array.isArray(z[k])) out[k]=z[k].map(String); });
+  if(Array.isArray(z.alt)) out.av=out.av.concat(z.alt.map(String));   // migrate the v7.20/21 single-ALTERNATES saves into VERSE alternates
   return out;
 }
 function sbEncode(){ const p={t:sbState.tag,z:sbState.zones}; return btoa(unescape(encodeURIComponent(JSON.stringify(p)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
@@ -2577,10 +2579,10 @@ function sbMembers(tagId){
     .map(m=>({id:String(m.id), name:m.name, head:m.head, roleLabels:(m.f.role||[]).map(rid=>{const o=roleOpts.find(x=>Number(x.id)===Number(rid)); return o?String(o.label):'';}).filter(Boolean)}))
     .sort((a,b)=>a.name.localeCompare(b.name));
 }
-function sbDefaultZone(roleLabels){ const t=portDecideType(roleLabels); return t==='VERSE'?'v':t==='TOP'?'t':t==='BOTTOM'?'b':'alt'; }
+function sbDefaultZone(roleLabels){ const t=portDecideType(roleLabels); return t==='VERSE'?'v':t==='TOP'?'t':t==='BOTTOM'?'b':'av'; }
 function sbTagChanged(){
   const v=document.getElementById('sb-tag').value;
-  sbState={tag:v||null, zones:{b:[],v:[],t:[],alt:[]}};
+  sbState={tag:v||null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}};
   sbSelected=null;
   renderSandbox();
 }
@@ -2613,21 +2615,18 @@ async function renderSandbox(){
   if(!mem.length){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag (approved statuses only). Tag people in the 5-APPROVED editor first.'; board.style.display='none'; return; }
   empty.style.display='none'; board.style.display='';
   const tile=id=>{ const m=byId[id]; const url=(m&&m.head)?(kbHeadCache[String(m.head)]||''):''; return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div></div>`; };
-  // A zone renders as fixed numbered slots (min 8, grows if fuller). Slot position = subitem number at Port.
-  const slots=z=>{ const ids=sbState.zones[z]||[]; const n=Math.max(SB_MIN_SLOTS, ids.length); let h='';
-    for(let i=0;i<n;i++){ const id=ids[i];
-      h+=`<div class="sb-slot ${id!=null?'filled':'empty'}" data-zone="${z}" data-index="${i}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDropSlot(event)" onclick="sbSlotClick(event,'${z}',${i})"><span class="sb-slotnum">${SB_TYPE[z].slice(0,1)}${i+1}</span>${id!=null?tile(id):''}</div>`; }
+  // A zone renders as fixed numbered slots (main ≥8, alt ≥4). Slot position = subitem number at Port.
+  const slots=(z,alt)=>{ const ids=sbState.zones[z]||[]; const n=Math.max(alt?SB_ALT_MIN:SB_MIN_SLOTS, ids.length); let h='';
+    for(let i=0;i<n;i++){ const id=ids[i]; const lbl=alt?'ALT':(SB_TYPE[z].slice(0,1)+(i+1));
+      h+=`<div class="sb-slot ${id!=null?'filled':'empty'}" data-zone="${z}" data-index="${i}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDropSlot(event)" onclick="sbSlotClick(event,'${z}',${i})"><span class="sb-slotnum">${lbl}</span>${id!=null?tile(id):''}</div>`; }
     return h; };
-  board.innerHTML=
-    `<div class="sb-cols">`+SB_MAIN.map(([z,label])=>`
+  board.innerHTML=`<div class="sb-cols">`+SB_MAIN.map(([z,label])=>{ const az=SB_ALT[z]; return `
       <div class="sb-colwrap">
         <div class="sb-colhead">${label} <span class="sb-cnt">${sbState.zones[z].length}</span></div>
-        <div class="sb-zone" data-zone="${z}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event)" onclick="sbZoneClick('${z}')">${slots(z)}</div>
-      </div>`).join('')+`</div>`+
-    `<div class="sb-altsection">
-       <div class="sb-althead2">ALTERNATES <span class="sb-cnt">${sbState.zones.alt.length}</span></div>
-       <div class="sb-zone sb-altrow" data-zone="alt" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event)" onclick="sbZoneClick('alt')">${slots('alt')}</div>
-     </div>`;
+        <div class="sb-zone" data-zone="${z}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event)" onclick="sbZoneClick('${z}')">${slots(z,false)}</div>
+        <div class="sb-althead">${label} ALTERNATES <span class="sb-cnt">${sbState.zones[az].length}</span></div>
+        <div class="sb-zone sb-altzone" data-zone="${az}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event)" onclick="sbZoneClick('${az}')">${slots(az,true)}</div>
+      </div>`; }).join('')+`</div>`;
   // Thumbnails stream in (smaller chunks → the 4 parallel workers engage and photos paint in waves),
   // filled by id so we never rebuild the board mid-load. A progress bar shows it's working.
   const missing=mem.filter(m=>m.head && !kbHeadCache[String(m.head)]).map(m=>m.head);
@@ -2763,9 +2762,12 @@ async function sbPortOpen(){
   if(!sbState.tag){ showToast('Pick a shoot tag first','error'); return; }
   if(!portSelectedRowId){ showToast('Pick a casting row first','error'); return; }
   const mem=sbSyncMembership(); const byId={}; mem.forEach(m=>byId[m.id]=m);
-  // Walk each zone in position order; position i (1-based) → subitem TYPE{i}. Order here = priority on Monday.
+  // Mains: position i → TYPE{i}. Alternates (all 3 columns) collapse to ALTERNATE type, numbered
+  // in column order (BOTTOM→VERSE→TOP) since Monday has a single ALTERNATE subitem type.
   const entries=[];
-  ['b','v','t','alt'].forEach(z=>(sbState.zones[z]||[]).forEach((id,i)=>{ const m=byId[id]; if(m) entries.push({model:m, type:SB_TYPE[z], num:i+1}); }));
+  ['b','v','t'].forEach(z=>(sbState.zones[z]||[]).forEach((id,i)=>{ const m=byId[id]; if(m) entries.push({model:m, type:SB_TYPE[z], num:i+1}); }));
+  let altNum=0;
+  ['ab','av','at'].forEach(z=>(sbState.zones[z]||[]).forEach(id=>{ const m=byId[id]; if(m){ altNum++; entries.push({model:m, type:'ALTERNATE', num:altNum}); } }));
   if(!entries.length){ showToast('Nothing to port','error'); return; }
   const tagOpt=(boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.id)===String(sbState.tag));
   await portShowPlan(null, null, `Sandbox “${tagOpt?tagOpt.label:sbState.tag}” → row “${portSelectedRowName||portSelectedRowId}” (order = subitem number)`, slots=>sbBuildPlan(entries, slots));
@@ -5118,6 +5120,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.22: Casting Sandbox alternates are per-column again — BOTTOM, VERS, TOP each get their own ALTERNATES section (3 columns × 2 sections), reverting v7.20's single alternates row. Fixed numbered slots kept (main ≥8, alt ≥4). Port numbering: mains stay TYPE{position}; alternates from all three columns collapse to ALTERNATE and are numbered in column order (BOTTOM→VERSE→TOP), since Monday has one ALTERNATE subitem type. Old single-ALTERNATES saves/links migrate into VERSE alternates.
    v7.21: Casting Sandbox "Save state" — arrangements persist on Monday board 18420711215 (JSON in a Long Text column, discovered by type at runtime) so ANY coworker can load them, not just the maker; a "Saved states" strip lists every save (running list, newest first) and clicking one loads it. Chosen over cookies/localStorage (per-device, invisible to coworkers) and server files (Render disk is ephemeral). server.js: saves board added to ALLOWED_BOARD_IDS (create_item + reads already allowed).
    v7.20: Casting Sandbox columns now show fixed numbered slots (min 8 each: BOTTOM/VERS/TOP + one ALTERNATES row of 8) so the grid is consistent regardless of dragging; position within a column IS the priority and maps directly to the ported subitem number (slot 1 → TYPE1, etc.) — rearranging changes the numbers, and re-porting relinks a slot to whoever now sits there (shown as "replaces X" in the preview). Drop onto a specific slot to insert at that position; drop on the column to append. (Single ALTERNATES zone replaces the old per-column alternates; old share links auto-migrate.)
    v7.19: Casting Sandbox now shows the real loading status bar (spinner + "Loading models… N loaded", same component as Kanban/All-Models) while the shared board store loads — the earlier static "Loading board…" gave no progress because the sandbox wasn't wired into loadKanban's loader list. The slow part on a cold first load is that full board fetch (~950 records); it's now visible/honest instead of looking frozen, and the per-tag photo progress bar (v7.18) still runs once the board is in.

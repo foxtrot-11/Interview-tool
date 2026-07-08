@@ -143,7 +143,7 @@ has(`function kbOpenRecrop()`, 'kanban-modal recrop entry exists');
 has(`✂ Recrop</button>`, 'kanban-modal has the ✂ Recrop button');
 has(`async function openRecrop(itemIdArg, headIdArg)`, 'openRecrop generalized for modal callers');
 has(`function refreshHeadEverywhere(itemId, hsOpt)`, 'refreshHeadEverywhere accepts explicit headshot');
-has(`const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',alt:'ALTERNATE'};`, 'sandbox column→TYPE map (VERSE naming kept)');
+has(`const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',ab:'ALTERNATE',av:'ALTERNATE',at:'ALTERNATE'};`, 'sandbox column→TYPE map (VERSE naming kept)');
 has(`location.hash||'').startsWith('#sb=')`, 'share-link boot hook present');
 has(`sbRenderRowList(); return;`, 'portLoadRows refreshes the sandbox picker too');
 /* v7.18 asserts */
@@ -169,11 +169,11 @@ has('if(!kanbanItems.length){ if(ld) ld.style.display=\'\'; empty.style.display=
 lacks("empty.textContent='Loading board…'", 'old static "Loading board…" removed');
 /* v7.20 asserts */
 has('v7.20:', 'v7.20 deploy marker present');
-has('const SB_MIN_SLOTS=8;', 'fixed 8-slot minimum');
-has("zones:{b:[],v:[],t:[],alt:[]}", 'single ALTERNATES zone model');
-has("const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',alt:'ALTERNATE'};", 'zone→TYPE map has single alt');
+has('const SB_MIN_SLOTS=8', 'fixed 8-slot minimum');
+has("zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}", 'per-column alternates zone model (v7.22)');
+has("const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',ab:'ALTERNATE',av:'ALTERNATE',at:'ALTERNATE'};", 'zone→TYPE map has per-column alts');
 has('function sbNormalizeZones(z)', 'zone normalizer present');
-has("['ab','av','at'].forEach(k=>{ if(Array.isArray(z[k])) out.alt=out.alt.concat", 'old per-column alts migrate to alt');
+has("if(Array.isArray(z.alt)) out.av=out.av.concat", 'legacy single-alt migrates into verse alternates');
 has('function sbBuildPlan(entries, slots)', 'order-based sandbox plan builder present');
 has('function sbMove(id,zone,index)', 'sbMove is index-aware');
 has('function sbDropSlot(e)', 'per-slot drop target present');
@@ -182,8 +182,7 @@ has('slots=>sbBuildPlan(entries, slots)', 'sandbox port uses the order-based pla
 has('a.replaces?` <span class="port-skip">(replaces', 'preview shows relink replacements');
 has('class="sb-slot ', 'fixed slot elements rendered');
 has('.sb-slotnum{', 'slot number badge CSS present');
-lacks('sb-altzone', 'old per-column alternate zones removed');
-lacks("zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}", 'old six-zone model removed');
+has('sb-altzone', 'per-column alternate zones present (v7.22)');
 /* v7.21 asserts (save states) */
 has('v7.21:', 'v7.21 deploy marker present');
 has("const SANDBOX_SAVES_BOARD_ID='18420711215';", 'saves board id present (client)');
@@ -196,6 +195,13 @@ has('function sbLoadSave(id)', 'load-a-save present');
 has('onclick="sbSaveState()"', 'Save state button wired');
 has('id="sb-saves-list"', 'saved-states strip present');
 has('sbLoadSaves(false);', 'saves load when sandbox opens');
+/* v7.22 asserts (per-column alternates) */
+has('v7.22:', 'v7.22 deploy marker present');
+has("const SB_ALT={b:'ab',v:'av',t:'at'};", 'per-column alternates map present');
+has('const SB_MIN_SLOTS=8, SB_ALT_MIN=4;', 'main/alt slot minimums');
+has('${label} ALTERNATES', 'each column renders its own ALTERNATES header');
+has("['ab','av','at'].forEach(z=>(sbState.zones[z]||[]).forEach(id=>{ const m=byId[id]; if(m){ altNum++;", 'alternates numbered globally in column order at port');
+has('const slots=(z,alt)=>', 'slot renderer takes an alt flag');
 // Guard against duplicate element ids from the toolbar rebuild:
 ['am-title','am-search','am-sort','am-count','am-filterbtns','port-wrap','port-tag','port-btn','port-row-btn','port-row-picker','port-row-search','port-row-list',
  'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list','sb-progress','sb-loading','sb-load-status'].forEach(id=>{
