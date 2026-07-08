@@ -5212,6 +5212,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.26: Duplicate tool — two additions. (1) "Not a duplicate": marks a group as different-people-same-name, keeps all records, and hides it PERMANENTLY and for everyone (stored on Monday in a "__DUP_IGNORE__" item on the save-states board, keyed by the record id-set; falls back to session-only if that Long Text column isn't set up). Distinct from "Skip (this session)" which is temporary. (2) "Keep one · delete rest": pick the ◉ keeper and delete the other record(s) WITHOUT merging any fields/photos — for when a duplicate is empty. Reuses the delete + retry + Recycle-Bin safety and the name guardrail.
    v7.25: Fix — the merge-execution "Safety stop: names differ" guardrail was still comparing exact names, so it blocked the very "(NEEDS STAGE NAME)" twin merges v7.24 enabled (e.g. "donovan cox" vs "donovan cox (needs stage name)"). It now compares by dupNameKey (same normalization as grouping), so flag-twins merge while genuinely different names are still blocked.
    v7.24: Duplicate catcher now groups a plain name with its "(NEEDS STAGE NAME)"-flagged twin (the parser appends that suffix when a name looks like a legal name) — grouping key strips the trailing flag, but only when a real name precedes it so bare placeholders don't collapse together. On merge the keeper defaults to the FLAGGED row, so the "(NEEDS STAGE NAME)" state survives and the row that passed a legal name off as a stage name is the one removed.
    v7.23: Three additions — (1) each saved sandbox state gets a 🗑 delete button gated behind a confirm box (delete_item; irreversible + shared, so it warns it removes for everyone). (2) In the full editor (Approved / All Models / 2 / 4), a "🔗 Copy link" button copies a #model=<id> URL that opens that model's page directly on load (recipient needs the app passphrase). (3) All Models sort adds "Date added" (newest/oldest): unified date = DATE INPUT column (Evernote import, discovered by title per board) if present, else Monday created_at — one timeline across both systems.
@@ -5365,6 +5366,7 @@ async function loadDuplicates(){
       } while(cursor);
     }
     setLoad('Grouping duplicates…');
+    await dupLoadIgnore();   // shared "not a duplicate" list from Monday
     const byName = {};
     Object.values(byId).forEach(it => { const k=dupNameKey(it.name); (byName[k]=byName[k]||[]).push(it); });
     dupGroups = Object.entries(byName)
@@ -5375,7 +5377,8 @@ async function loadDuplicates(){
         const flagged = items.find(x=>hasStageNameFlag(x.name));
         const gname = flagged ? flagged.name : items[0].name;
         return { gid:'g'+i+'_'+items[0].id, name: gname, placeholder: isPlaceholderName(gname), items, keeperId:null, done:false };
-      });
+      })
+      .filter(g => !dupIgnoreSet.has(dupSig(g)));   // drop pairs a coworker already marked "not a duplicate"
     if(!dupGroups.length){ container.innerHTML = '<div class="dup-empty">✓ No duplicate name-groups found</div>'; summary.innerHTML=''; return; }
     dupGroups.forEach(g => { if(!g.placeholder) g.keeperId = defaultKeeperId(g); });
     renderDupGroups();
@@ -5447,10 +5450,13 @@ function renderDupGroups(){
       <div class="dup-preview" id="dup-preview-${gid}"></div>
       <div class="dup-actions">
         ${info.type==='D'
-          ? `<div class="dup-locked-note">🔒 Placeholder name — these are different people. Merge is disabled. Use Dismiss to hide.</div>
-             <button class="skip-btn" onclick="skipGroup('${gid}')">Dismiss</button>`
+          ? `<div class="dup-locked-note">🔒 Placeholder name — these are different people. Merge is disabled.</div>
+             <button class="skip-btn" onclick="ignoreGroup('${gid}')" title="Keep all and hide permanently for everyone (stored on Monday)">Not duplicates — hide</button>
+             <button class="skip-btn" onclick="skipGroup('${gid}')">Skip (this session)</button>`
           : `<button class="merge-btn" onclick="previewMerge('${gid}')" id="merge-btn-${gid}">Preview changes →</button>
-             <button class="skip-btn" onclick="skipGroup('${gid}')">Skip</button>`}
+             <button class="merge-btn" onclick="executeKeepOnly('${gid}')" title="Keep the ◉ selected record and delete the other(s) WITHOUT merging any fields — for when a duplicate is empty">Keep one · delete rest</button>
+             <button class="skip-btn" onclick="ignoreGroup('${gid}')" title="Different people who share a name — keep both and hide permanently for everyone (stored on Monday)">Not a duplicate</button>
+             <button class="skip-btn" onclick="skipGroup('${gid}')">Skip (this session)</button>`}
         <div id="dup-log-${gid}" class="dup-merge-log"></div>
       </div>`;
     container.appendChild(div);
@@ -5909,6 +5915,84 @@ function skipGroup(gid){
   const g=getDupGroup(gid); if(g) g.done=true;
   const el=document.getElementById(`dup-group-${gid}`);
   if(el){ el.style.opacity='0.4'; el.style.pointerEvents='none'; }
+}
+
+/* ══ v7.26: persistent "not a duplicate" + keep-one-delete-rest ═══════════════════════════════════════
+   "Not a duplicate" must survive reloads AND be shared (so coworkers don't re-review the same false pair).
+   Stored on Monday in one item ("__DUP_IGNORE__") on the save-states board — same board/column as sandbox
+   saves, so no new infra or server change. Falls back to session-only if that Long Text column isn't set up. */
+const DUP_IGNORE_NAME='__DUP_IGNORE__';
+let dupIgnoreItemId=null, dupIgnoreSet=null;
+function dupSig(group){ return group.items.map(i=>String(i.id)).sort().join('_'); }  // id-set signature; a changed set re-surfaces the group
+async function dupLoadIgnore(){
+  dupIgnoreSet=new Set(); dupIgnoreItemId=null;
+  try{
+    const col=await sbEnsureSavesCol(); if(!col) return;
+    const d=await gql(`{boards(ids:[${SANDBOX_SAVES_BOARD_ID}]){items_page(limit:200){items{id name column_values(ids:["${col}"]){text}}}}}`);
+    const items=(((d.boards||[])[0]||{}).items_page||{}).items||[];
+    const it=items.find(x=>x.name===DUP_IGNORE_NAME);
+    if(it){ dupIgnoreItemId=it.id; try{ (JSON.parse((it.column_values[0]||{}).text||'[]')||[]).forEach(s=>dupIgnoreSet.add(String(s))); }catch(e){} }
+  }catch(e){ /* leave set empty on failure — nothing hidden, safe default */ }
+}
+async function dupIgnorePersist(){
+  const col=await sbEnsureSavesCol(); if(!col) return false;
+  const payload=JSON.stringify([...dupIgnoreSet]);
+  if(dupIgnoreItemId){
+    await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
+      {i:dupIgnoreItemId, b:SANDBOX_SAVES_BOARD_ID, c:JSON.stringify({[col]:{text:payload}})});
+  } else {
+    const r=await gql(`mutation($b:ID!,$n:String!,$c:JSON!){create_item(board_id:$b,item_name:$n,column_values:$c){id}}`,
+      {b:SANDBOX_SAVES_BOARD_ID, n:DUP_IGNORE_NAME, c:JSON.stringify({[col]:{text:payload}})});
+    dupIgnoreItemId=(r.create_item||{}).id||null;
+  }
+  return true;
+}
+async function ignoreGroup(gid){
+  const g=getDupGroup(gid); if(!g) return;
+  if(!dupIgnoreSet) dupIgnoreSet=new Set();
+  dupIgnoreSet.add(dupSig(g));
+  let persisted=false;
+  try{ persisted=await dupIgnorePersist(); }catch(e){}
+  const el=document.getElementById(`dup-group-${gid}`);
+  if(el){ el.style.opacity='0.4'; el.style.pointerEvents='none'; }
+  g.done=true;
+  showToast(persisted ? 'Marked “not a duplicate” — hidden for everyone' : 'Hidden for this session only (add a Long Text column to the save-states board to make it stick)', persisted?'success':'error');
+}
+// Keep the selected record, delete the other(s) with NO field/photo merge (for when a duplicate is empty).
+async function executeKeepOnly(gid){
+  const group=getDupGroup(gid); if(!group) return;
+  if(!group.keeperId){ alert('Pick which record to KEEP first (the ◉ button on a card).'); return; }
+  const names=new Set(group.items.map(it=>dupNameKey(it.name)));
+  if(names.size!==1){ alert('Safety stop: names differ ('+[...names].join(', ')+'). Aborted.'); return; }
+  const keeper=group.items.find(i=>i.id===group.keeperId);
+  const sources=group.items.filter(i=>i.id!==group.keeperId);
+  if(!sources.length){ alert('Nothing to delete — only one record.'); return; }
+  if(!confirm(`Keep “${keeper.name}” (id ${keeper.id}) and permanently delete ${sources.length} other record(s) WITHOUT merging any data?\n\nUse this only when the other record(s) are empty — their data will NOT be copied over. Deleted records go to monday's Recycle Bin.`)) return;
+  const log=document.getElementById(`dup-log-${gid}`);
+  log.className='dup-merge-log visible'; log.innerHTML='';
+  const addLog=(m,c='')=>{ log.innerHTML+=`<span class="${c}">${escapeHtml(m)}</span>\n`; log.scrollTop=log.scrollHeight; };
+  addLog(`KEEP id ${keeper.id} (${keeper.name}). Deleting ${sources.length} record(s) — no merge.`);
+  const failed=[];
+  for(const s of sources){
+    try{ await gqlRetry(`mutation($i:ID!,$b:String!){create_update(item_id:$i,body:$b){id}}`,{i:s.id,b:`DELETED as duplicate of ${keeper.id} (${keeper.name}) on ${new Date().toISOString().slice(0,10)} — kept without merge.`}); }catch(e){}
+    try{ await gqlRetry(`mutation{delete_item(item_id:${s.id}){id}}`,{}); addLog(`  ✓ Deleted ${s.name} (${s.id}) — recoverable in monday's Recycle Bin`,'log-ok'); }
+    catch(e){ failed.push(s); addLog(`  ✗ Could not delete ${s.name} (${s.id}): ${e.message}`,'log-err'); }
+  }
+  if(failed.length){
+    group._failedDeletes=failed;
+    addLog(`⚠ ${failed.length} record(s) could not be deleted — use "Retry delete".`,'log-warn');
+    const acts=document.querySelector(`#dup-group-${gid} .dup-actions`);
+    if(acts && !document.getElementById(`retry-del-${gid}`)){
+      const b=document.createElement('button'); b.className='merge-btn'; b.id=`retry-del-${gid}`;
+      b.textContent='↻ Retry delete'; b.onclick=()=>retryFailedDeletes(gid);
+      acts.insertBefore(b, acts.firstChild);
+    }
+    return;
+  }
+  addLog('✓ Done — kept one record, deleted the rest (no merge).','log-ok');
+  group.done=true;
+  const card=document.getElementById(`dup-group-${gid}`);
+  if(card){ card.style.opacity='0.6'; card.querySelectorAll('.dup-actions button,.dup-keeper-pick input').forEach(b=>b.disabled=true); }
 }
 
 bootCheck();

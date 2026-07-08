@@ -231,6 +231,16 @@ lacks('const k=it.name.toLowerCase(); (byName', 'old exact-name grouping removed
 has('v7.25:', 'v7.25 deploy marker present');
 has('const names = new Set(group.items.map(it=>dupNameKey(it.name)));', 'merge guardrail uses normalized key');
 lacks("const names = new Set(group.items.map(it=>it.name.trim().toLowerCase()));", 'old exact-name guardrail removed');
+/* v7.26 asserts (ignore + keep-one) */
+has('v7.26:', 'v7.26 deploy marker present');
+has('async function ignoreGroup(gid)', 'persistent ignore present');
+has('async function executeKeepOnly(gid)', 'keep-one-delete-rest present');
+has("const DUP_IGNORE_NAME='__DUP_IGNORE__';", 'ignore list item name');
+has('function dupSig(group)', 'id-set signature present');
+has('.filter(g => !dupIgnoreSet.has(dupSig(g)))', 'ignored groups filtered from scan');
+has('await dupLoadIgnore();', 'ignore list loaded on scan');
+has('onclick="executeKeepOnly(', 'keep-one button wired');
+has('onclick="ignoreGroup(', 'not-a-duplicate button wired');
 // Guard against duplicate element ids from the toolbar rebuild:
 ['am-title','am-search','am-sort','am-count','am-filterbtns','port-wrap','port-tag','port-btn','port-row-btn','port-row-picker','port-row-search','port-row-list',
  'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list','sb-progress','sb-loading','sb-load-status'].forEach(id=>{
