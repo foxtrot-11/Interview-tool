@@ -227,6 +227,10 @@ has('const k=dupNameKey(it.name);', 'dedup groups by normalized key');
 has('const flagged = group.items.filter(i=>hasStageNameFlag(i.name));', 'keeper prefers flagged row');
 has('const pool = flagged.length ? flagged : group.items;', 'keeper falls back when none flagged');
 lacks('const k=it.name.toLowerCase(); (byName', 'old exact-name grouping removed');
+/* v7.25 assert (merge guardrail matches grouping) */
+has('v7.25:', 'v7.25 deploy marker present');
+has('const names = new Set(group.items.map(it=>dupNameKey(it.name)));', 'merge guardrail uses normalized key');
+lacks("const names = new Set(group.items.map(it=>it.name.trim().toLowerCase()));", 'old exact-name guardrail removed');
 // Guard against duplicate element ids from the toolbar rebuild:
 ['am-title','am-search','am-sort','am-count','am-filterbtns','port-wrap','port-tag','port-btn','port-row-btn','port-row-picker','port-row-search','port-row-list',
  'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list','sb-progress','sb-loading','sb-load-status'].forEach(id=>{

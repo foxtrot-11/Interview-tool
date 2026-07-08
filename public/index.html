@@ -5212,6 +5212,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.25: Fix — the merge-execution "Safety stop: names differ" guardrail was still comparing exact names, so it blocked the very "(NEEDS STAGE NAME)" twin merges v7.24 enabled (e.g. "donovan cox" vs "donovan cox (needs stage name)"). It now compares by dupNameKey (same normalization as grouping), so flag-twins merge while genuinely different names are still blocked.
    v7.24: Duplicate catcher now groups a plain name with its "(NEEDS STAGE NAME)"-flagged twin (the parser appends that suffix when a name looks like a legal name) — grouping key strips the trailing flag, but only when a real name precedes it so bare placeholders don't collapse together. On merge the keeper defaults to the FLAGGED row, so the "(NEEDS STAGE NAME)" state survives and the row that passed a legal name off as a stage name is the one removed.
    v7.23: Three additions — (1) each saved sandbox state gets a 🗑 delete button gated behind a confirm box (delete_item; irreversible + shared, so it warns it removes for everyone). (2) In the full editor (Approved / All Models / 2 / 4), a "🔗 Copy link" button copies a #model=<id> URL that opens that model's page directly on load (recipient needs the app passphrase). (3) All Models sort adds "Date added" (newest/oldest): unified date = DATE INPUT column (Evernote import, discovered by title per board) if present, else Monday created_at — one timeline across both systems.
    v7.22: Casting Sandbox alternates are per-column again — BOTTOM, VERS, TOP each get their own ALTERNATES section (3 columns × 2 sections), reverting v7.20's single alternates row. Fixed numbered slots kept (main ≥8, alt ≥4). Port numbering: mains stay TYPE{position}; alternates from all three columns collapse to ALTERNATE and are numbered in column order (BOTTOM→VERSE→TOP), since Monday has one ALTERNATE subitem type. Old single-ALTERNATES saves/links migrate into VERSE alternates.
@@ -5767,7 +5768,9 @@ async function executeMerge(gid){
   const log   = document.getElementById(`dup-log-${gid}`);
   const pv    = document.getElementById(`dup-preview-${gid}`);
   if(!group || !plan){ alert('Please run Preview again.'); return; }
-  const names = new Set(group.items.map(it=>it.name.trim().toLowerCase()));
+  // v7.25: compare by the SAME normalized key the grouping uses, so a "(NEEDS STAGE NAME)" twin is allowed
+  // to merge with its plain twin; genuinely different names still trip the safety stop.
+  const names = new Set(group.items.map(it=>dupNameKey(it.name)));
   if(names.size!==1){ alert('Safety stop: names differ ('+[...names].join(', ')+'). Aborted.'); return; }
   if(pv){ pv.querySelectorAll('button,select,input').forEach(b=>b.disabled=true); }
   log.className='dup-merge-log visible'; log.innerHTML='';
