@@ -5212,6 +5212,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.24: Duplicate catcher now groups a plain name with its "(NEEDS STAGE NAME)"-flagged twin (the parser appends that suffix when a name looks like a legal name) — grouping key strips the trailing flag, but only when a real name precedes it so bare placeholders don't collapse together. On merge the keeper defaults to the FLAGGED row, so the "(NEEDS STAGE NAME)" state survives and the row that passed a legal name off as a stage name is the one removed.
    v7.23: Three additions — (1) each saved sandbox state gets a 🗑 delete button gated behind a confirm box (delete_item; irreversible + shared, so it warns it removes for everyone). (2) In the full editor (Approved / All Models / 2 / 4), a "🔗 Copy link" button copies a #model=<id> URL that opens that model's page directly on load (recipient needs the app passphrase). (3) All Models sort adds "Date added" (newest/oldest): unified date = DATE INPUT column (Evernote import, discovered by title per board) if present, else Monday created_at — one timeline across both systems.
    v7.22: Casting Sandbox alternates are per-column again — BOTTOM, VERS, TOP each get their own ALTERNATES section (3 columns × 2 sections), reverting v7.20's single alternates row. Fixed numbered slots kept (main ≥8, alt ≥4). Port numbering: mains stay TYPE{position}; alternates from all three columns collapse to ALTERNATE and are numbered in column order (BOTTOM→VERSE→TOP), since Monday has one ALTERNATE subitem type. Old single-ALTERNATES saves/links migrate into VERSE alternates.
    v7.21: Casting Sandbox "Save state" — arrangements persist on Monday board 18420711215 (JSON in a Long Text column, discovered by type at runtime) so ANY coworker can load them, not just the maker; a "Saved states" strip lists every save (running list, newest first) and clicking one loads it. Chosen over cookies/localStorage (per-device, invisible to coworkers) and server files (Render disk is ephemeral). server.js: saves board added to ALLOWED_BOARD_IDS (create_item + reads already allowed).
@@ -5260,6 +5261,22 @@ function isPlaceholderName(name){
   if(n === '(no name found)') return true;
   if(/^\(needs (stage name|info|real)\)$/.test(n)) return true;
   return false;
+}
+
+// v7.24: the parser appends a suffix like "(NEEDS STAGE NAME)" to rows whose name looks like a legal name.
+// So "John Smith" and "John Smith (NEEDS STAGE NAME)" are the SAME person but wouldn't group by exact name.
+const STAGE_FLAG_RE = /\s*\(\s*needs\s+(?:stage name|info|real)\s*\)\s*$/i;
+function hasStageNameFlag(name){
+  const raw=(name||'').trim();
+  // Flag must be a SUFFIX on a real name (not the whole name — a bare "(needs stage name)" is a placeholder).
+  return STAGE_FLAG_RE.test(raw) && raw.replace(STAGE_FLAG_RE,'').trim()!=='';
+}
+// Grouping key: strip the trailing flag ONLY when real text precedes it, so the flagged + unflagged
+// versions collapse together, while bare placeholders keep their own identity (not merged into "").
+function dupNameKey(name){
+  const raw=(name||'').trim();
+  const stripped=raw.replace(STAGE_FLAG_RE,'').trim();
+  return (stripped ? stripped : raw).toLowerCase();
 }
 
 // True when a column value is effectively empty (covers empty dropdown {"ids":[]},
@@ -5348,12 +5365,15 @@ async function loadDuplicates(){
     }
     setLoad('Grouping duplicates…');
     const byName = {};
-    Object.values(byId).forEach(it => { const k=it.name.toLowerCase(); (byName[k]=byName[k]||[]).push(it); });
+    Object.values(byId).forEach(it => { const k=dupNameKey(it.name); (byName[k]=byName[k]||[]).push(it); });
     dupGroups = Object.entries(byName)
       .filter(([,g]) => g.length > 1)
       .map(([key,g], i) => {
         const items = g.sort((a,b)=> new Date(a.created_at)-new Date(b.created_at));
-        return { gid:'g'+i+'_'+items[0].id, name: items[0].name, placeholder: isPlaceholderName(items[0].name), items, keeperId:null, done:false };
+        // Prefer showing the flagged name in the header so a "needs stage name" pair reads clearly.
+        const flagged = items.find(x=>hasStageNameFlag(x.name));
+        const gname = flagged ? flagged.name : items[0].name;
+        return { gid:'g'+i+'_'+items[0].id, name: gname, placeholder: isPlaceholderName(gname), items, keeperId:null, done:false };
       });
     if(!dupGroups.length){ container.innerHTML = '<div class="dup-empty">✓ No duplicate name-groups found</div>'; summary.innerHTML=''; return; }
     dupGroups.forEach(g => { if(!g.placeholder) g.keeperId = defaultKeeperId(g); });
@@ -5365,7 +5385,12 @@ async function loadDuplicates(){
 }
 
 function defaultKeeperId(group){
-  const sorted = [...group.items].sort((a,b) =>
+  // v7.24: if any member carries the "(NEEDS STAGE NAME)" flag, keep that one — it accurately says the name
+  // is a legal name still needing a stage name; the unflagged twin is the bad row that passes a legal name
+  // off as a stage name. Among the eligible pool, fall back to the usual highest-status / oldest rule.
+  const flagged = group.items.filter(i=>hasStageNameFlag(i.name));
+  const pool = flagged.length ? flagged : group.items;
+  const sorted = [...pool].sort((a,b) =>
     statusRank(b.statusIdx)-statusRank(a.statusIdx) || (new Date(a.created_at)-new Date(b.created_at)));
   return sorted[0].id;
 }

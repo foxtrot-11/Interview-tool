@@ -219,6 +219,14 @@ has("x.type==='date' && /date\\s*input/i.test", 'discovers DATE INPUT by title/t
 has('if(!isFinite(addedTs)) addedTs = Date.parse(it.created_at', 'date falls back to created_at');
 has('items{id name created_at updated_at column_values', 'bulk load fetches created_at');
 has('<option value="date-desc">', 'date sort option in dropdown');
+/* v7.24 asserts (duplicate stage-name twins) */
+has('v7.24:', 'v7.24 deploy marker present');
+has('function hasStageNameFlag(name)', 'stage-name-flag detector present');
+has('function dupNameKey(name)', 'dup grouping-key normalizer present');
+has('const k=dupNameKey(it.name);', 'dedup groups by normalized key');
+has('const flagged = group.items.filter(i=>hasStageNameFlag(i.name));', 'keeper prefers flagged row');
+has('const pool = flagged.length ? flagged : group.items;', 'keeper falls back when none flagged');
+lacks('const k=it.name.toLowerCase(); (byName', 'old exact-name grouping removed');
 // Guard against duplicate element ids from the toolbar rebuild:
 ['am-title','am-search','am-sort','am-count','am-filterbtns','port-wrap','port-tag','port-btn','port-row-btn','port-row-picker','port-row-search','port-row-list',
  'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list','sb-progress','sb-loading','sb-load-status'].forEach(id=>{
