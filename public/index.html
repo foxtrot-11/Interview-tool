@@ -8,7 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 <title>Carnal Media — Model Tool</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Source+Sans+3:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg:#0d0d0f;--surface:#141416;--surface2:#1c1c1f;
@@ -16,7 +16,7 @@
     --accent:#c8b4ff;--accent2:#ff7eb3;--accent3:#7ef4c8;
     --text:#e8e8f0;--text-muted:#8b8ba0;--text-dim:#74748a;
     --success:#4ade80;--warning:#facc15;--danger:#f87171;
-    --radius:6px;--font-display:'Syne',sans-serif;--font-mono:'DM Mono',monospace;
+    --radius:6px;--font-display:'Myriad Pro','Source Sans 3',sans-serif;--font-mono:'DM Mono',monospace;
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;overflow:hidden}
@@ -26,6 +26,8 @@
   /* HEADER */
   header{flex-shrink:0;height:56px;background:rgba(13,13,15,0.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;z-index:100;position:relative}
   .logo{font-family:var(--font-display);font-weight:800;font-size:14px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);flex-shrink:0}
+  .logo-img{height:26px;width:auto;display:block}
+  .pw-logo-img{height:42px;width:auto;display:block;margin:0 auto 24px}
   .logo span{color:var(--text-muted);font-weight:400}
 
   /* MODE SELECTOR */
@@ -118,7 +120,7 @@
   /* ── ALL MODELS grid ── */
   .am-toolbar{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
   .am-toolbar-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
-  .am-title{font-family:var(--font-display);font-size:20px;font-weight:700}
+  .am-title{font-family:var(--font-display);font-size:20px;font-weight:900}
   .tb-label{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:0.12em;color:var(--text-muted);text-transform:uppercase;white-space:nowrap}
   .tb-sep{width:1px;height:22px;background:var(--border);margin:0 2px;flex:none}
   /* ── CASTING SANDBOX (v7.17) ── */
@@ -188,7 +190,7 @@
   .unsaved-modal{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center}
   .unsaved-modal.open{display:flex}
   .unsaved-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px 26px;max-width:440px;margin:20px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
-  .unsaved-title{font-family:var(--font-display);font-weight:700;font-size:16px;margin-bottom:6px;color:var(--text)}
+  .unsaved-title{font-family:var(--font-display);font-weight:900;font-size:16px;margin-bottom:6px;color:var(--text)}
   .unsaved-text{font-size:12px;color:var(--text-muted);margin-bottom:16px;line-height:1.5}
   .unsaved-actions{display:flex;gap:10px;flex-wrap:wrap}
   /* ── Shoot tag chips ── */
@@ -458,7 +460,7 @@
   .compat-btn.new{outline:2px solid #ff3b5c;outline-offset:1px;box-shadow:0 0 0 2px #ff3b5c}
   .section.active{display:block}
   .section-header{display:flex;align-items:baseline;gap:14px;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid var(--border)}
-  .section-title{font-family:var(--font-display);font-weight:700;font-size:20px;color:var(--text)}
+  .section-title{font-family:var(--font-display);font-weight:900;font-size:20px;color:var(--text)}
   .section-count{font-size:10px;color:var(--text-muted);letter-spacing:0.15em;text-transform:uppercase}
 
   /* FIELD GRID */
@@ -672,7 +674,7 @@
 <body>
 
 <div id="pw-gate">
-  <div class="pw-logo">Carnal <span>Media</span></div>
+  <div class="pw-logo"><img src="/logo-carnal.png" alt="Carnal Media" class="pw-logo-img"></div>
   <div class="pw-box">
     <div class="pw-label">Passphrase</div>
     <input class="pw-input" id="pw-input" type="password" placeholder="Enter passphrase..." onkeydown="if(event.key==='Enter')checkPw()">
@@ -699,7 +701,7 @@
 
 <!-- HEADER -->
 <header>
-  <div class="logo">Carnal <span>Media</span></div>
+  <div class="logo"><img src="/logo-carnal.png" alt="Carnal Media" class="logo-img"></div>
 
   <!-- MODE SELECTOR -->
   <div class="mode-selector" id="mode-selector">
@@ -1490,6 +1492,7 @@ let currentMode = '0';
 let allCandidates = [];
 let currentItem   = null;
 let isDirty       = false;
+let suppressDirty = false;   // v7.27: true while a model is loading/populating, so programmatic field-fills don't trip "unsaved changes"
 let statusValues  = {};
 let selectValues  = {};
 let multiValues   = {};
@@ -1748,7 +1751,7 @@ AM_FILTERS.forEach(f=>{ (f.kind==='dropdown'?AM_DD_KEY:AM_ST_KEY)[f.col]=f.key; 
 let amFilters={};            // filter key -> Set of selected option ids (live set for the CURRENT scope)
 // Grid scopes: the same grid view serves ALL MODELS and 5-APPROVED, each with its own filters/search/sort.
 let gridScope='all';
-const GRID_SCOPES={ all:{title:'All Models', ids:null}, '2':{title:'2-POTENTIAL', ids:[10], full:true}, '4':{title:'4-REVIEW', ids:[9], full:true}, '5a':{title:'5-APPROVED', ids:[2,4,105], full:true} };
+const GRID_SCOPES={ all:{title:'All Models', ids:null, full:true}, '2':{title:'2-POTENTIAL', ids:[10], full:true}, '4':{title:'4-REVIEW', ids:[9], full:true}, '5a':{title:'5-APPROVED', ids:[2,4,105], full:true} };
 let amState={ all:{filters:{},search:'',sort:'name-asc'}, '2':{filters:{},search:'',sort:'name-asc'}, '4':{filters:{},search:'',sort:'name-asc'}, '5a':{filters:{},search:'',sort:'name-asc'} };
 let approvedFromGrid=false;
 function setGridScope(scope){
@@ -3844,12 +3847,14 @@ async function loadCandidate(itemId){
   if(fullEditorDirty() && (!currentItem || String(itemId||'')!==String(currentItem.id))){
     if(!(await gateFullEditor())) return;   // switching candidates with unsaved edits
   }
+  suppressDirty=true;   // v7.27: guard the whole load/populate; cleared once fields + photos have settled
   if(!itemId){
     resetForm();show('empty-state');
     document.getElementById('candidate-strip').classList.remove('visible');
   const ssb=document.getElementById('sticky-status-bar');if(ssb)ssb.style.display='none';
     document.getElementById('save-btn').disabled=true;currentItem=null;
     document.getElementById('copy-model-link-btn')?.style.setProperty('display','none');
+    suppressDirty=false;
     return;
   }
   showToast('Loading...','saving');
@@ -3890,6 +3895,8 @@ async function loadCandidate(itemId){
   document.getElementById('save-status').textContent='';
   maybeShowDraftBanner(currentItem.id);
   showToast('Loaded','success');
+  // Lift the dirty guard on the next tick so any load-time field events have flushed first.
+  setTimeout(()=>{ suppressDirty=false; }, 0);
 }
 
 function populateForm(item){
@@ -3926,7 +3933,7 @@ function populateForm(item){
     shootTagsDirty=false;
     shootTags=(txt(SHOOT_COL)||'').split(',').map(s=>s.trim()).filter(Boolean);
     const blk=document.getElementById('shoot-tags-block');
-    if(blk) blk.style.display=(currentMode==='5a')?'':'none';
+    if(blk) blk.style.display='';   // v7.27: shoot tags available in the full editor for every view (All Models, 2, 4, 5-APPROVED)
     renderShootChips();
   });
 
@@ -4209,6 +4216,7 @@ function selectStatusIv(pill,fieldKey){
 
 // ── DIRTY ──
 function markDirty(){
+  if(suppressDirty) return;   // ignore field changes fired by loading a record, not by the user
   isDirty=true;
   document.getElementById('unsaved-dot').classList.add('visible');
   document.getElementById('save-status').textContent='Unsaved changes';
@@ -5212,6 +5220,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.27: (1) ALL MODELS now opens the full editor on click (like 5-APPROVED / 2 / 4) instead of the kanban modal — GRID_SCOPES.all gained full:true. (2) Shoot tags now show in the full editor for EVERY view (was 5-APPROVED only). (3) CARNAL MEDIA wordmark replaced with the logo image (public/logo-carnal.png) in the header and the login screen. (4) Heading font switched off "Syne" to a Myriad Pro → Source Sans 3 stack (real Myriad Pro if installed, else the free Myriad-alike); primary headings set to Black (900); body stays DM Mono. (5) Fixed the false "unsaved changes" prompt — markDirty is now suppressed while a record loads/populates, so it only fires on real user edits.
    v7.26: Duplicate tool — two additions. (1) "Not a duplicate": marks a group as different-people-same-name, keeps all records, and hides it PERMANENTLY and for everyone (stored on Monday in a "__DUP_IGNORE__" item on the save-states board, keyed by the record id-set; falls back to session-only if that Long Text column isn't set up). Distinct from "Skip (this session)" which is temporary. (2) "Keep one · delete rest": pick the ◉ keeper and delete the other record(s) WITHOUT merging any fields/photos — for when a duplicate is empty. Reuses the delete + retry + Recycle-Bin safety and the name guardrail.
    v7.25: Fix — the merge-execution "Safety stop: names differ" guardrail was still comparing exact names, so it blocked the very "(NEEDS STAGE NAME)" twin merges v7.24 enabled (e.g. "donovan cox" vs "donovan cox (needs stage name)"). It now compares by dupNameKey (same normalization as grouping), so flag-twins merge while genuinely different names are still blocked.
    v7.24: Duplicate catcher now groups a plain name with its "(NEEDS STAGE NAME)"-flagged twin (the parser appends that suffix when a name looks like a legal name) — grouping key strips the trailing flag, but only when a real name precedes it so bare placeholders don't collapse together. On merge the keeper defaults to the FLAGGED row, so the "(NEEDS STAGE NAME)" state survives and the row that passed a legal name off as a stage name is the one removed.
