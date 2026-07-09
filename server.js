@@ -348,6 +348,127 @@ app.get('/asset-bytes', dataLimiter, requireAuth, async (req, res) => {
   }
 });
 
+// ── v7.28: PHOTO SCRAPE (Bluesky + generic page) ─────────────────────────────
+// REST (not GraphQL, so outside the /api allow-list) but still behind requireAuth + dataLimiter.
+// The real risk is SSRF — the server fetches a user-supplied URL — so EVERY outbound fetch goes through
+// safeFetch(), which re-validates the host on each redirect hop: http/https only, and the resolved IP must
+// be public (no loopback/private/link-local/CGNAT/cloud-metadata). Only staff with the app passphrase can
+// reach these endpoints at all.
+const dns = require('dns').promises;
+function ipIsPrivate(ip){
+  if(!ip) return true;
+  const m = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i); if(m) ip = m[1];
+  if(ip.indexOf('.')>=0){                              // IPv4
+    const p = ip.split('.').map(Number);
+    if(p.length!==4 || p.some(n=>isNaN(n)||n<0||n>255)) return true;
+    const [a,b,c] = p;
+    if(a===0||a===10||a===127) return true;
+    if(a===169&&b===254) return true;                  // link-local incl. 169.254.169.254 metadata
+    if(a===172&&b>=16&&b<=31) return true;
+    if(a===192&&b===168) return true;
+    if(a===100&&b>=64&&b<=127) return true;            // CGNAT
+    if(a===192&&b===0&&c===2) return true;             // TEST-NET-1
+    if(a>=224) return true;                            // multicast / reserved
+    return false;
+  }
+  const low = ip.toLowerCase();                        // IPv6
+  if(low==='::1'||low==='::') return true;
+  if(low.startsWith('fe80')||low.startsWith('fc')||low.startsWith('fd')) return true;
+  return false;
+}
+async function assertPublicHttpUrl(raw){
+  let u; try{ u = new URL(raw); }catch(e){ throw new Error('invalid URL'); }
+  if(u.protocol!=='http:' && u.protocol!=='https:') throw new Error('only http/https allowed');
+  if(/^(localhost|.*\.local)$/i.test(u.hostname)) throw new Error('blocked host');
+  let addrs; try{ addrs = await dns.lookup(u.hostname,{all:true}); }catch(e){ throw new Error('DNS resolve failed'); }
+  if(!addrs.length) throw new Error('no address');
+  for(const a of addrs){ if(ipIsPrivate(a.address)) throw new Error('blocked (non-public address)'); }
+  return u;
+}
+// fetch that re-validates the target on every redirect hop (so a public URL can't 302 into a private IP)
+async function safeFetch(rawUrl, opts, maxHops){
+  maxHops = (maxHops==null)?4:maxHops;
+  let url = rawUrl;
+  for(let i=0;i<=maxHops;i++){
+    const u = await assertPublicHttpUrl(url);
+    const r = await fetch(u.href, Object.assign({ redirect:'manual' }, opts||{}));
+    if(r.status>=300 && r.status<400 && r.headers.get('location')){
+      url = new URL(r.headers.get('location'), u.href).href; continue;
+    }
+    return r;
+  }
+  throw new Error('too many redirects');
+}
+// Bluesky actor out of a bsky.app URL or a bare handle; null if not Bluesky.
+function parseBlueskyActor(input){
+  const s = String(input||'').trim();
+  try{
+    const u = new URL(s);
+    if(/(^|\.)bsky\.app$/i.test(u.hostname)){ const m = u.pathname.match(/\/profile\/([^/]+)/i); if(m) return decodeURIComponent(m[1]); }
+    return null;
+  }catch(e){
+    if(/^@?[a-z0-9.-]+\.[a-z]{2,}$/i.test(s) && !/\s/.test(s)) return s.replace(/^@/,'');
+    return null;
+  }
+}
+// Up to `cap` absolute image URLs from static HTML (og:image first, then <img> src/srcset), junk filtered.
+function extractImageUrls(html, baseUrl, cap){
+  cap = cap||10; const out=[]; const seen=new Set();
+  const add = (raw)=>{ if(!raw||out.length>=cap) return; let abs; try{ abs=new URL(raw, baseUrl).href; }catch(e){ return; }
+    if(!/^https?:/i.test(abs)) return;
+    if(/\.svg(\?|$)/i.test(abs)) return;
+    if(/(sprite|favicon|logo|icon|avatar-default|placeholder|blank|spacer|pixel|1x1|tracking)/i.test(abs)) return;
+    if(seen.has(abs)) return; seen.add(abs); out.push(abs); };
+  const metaRe=/<meta[^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image)["'][^>]*>/gi; let mm;
+  while((mm=metaRe.exec(html))){ const c=mm[0].match(/content=["']([^"']+)["']/i); if(c) add(c[1]); }
+  const imgRe=/<img\b[^>]*>/gi; let im;
+  while((im=imgRe.exec(html)) && out.length<cap){ const tag=im[0];
+    const ss=tag.match(/srcset=["']([^"']+)["']/i);
+    if(ss){ const cands=ss[1].split(',').map(x=>x.trim().split(/\s+/)[0]).filter(Boolean); if(cands.length) add(cands[cands.length-1]); }
+    const src=tag.match(/\bsrc=["']([^"']+)["']/i); if(src) add(src[1]); }
+  return out.slice(0,cap);
+}
+
+app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
+  try{
+    const input = String(req.query.url||'').trim();
+    if(!input) return res.status(400).json({ error:'url required' });
+    const actor = parseBlueskyActor(input);
+    if(actor){
+      const api = 'https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor='+encodeURIComponent(actor)+'&limit=40&filter=posts_with_media';
+      const r = await safeFetch(api, { headers:{ 'Accept':'application/json' } });
+      if(!r.ok) return res.status(502).json({ error:'Bluesky fetch failed ('+r.status+') — check the handle' });
+      const j = await r.json();
+      const imgs=[]; const seen=new Set();
+      for(const it of (j.feed||[])){
+        const e = it.post && it.post.embed; if(!e){ continue; }
+        const arr = e.images || (e.media && e.media.images) || [];
+        for(const p of arr){ const u = p.fullsize || p.thumb; if(u && !seen.has(u)){ seen.add(u); imgs.push({ url:u, thumb:p.thumb||u }); } }
+        if(imgs.length>=10) break;
+      }
+      return res.json({ source:'bluesky', actor, images: imgs.slice(0,10) });
+    }
+    const u = await assertPublicHttpUrl(input);
+    const r = await safeFetch(u.href, { headers:{ 'User-Agent':'Mozilla/5.0 (compatible; CarnalTool/1.0)', 'Accept':'text/html' } });
+    if(!r.ok) return res.status(502).json({ error:'page fetch failed ('+r.status+')' });
+    if(!/text\/html|application\/xhtml/i.test(r.headers.get('content-type')||'')) return res.status(415).json({ error:'not an HTML page' });
+    const html = (await r.text()).slice(0, 2000000);
+    return res.json({ source:'page', images: extractImageUrls(html, u.href, 10).map(x=>({ url:x, thumb:x })) });
+  }catch(e){ res.status(400).json({ error: e.message||String(e) }); }
+});
+
+app.get('/proxy-image', dataLimiter, requireAuth, async (req, res) => {
+  try{
+    const r = await safeFetch(String(req.query.url||''), { headers:{ 'User-Agent':'Mozilla/5.0 (compatible; CarnalTool/1.0)' } });
+    if(!r.ok) return res.status(502).json({ error:'fetch failed ('+r.status+')' });
+    const ct = r.headers.get('content-type')||'application/octet-stream';
+    if(!/^image\//i.test(ct)) return res.status(415).json({ error:'not an image' });
+    const buf = Buffer.from(await r.arrayBuffer());
+    if(buf.length > 15000000) return res.status(413).json({ error:'image too large' });
+    res.set('Content-Type', ct); res.set('Cache-Control','private, max-age=300'); res.send(buf);
+  }catch(e){ res.status(400).json({ error: e.message||String(e) }); }
+});
+
 async function mondayGql(query, variables) {
   const r = await fetch('https://api.monday.com/v2', {
     method: 'POST',

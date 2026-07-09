@@ -27,6 +27,18 @@
   header{flex-shrink:0;height:56px;background:rgba(13,13,15,0.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;z-index:100;position:relative}
   .logo{font-family:var(--font-display);font-weight:800;font-size:14px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);flex-shrink:0}
   .logo-img{height:26px;width:auto;display:block}
+  .scrape-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .scrape-input{flex:1;min-width:240px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px}
+  .scrape-input:focus{border-color:var(--accent);outline:none}
+  .fv-scrape-btn{background:var(--surface2);border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:8px 16px;font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+  .fv-scrape-btn:hover{background:var(--accent);color:#fff}
+  .fv-scrape-btn:disabled{opacity:.5;cursor:default}
+  .scrape-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;max-height:60vh;overflow:auto;margin-top:6px}
+  .scrape-cell{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);display:flex;flex-direction:column}
+  .scrape-cell.broken{opacity:.35}
+  .scrape-cell img{width:100%;height:150px;object-fit:cover;display:block;background:var(--surface2)}
+  .scrape-cell label{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:5px;padding:5px 8px;cursor:pointer}
+  .scrape-cell label input{cursor:pointer}
   .pw-logo-img{height:42px;width:auto;display:block;margin:0 auto 24px}
   .logo span{color:var(--text-muted);font-weight:400}
 
@@ -823,6 +835,10 @@
     </div>
     <!-- Shared photo upload (full-view modes: applicant → approved/rejected) -->
     <div id="fv-upload-section" style="display:none;margin-bottom:20px">
+      <div class="scrape-row">
+        <input type="url" id="scrape-url" class="scrape-input" placeholder="Paste a Bluesky profile or a webpage with photos, then Scrape…">
+        <button type="button" class="fv-scrape-btn" id="scrape-btn" onclick="scrapePhotos()">🔎 Scrape photos</button>
+      </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap">
         <div style="flex:1;min-width:240px">
           <div class="iv-upload-label">Replace Headshot → Monday</div>
@@ -1401,6 +1417,19 @@
           <button class="kb-hs-cancel" onclick="sbDelClose()">Cancel</button>
           <button class="kb-save" id="sb-del-confirm" style="background:var(--danger);border-color:var(--danger)" onclick="sbDoDeleteSave()">Delete permanently</button>
           <span class="am-count" id="sb-del-status"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="scrape-modal" class="unsaved-modal" style="z-index:9700">
+      <div class="unsaved-panel" style="max-width:760px;width:min(96vw,760px)">
+        <div class="unsaved-title">Scraped photos</div>
+        <div class="unsaved-text" id="scrape-note">Tick the ones to keep, choose one as the headshot, then Import.</div>
+        <div id="scrape-grid" class="scrape-grid"></div>
+        <div class="unsaved-actions" style="margin-top:14px">
+          <button class="kb-save" id="scrape-import-btn" onclick="scrapeImport()">Import selected</button>
+          <button class="kb-hs-cancel" onclick="scrapeClose()">Cancel</button>
+          <span class="am-count" id="scrape-status"></span>
         </div>
       </div>
     </div>
@@ -3826,6 +3855,70 @@ window.addEventListener('beforeunload', (e)=>{
 });
 
 // ── LOAD CANDIDATE ──
+// v7.28: SCRAPE PHOTOS — paste a Bluesky profile or a webpage; the server returns up to 10 candidate images
+// (SSRF-guarded). Pick which to keep + one headshot; chosen images are fetched via /proxy-image (so they're
+// same-origin, not CORS-tainted), turned into Files, and fed to the SAME addPhotos() path as drag-drop, so
+// they upload on the normal Save. Limitation: JS-rendered galleries / login-walled sites (X, IG) won't yield
+// images — only static HTML + Bluesky's public API.
+let scrapeResults=[];
+async function scrapePhotos(){
+  const url=(document.getElementById('scrape-url').value||'').trim();
+  if(!url){ showToast('Paste a URL or Bluesky handle first','error'); return; }
+  const btn=document.getElementById('scrape-btn'); btn.disabled=true; const lbl=btn.textContent; btn.textContent='Scraping…';
+  try{
+    const r=await fetch('/scrape-images?url='+encodeURIComponent(url),{headers:{'X-App-Auth':APP_PW}});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
+    scrapeResults=(j.images||[]).filter(x=>x&&x.url);
+    if(!scrapeResults.length){ showToast('No photos found at that link','error'); return; }
+    renderScrapeGrid(j.source);
+    document.getElementById('scrape-status').textContent='';
+    document.getElementById('scrape-import-btn').disabled=false;
+    document.getElementById('scrape-modal').classList.add('open');
+  }catch(e){ showToast('Scrape failed: '+(e.message||e),'error'); }
+  finally{ btn.disabled=false; btn.textContent=lbl; }
+}
+function renderScrapeGrid(source){
+  document.getElementById('scrape-note').textContent =
+    (source==='bluesky'?'From Bluesky. ':'From the page. ')+'Tick the ones to keep, choose one as the headshot, then Import.';
+  document.getElementById('scrape-grid').innerHTML = scrapeResults.map((im,i)=>`
+    <div class="scrape-cell" id="scrape-cell-${i}">
+      <img src="${escapeHtml(im.thumb||im.url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="document.getElementById('scrape-cell-${i}').classList.add('broken')">
+      <label><input type="checkbox" class="scrape-cb" data-i="${i}" checked> keep</label>
+      <label><input type="radio" name="scrape-hs" class="scrape-hsr" data-i="${i}" ${i===0?'checked':''}> headshot</label>
+    </div>`).join('');
+}
+function scrapeClose(){ document.getElementById('scrape-modal')?.classList.remove('open'); }
+async function scrapeImport(){
+  const keep=[...document.querySelectorAll('.scrape-cb:checked')].map(c=>Number(c.dataset.i));
+  if(!keep.length){ showToast('Select at least one photo','error'); return; }
+  const hsEl=document.querySelector('.scrape-hsr:checked');
+  let hsIdx = hsEl ? Number(hsEl.dataset.i) : keep[0];
+  if(!keep.includes(hsIdx)) hsIdx=keep[0];
+  const btn=document.getElementById('scrape-import-btn'), st=document.getElementById('scrape-status');
+  btn.disabled=true;
+  const grab=async(im,i)=>{
+    const r=await fetch('/proxy-image?url='+encodeURIComponent(im.url),{headers:{'X-App-Auth':APP_PW}});
+    if(!r.ok) throw new Error('img '+i);
+    const blob=await r.blob();
+    const ext=((blob.type||'image/jpeg').split('/')[1]||'jpg').replace('jpeg','jpg').replace('+xml','');
+    return new File([blob],'scraped_'+Date.now()+'_'+i+'.'+ext,{type:blob.type||'image/jpeg'});
+  };
+  let added=0, failed=0, done=0;
+  // headshot first so it lands in the headshot slot
+  const order=[hsIdx, ...keep.filter(i=>i!==hsIdx)];
+  for(const i of order){
+    st.textContent='Downloading '+(++done)+'/'+order.length+'…';
+    try{
+      const file=await grab(scrapeResults[i], i);
+      if(i===hsIdx) addPhotos([file],'fv-headshot'); else addPhotos([file],'fv-extra');
+      added++;
+    }catch(e){ failed++; }
+  }
+  scrapeClose();
+  showToast(added+' photo(s) added'+(failed?(', '+failed+' failed'):'')+' — hit Save to upload to Monday', failed?'error':'success');
+}
+
 // v7.23: deep link to a model's full page. copyModelLink() copies a #model=<id> URL; on boot, that hash
 // opens the model straight in the full editor (recipient still needs the app passphrase).
 function copyModelLink(){
@@ -3933,7 +4026,16 @@ function populateForm(item){
     shootTagsDirty=false;
     shootTags=(txt(SHOOT_COL)||'').split(',').map(s=>s.trim()).filter(Boolean);
     const blk=document.getElementById('shoot-tags-block');
-    if(blk) blk.style.display='';   // v7.27: shoot tags available in the full editor for every view (All Models, 2, 4, 5-APPROVED)
+    if(blk){
+      // v7.28: lift the shoot-tags block to the very top of the editor (was buried in the last section).
+      const fv=document.getElementById('full-view');
+      if(fv && blk.parentElement!==fv){
+        const notes=fv.querySelector('.iv-notes-sticky');
+        fv.insertBefore(blk, notes && notes.nextSibling ? notes.nextSibling : fv.firstChild);
+        blk.style.margin='0 0 18px';
+      }
+      blk.style.display='';   // v7.27: shoot tags in the full editor for every view (All Models, 2, 4, 5-APPROVED)
+    }
     renderShootChips();
   });
 
@@ -5220,6 +5322,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.28: (1) Shoot-tag selector lifted to the TOP of the full editor (was buried in the last section). (2) SCRAPE PHOTOS — in the full editor, paste a Bluesky profile or a webpage URL and pull up to 10 candidate photos; pick which to keep + one headshot, and they're imported as headshot/extra uploads (saved to Monday on the normal Save). Server adds SSRF-guarded /scrape-images + /proxy-image (http/https only, public IPs only, redirect hops re-validated, behind app auth). Limitation: only Bluesky's public API + static-HTML pages work; JS-rendered/login-walled sites (X, Instagram) won't yield images.
    v7.27: (1) ALL MODELS now opens the full editor on click (like 5-APPROVED / 2 / 4) instead of the kanban modal — GRID_SCOPES.all gained full:true. (2) Shoot tags now show in the full editor for EVERY view (was 5-APPROVED only). (3) CARNAL MEDIA wordmark replaced with the logo image (public/logo-carnal.png) in the header and the login screen. (4) Heading font switched off "Syne" to a Myriad Pro → Source Sans 3 stack (real Myriad Pro if installed, else the free Myriad-alike); primary headings set to Black (900); body stays DM Mono. (5) Fixed the false "unsaved changes" prompt — markDirty is now suppressed while a record loads/populates, so it only fires on real user edits.
    v7.26: Duplicate tool — two additions. (1) "Not a duplicate": marks a group as different-people-same-name, keeps all records, and hides it PERMANENTLY and for everyone (stored on Monday in a "__DUP_IGNORE__" item on the save-states board, keyed by the record id-set; falls back to session-only if that Long Text column isn't set up). Distinct from "Skip (this session)" which is temporary. (2) "Keep one · delete rest": pick the ◉ keeper and delete the other record(s) WITHOUT merging any fields/photos — for when a duplicate is empty. Reuses the delete + retry + Recycle-Bin safety and the name guardrail.
    v7.25: Fix — the merge-execution "Safety stop: names differ" guardrail was still comparing exact names, so it blocked the very "(NEEDS STAGE NAME)" twin merges v7.24 enabled (e.g. "donovan cox" vs "donovan cox (needs stage name)"). It now compares by dupNameKey (same normalization as grouping), so flag-twins merge while genuinely different names are still blocked.

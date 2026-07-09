@@ -113,7 +113,7 @@ has(`'5a':{title:'5-APPROVED', ids:[2,4,105], full:true}`, 'GRID_SCOPES 5a uncha
 has(`GRID_SCOPES[gridScope] && GRID_SCOPES[gridScope].full) ? 'openApprovedEditor'`, 'tile routing driven by scope.full');
 has(`if(mode==='5a'||mode==='2'||mode==='4'){`, 'setMode routes 2/4/5a to the grid');
 has(`setGridScope(mode);`, 'setMode passes the mode as grid scope');
-has(`if(blk) blk.style.display='';   // v7.27`, 'shoot-tags editor block shows in every full-editor view (v7.27)');
+has("blk.style.display='';   // v7.27", 'shoot-tags editor block shows in every full-editor view');
 has(`const on=(gridScope==='5a');`, 'Port row stays 5-APPROVED-only');
 has(`scope:'5a'`, 'Shoot Tags FILTER stays 5-APPROVED-only');
 has(`'2':{filters:{},search:'',sort:'name-asc'}`, 'amState has per-tab memory for 2');
@@ -244,7 +244,7 @@ has('onclick="ignoreGroup(', 'not-a-duplicate button wired');
 /* v7.27 asserts */
 has('v7.27:', 'v7.27 deploy marker present');
 has("all:{title:'All Models', ids:null, full:true}", 'All Models opens full editor');
-has("if(blk) blk.style.display='';", 'shoot tags show in full editor for all scopes');
+has("fv.insertBefore(blk, notes && notes.nextSibling", 'shoot tags relocated + shown in full editor');
 has('src="/logo-carnal.png"', 'logo image used in header');
 has('class="pw-logo-img"', 'logo image on login screen');
 has("--font-display:'Myriad Pro','Source Sans 3',sans-serif", 'heading font is Myriad Pro/Source Sans 3');
@@ -253,6 +253,16 @@ lacks("family=Syne", 'old Syne font removed');
 has('let suppressDirty = false;', 'dirty guard flag present');
 has('if(suppressDirty) return;', 'markDirty respects the load guard');
 has('suppressDirty=true;   // v7.27', 'guard engaged on load');
+/* v7.28 asserts */
+has('v7.28:', 'v7.28 deploy marker present');
+has("fv.insertBefore(blk, notes && notes.nextSibling", 'shoot tags lifted to top of editor');
+has('async function scrapePhotos()', 'scrape entry present');
+has('async function scrapeImport()', 'scrape import present');
+has("fetch('/scrape-images?url='", 'calls scrape endpoint');
+has("fetch('/proxy-image?url='", 'downloads via image proxy');
+has("addPhotos([file],'fv-headshot')", 'scraped headshot uses the normal upload path');
+has('id="scrape-modal"', 'scrape picker modal present');
+has('onclick="scrapePhotos()"', 'scrape button wired');
 // Guard against duplicate element ids from the toolbar rebuild:
 ['am-title','am-search','am-sort','am-count','am-filterbtns','port-wrap','port-tag','port-btn','port-row-btn','port-row-picker','port-row-search','port-row-list',
  'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list','sb-progress','sb-loading','sb-load-status'].forEach(id=>{
