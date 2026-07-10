@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const multer = require('multer');
 const path = require('path');
 const crypto = require('crypto');
@@ -191,7 +192,21 @@ app.get('/robots.txt', (_req, res) => {
   res.type('text/plain').send('User-agent: *\nDisallow: /\n');
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+// v7.32: gzip all compressible responses (index.html ~419KB→~108KB, and every /api JSON
+// board page compresses ~5-8×). Must run BEFORE static + routes. Already-compressed image
+// bytes (/asset-bytes, /proxy-image) are skipped automatically by content-type.
+app.use(compression());
+
+// v7.32: long-cache immutable static assets (logo, etc.) so browsers don't refetch them,
+// but keep index.html on ETag revalidation so a deploy propagates immediately.
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '7d',
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-cache'); // revalidate every load; deploys show up at once
+    }
+  },
+}));
 app.use(express.json({ limit: '5mb' }));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));

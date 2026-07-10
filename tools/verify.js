@@ -319,5 +319,11 @@ lacks('onblur="updateItemName(this.value)"', 'old immediate-write stage-name han
   c === 1 ? ok(`id "${id}" unique`) : bad(`id "${id}" appears ${c} times`);
 });
 
+/* v7.32 asserts: wire speed */
+has('v7.32:', 'v7.32 deploy marker present');
+has("'limit:500'", 'board pager uses limit:500');
+has("sessionStorage.getItem('dateInputColId:'", 'date-input column id cached in session');
+has('rel="preconnect" href="https://fonts.gstatic.com"', 'font preconnect hint present');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

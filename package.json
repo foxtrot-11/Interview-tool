@@ -9,6 +9,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "compression": "^1.8.1",
     "express": "^4.19.2",
     "express-rate-limit": "^8.5.2",
     "graphql": "^17.0.1",

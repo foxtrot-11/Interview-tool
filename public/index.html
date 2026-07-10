@@ -8,6 +8,9 @@
 <meta http-equiv="Expires" content="0">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 <title>Carnal Media — Model Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Source+Sans+3:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1991,12 +1994,18 @@ async function fetchAssetUrls(assetIds, opts){
 let dateInputColId; // undefined = not resolved yet, null = board has none
 async function resolveDateInputCol(){
   if(dateInputColId!==undefined) return dateInputColId;
+  // v7.32: reuse the resolved id across loads within a session (its value is board-stable).
+  try{
+    const cached = sessionStorage.getItem('dateInputColId:'+MAIN_BOARD_ID);
+    if(cached!==null){ dateInputColId = (cached==='') ? null : cached; return dateInputColId; }
+  }catch(e){}
   try{
     const d=await gql(`{boards(ids:[${MAIN_BOARD_ID}]){columns{id title type}}}`);
     const cols=(((d.boards||[])[0])||{}).columns||[];
     const c=cols.find(x=>x.type==='date' && /date\s*input/i.test(x.title||''));
     dateInputColId = c ? c.id : null;
   }catch(e){ dateInputColId=null; }
+  try{ sessionStorage.setItem('dateInputColId:'+MAIN_BOARD_ID, dateInputColId||''); }catch(e){}
   return dateInputColId;
 }
 async function loadKanban(){
@@ -2016,7 +2025,7 @@ async function loadKanban(){
     const colIdsJson = JSON.stringify(colIds);
     const items=[]; let cursor=null, pages=0;
     do{
-      const cp = cursor ? `cursor:"${cursor}"` : 'limit:200';
+      const cp = cursor ? `cursor:"${cursor}"` : 'limit:500';
       const data = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name created_at updated_at column_values(ids:${colIdsJson}){id value}}}}}`);
       const page = data.boards[0].items_page;
       page.items.forEach(it=>{
@@ -5463,6 +5472,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.32: (wire speed + logo) Server now gzip-compresses all responses (index.html ~420KB→~108KB on the wire; every /api board page compresses ~4×) and long-caches static assets while keeping index.html revalidating so deploys still propagate instantly. Board loads page 500 items at a time instead of 200 (fewer round-trips). Date-input column id cached in sessionStorage (one lookup per session). Preconnect hints added for fonts + CDN. Logo swapped for a compressed 15KB / 300px version (was 199KB / 4114px). NOTE: touches server.js + package.json (adds the compression dependency) — deploying it restarts prod.
    v7.31: (1) INTERVIEW editor field navigator — the interview tab's left sidebar now lists every field under "Quick Fields" and "Extra Fields" headings (same searchable click-to-scroll list as the full editor), with the field search box enabled. Clicking a field scrolls the form to it and flashes it; scroll-spy highlights the current field. The interview editor is now one-scroll (both sections always visible) instead of the old Quick/Extra show-hide toggle; showIvSection retired to a no-op. New IV_QUESTION_MAP drives the list. (2) NEW MODEL: the Bluesky/webpage scrape box moved to the very top of the section (right under the banner), above all fields.
    v7.30: INTERVIEW tab is now a photo grid (like 5-APPROVED / 2 / 4), filtered to show only 3-INTERVIEW people (status idx 7). Opening the tab shows the thumbnail grid with search + filters; clicking a tile opens that person in the interview editor via openInterviewEditor, with a "← Back to grid" button. Replaces the old type-to-search combo entry flow. GRID_SCOPES gained '3' (interview:true); tile routing now picks openInterviewEditor for interview scope, openApprovedEditor for other full scopes, openKanbanModal otherwise.
    v7.29: (1) SCRAPE PHOTOS now in the NEW MODEL and INTERVIEW tabs too (was full editor only) — each view has its own scrape box; scrapePhotos(ctx) routes imports to that view's headshot/extra slots via SCRAPE_TYPES. Full-editor scrape ids renamed to scrape-url-fv/scrape-btn-fv for consistency. (2) CASTING SANDBOX per-person shoot notes — each tile gets a ▾ caret opening a Pay Information + Dates Booked note; notes ride in the share link and the Monday save-state JSON (no new column). At Port they write into the subitem's Pay information (text_mm522jb4) + DATES BOOKED / GROUP (long_text_mm35h07x) columns; the plain 5-APPROVED port path is unaffected (safe no-op). (3) Stage-name edits are DEFERRED to Save like every other field — blur no longer writes to Monday immediately; it marks dirty and shows "Stage name changed — hit Save to apply", and saveAll() applies the rename via applyStageNameOnSave() before the mode save (full + interview views).
@@ -5607,7 +5617,7 @@ async function loadDuplicates(){
     for(const boardId of boards){
       let cursor = null;
       do {
-        const cp = cursor ? `cursor:"${cursor}"` : 'limit:200';
+        const cp = cursor ? `cursor:"${cursor}"` : 'limit:500';
         const data = await gql(`{boards(ids:[${boardId}]){items_page(${cp}){cursor items{id name created_at column_values(ids:["label"]){value}}}}}`);
         const page = data.boards[0].items_page;
         page.items.forEach(it => {
