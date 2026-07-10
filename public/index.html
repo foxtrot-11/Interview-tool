@@ -166,9 +166,12 @@
   .sb-slot.empty:hover,.sb-slot.over{border-color:var(--accent);background:rgba(255,120,60,.06)}
   .sb-slotnum{position:absolute;top:2px;left:4px;font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--text-muted);opacity:.7;pointer-events:none;z-index:1}
   .sb-slot.empty .sb-slotnum{position:static;margin:auto;opacity:.5;font-size:11px;letter-spacing:.08em}
-  .sb-tile{width:86px;cursor:grab;user-select:none;border:2px solid transparent;border-radius:8px;padding:3px;text-align:center}
+  .sb-tile{position:relative;width:86px;cursor:grab;user-select:none;border:2px solid transparent;border-radius:8px;padding:3px;text-align:center}
   .sb-tile:active{cursor:grabbing}
   .sb-tile.sel{border-color:var(--accent);background:rgba(255,120,60,.10)}
+  .sb-note-caret{position:absolute;top:1px;right:1px;width:18px;height:18px;line-height:16px;padding:0;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--text-dim);font-size:11px;cursor:pointer;opacity:.55}
+  .sb-note-caret:hover{opacity:1;border-color:var(--accent);color:var(--accent)}
+  .sb-note-caret.has{opacity:1;background:var(--accent);border-color:var(--accent);color:#fff}
   .sb-thumb{width:80px;height:80px;border-radius:6px;overflow:hidden;background:var(--surface);margin:0 auto}
   .sb-thumb img{width:100%;height:100%;object-fit:cover;pointer-events:none}
   .sb-name{font-size:10px;line-height:1.25;margin-top:3px;word-break:break-word;max-height:26px;overflow:hidden}
@@ -817,7 +820,7 @@
           <input class="candidate-name-input" id="strip-name" value="—" 
             title="Stage name (item name in Monday)" 
             oninput="markDirty()" 
-            onblur="updateItemName(this.value)">
+            onblur="stageNameEdited(this.value)">
           <span style="font-size:10px;color:var(--text-dim);letter-spacing:0.1em;text-transform:uppercase">stage name</span>
         </div>
         <div class="candidate-meta">
@@ -836,8 +839,8 @@
     <!-- Shared photo upload (full-view modes: applicant → approved/rejected) -->
     <div id="fv-upload-section" style="display:none;margin-bottom:20px">
       <div class="scrape-row">
-        <input type="url" id="scrape-url" class="scrape-input" placeholder="Paste a Bluesky profile or a webpage with photos, then Scrape…">
-        <button type="button" class="fv-scrape-btn" id="scrape-btn" onclick="scrapePhotos()">🔎 Scrape photos</button>
+        <input type="url" id="scrape-url-fv" class="scrape-input" placeholder="Paste a Bluesky profile or a webpage with photos, then Scrape…">
+        <button type="button" class="fv-scrape-btn" id="scrape-btn-fv" onclick="scrapePhotos('fv')">🔎 Scrape photos</button>
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap">
         <div style="flex:1;min-width:240px">
@@ -1084,7 +1087,7 @@
         </div>
 
 <div class="field-grid single">
-          <div class="field"><div class="field-label">Stage Name <span style="color:var(--text-dim);font-weight:400">(renames the model)</span></div><input type="text" id="iv-stage-name" placeholder="Stage / display name" onblur="updateStageName(this.value)" oninput="markDirty()"></div>
+          <div class="field"><div class="field-label">Stage Name <span style="color:var(--text-dim);font-weight:400">(renames the model)</span></div><input type="text" id="iv-stage-name" placeholder="Stage / display name" onblur="stageNameEdited(this.value)" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Experience in Porn</div><textarea id="iv-long_text_mm2mxr92" oninput="syncIvField('long_text_mm2mxr92',this.value)"></textarea></div>
           <div class="field"><div class="field-label">Other Studios?</div><div class="status-group" id="iv-color_mm25jb44"><div class="status-pill" style="background:#fdab3d;color:#111" data-value="0" onclick="selectStatusIv(this,'color_mm25jb44')">No Prev Exp</div><div class="status-pill" style="background:#df2f4a;color:#fff" data-value="2" onclick="selectStatusIv(this,'color_mm25jb44')">OF Only</div><div class="status-pill" style="background:#9d50dd;color:#fff" data-value="4" onclick="selectStatusIv(this,'color_mm25jb44')">Occasional</div><div class="status-pill" style="background:#037f4c;color:#fff" data-value="6" onclick="selectStatusIv(this,'color_mm25jb44')">Mix</div><div class="status-pill" style="background:#66ccff;color:#111" data-value="16" onclick="selectStatusIv(this,'color_mm25jb44')">Regularly</div></div></div>
           <div class="field"><div class="field-label">Other Studios Notes</div><textarea id="iv-long_text_mm252r65" oninput="syncIvField('long_text_mm252r65',this.value)"></textarea></div>
@@ -1136,6 +1139,10 @@
         </div>
 
         <!-- PHOTO UPLOAD IN INTERVIEW -->
+        <div class="scrape-row" style="margin-top:24px">
+          <input type="url" id="scrape-url-iv" class="scrape-input" placeholder="Paste a Bluesky profile or a webpage with photos, then Scrape…">
+          <button type="button" class="fv-scrape-btn" id="scrape-btn-iv" onclick="scrapePhotos('iv')">🔎 Scrape photos</button>
+        </div>
         <div class="iv-upload-section">
           <div class="iv-upload-label">Replace Headshot → Monday</div>
           <div class="photo-zone" id="iv-headshot-zone" ondragover="onDragOver(event,'iv-headshot-zone')" ondragleave="onDragLeave('iv-headshot-zone')" ondrop="onDrop(event,'iv-headshot')">
@@ -1232,6 +1239,10 @@
 
           <!-- HEADSHOT -->
           <div class="field field-full">
+            <div class="scrape-row" style="margin-bottom:12px">
+              <input type="url" id="scrape-url-new" class="scrape-input" placeholder="Paste a Bluesky profile or a webpage with photos, then Scrape…">
+              <button type="button" class="fv-scrape-btn" id="scrape-btn-new" onclick="scrapePhotos('new')">🔎 Scrape photos</button>
+            </div>
             <div class="field-label">Headshot <span style="color:var(--text-dim);font-size:9px;letter-spacing:0">— 1 photo, goes to Headshot field in Monday</span></div>
             <div class="photo-zone" id="headshot-zone" ondragover="onDragOver(event,'headshot-zone')" ondragleave="onDragLeave('headshot-zone')" ondrop="onDrop(event,'headshot')">
               <input type="file" accept="image/*,.heic,.heif" onchange="onFileSelect(event,'headshot')">
@@ -1430,6 +1441,23 @@
           <button class="kb-save" id="scrape-import-btn" onclick="scrapeImport()">Import selected</button>
           <button class="kb-hs-cancel" onclick="scrapeClose()">Cancel</button>
           <span class="am-count" id="scrape-status"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- v7.29: Sandbox per-person shoot note (Pay + Dates). Rides in the share-link + save-state
+         JSON; ports to the subitem's Pay information + DATES BOOKED / GROUP columns at Port. -->
+    <div id="sb-note-modal" class="unsaved-modal" style="z-index:9750">
+      <div class="unsaved-panel" style="max-width:520px;width:min(96vw,520px)">
+        <div class="unsaved-title" id="sb-note-title">Shoot note</div>
+        <div class="unsaved-text">These carry to the ported subitem (Pay information + Dates Booked). Leave both blank to clear.</div>
+        <label class="iv-upload-label" for="sb-note-pay" style="display:block;margin-top:10px">Pay Information for this shoot</label>
+        <textarea id="sb-note-pay" class="scrape-input" style="width:100%;min-height:64px;resize:vertical" placeholder="e.g. $1,200 flat, paid on wrap"></textarea>
+        <label class="iv-upload-label" for="sb-note-dates" style="display:block;margin-top:10px">Dates Booked</label>
+        <textarea id="sb-note-dates" class="scrape-input" style="width:100%;min-height:64px;resize:vertical" placeholder="e.g. Aug 4–6, call time 9am"></textarea>
+        <div class="unsaved-actions" style="margin-top:14px">
+          <button class="kb-save" onclick="sbSaveNote()">Save note</button>
+          <button class="kb-hs-cancel" onclick="sbNoteClose()">Cancel</button>
         </div>
       </div>
     </div>
@@ -2625,7 +2653,7 @@ function portRowEnter(){ if(portRowOpts.length) portRowPick(0); }
    Share: the whole arrangement is encoded into a #sb= URL — stateless, so it
    survives server restarts; the recipient logs in with the app passphrase,
    sees it, can adjust, and can copy a new link back. */
-let sbState={tag:null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}};
+let sbState={tag:null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}, notes:{}};
 let sbPending=null, sbSelected=null;
 const SB_MAIN=[['b','BOTTOM'],['v','VERS'],['t','TOP']];
 const SB_ALT={b:'ab',v:'av',t:'at'};                                  // each main column's alternates zone (v7.22)
@@ -2638,8 +2666,16 @@ function sbNormalizeZones(z){
   if(Array.isArray(z.alt)) out.av=out.av.concat(z.alt.map(String));   // migrate the v7.20/21 single-ALTERNATES saves into VERSE alternates
   return out;
 }
-function sbEncode(){ const p={t:sbState.tag,z:sbState.zones}; return btoa(unescape(encodeURIComponent(JSON.stringify(p)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function sbEncode(){ const p={t:sbState.tag,z:sbState.zones,n:sbState.notes}; return btoa(unescape(encodeURIComponent(JSON.stringify(p)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
 function sbDecode(s){ try{ return JSON.parse(decodeURIComponent(escape(atob(String(s||'').replace(/-/g,'+').replace(/_/g,'/'))))); }catch(e){ return null; } }
+// Coerce incoming notes (share-link/save) to {id:{pay,dates}} with string values; drop empties.
+function sbNormalizeNotes(n){
+  const out={}; if(n && typeof n==='object'){
+    for(const k of Object.keys(n)){ const v=n[k]||{}; const pay=String(v.pay||'').trim(), dates=String(v.dates||'').trim();
+      if(pay||dates) out[String(k)]={pay, dates}; }
+  }
+  return out;
+}
 function sbInitUI(){
   const sel=document.getElementById('sb-tag'); if(!sel) return;
   const cur=sel.value;
@@ -2659,7 +2695,7 @@ function sbMembers(tagId){
 function sbDefaultZone(roleLabels){ const t=portDecideType(roleLabels); return t==='VERSE'?'v':t==='TOP'?'t':t==='BOTTOM'?'b':'av'; }
 function sbTagChanged(){
   const v=document.getElementById('sb-tag').value;
-  sbState={tag:v||null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}};
+  sbState={tag:v||null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}, notes:{}};
   sbSelected=null;
   renderSandbox();
 }
@@ -2683,7 +2719,7 @@ async function renderSandbox(){
   if(ld) ld.style.display='none';
   if(sbPending){
     const p=sbPending; sbPending=null;
-    sbState={tag:(p&&p.t)?String(p.t):null, zones:sbNormalizeZones(p&&p.z)};
+    sbState={tag:(p&&p.t)?String(p.t):null, zones:sbNormalizeZones(p&&p.z), notes:sbNormalizeNotes(p&&p.n)};
     const sel=document.getElementById('sb-tag'); if(sel&&sbState.tag) sel.value=String(sbState.tag);
   }
   if(!sbState.tag){ empty.style.display=''; empty.textContent='Pick a shoot tag to load its people.'; board.style.display='none'; const c=document.getElementById('sb-count'); if(c)c.textContent=''; return; }
@@ -2691,7 +2727,7 @@ async function renderSandbox(){
   const c=document.getElementById('sb-count'); if(c) c.textContent=mem.length?mem.length+' people':'';
   if(!mem.length){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag (approved statuses only). Tag people in the 5-APPROVED editor first.'; board.style.display='none'; return; }
   empty.style.display='none'; board.style.display='';
-  const tile=id=>{ const m=byId[id]; const url=(m&&m.head)?(kbHeadCache[String(m.head)]||''):''; return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div></div>`; };
+  const tile=id=>{ const m=byId[id]; const url=(m&&m.head)?(kbHeadCache[String(m.head)]||''):''; const nt=sbState.notes[String(id)]; const hasNote=!!(nt&&(nt.pay||nt.dates)); return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret${hasNote?' has':''}" title="${hasNote?'Pay / dates noted — click to edit':'Add pay / dates note'}" onclick="sbOpenNote(event,'${id}')">▾</button></div>`; };
   // A zone renders as fixed numbered slots (main ≥8, alt ≥4). Slot position = subitem number at Port.
   const slots=(z,alt)=>{ const ids=sbState.zones[z]||[]; const n=Math.max(alt?SB_ALT_MIN:SB_MIN_SLOTS, ids.length); let h='';
     for(let i=0;i<n;i++){ const id=ids[i]; const lbl=alt?'ALT':(SB_TYPE[z].slice(0,1)+(i+1));
@@ -2753,6 +2789,29 @@ function sbMove(id,zone,index){
 function sbTileClick(e,id){ e.stopPropagation(); sbSelected=(sbSelected===id)?null:id; renderSandbox(); }   // tap-to-move fallback (touch)
 function sbSlotClick(e,zone,index){ e.stopPropagation(); if(sbSelected) sbMove(sbSelected, zone, index); }
 function sbZoneClick(zone){ if(sbSelected) sbMove(sbSelected, zone, null); }
+// v7.29: per-person shoot note (pay + dates). Opened from the tile caret.
+let sbNoteId=null;
+function sbOpenNote(e, id){
+  if(e){ e.stopPropagation(); e.preventDefault(); }   // don't trigger tile select / drag
+  id=String(id); sbNoteId=id;
+  const nt=sbState.notes[id]||{};
+  const byId={}; sbMembers(sbState.tag||'').forEach(m=>byId[m.id]=m);
+  const nm=byId[id]?byId[id].name:id;
+  const title=document.getElementById('sb-note-title'); if(title) title.textContent='Shoot note — '+nm;
+  document.getElementById('sb-note-pay').value=nt.pay||'';
+  document.getElementById('sb-note-dates').value=nt.dates||'';
+  document.getElementById('sb-note-modal').classList.add('open');
+}
+function sbNoteClose(){ document.getElementById('sb-note-modal')?.classList.remove('open'); sbNoteId=null; }
+function sbSaveNote(){
+  if(sbNoteId==null) return;
+  const pay=(document.getElementById('sb-note-pay').value||'').trim();
+  const dates=(document.getElementById('sb-note-dates').value||'').trim();
+  if(pay||dates) sbState.notes[sbNoteId]={pay, dates};
+  else delete sbState.notes[sbNoteId];   // both blank → drop the entry so the caret un-highlights
+  sbNoteClose();
+  renderSandbox();   // refresh caret .has state
+}
 function sbCopyLink(){
   if(!sbState.tag){ showToast('Pick a shoot tag first','error'); return; }
   const url=location.origin+location.pathname+'#sb='+sbEncode();
@@ -2799,7 +2858,7 @@ function sbRenderSaves(){
 }
 function sbLoadSave(id){
   const s=sbSaves.find(x=>String(x.id)===String(id)); if(!s||!s.data){ showToast('Could not load that save','error'); return; }
-  sbState={tag:s.data.tag?String(s.data.tag):null, zones:sbNormalizeZones(s.data.zones)};
+  sbState={tag:s.data.tag?String(s.data.tag):null, zones:sbNormalizeZones(s.data.zones), notes:sbNormalizeNotes(s.data.notes)};
   const sel=document.getElementById('sb-tag'); if(sel&&sbState.tag) sel.value=String(sbState.tag);
   sbSelected=null; renderSandbox();
   showToast('Loaded “'+(s.name||'')+'”','success');
@@ -2836,7 +2895,7 @@ async function sbSaveState(){
   const now=new Date();
   const dflt=label+' — '+now.toLocaleDateString([], {month:'short',day:'numeric'})+' '+now.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
   const name=prompt('Name this saved arrangement:', dflt); if(name===null) return;
-  const payload=JSON.stringify({v:1, tag:sbState.tag, tagLabel:label, zones:sbState.zones, savedAt:now.toISOString()});
+  const payload=JSON.stringify({v:1, tag:sbState.tag, tagLabel:label, zones:sbState.zones, notes:sbState.notes, savedAt:now.toISOString()});
   try{
     await gql(`mutation($b:ID!,$n:String!,$c:JSON!){create_item(board_id:$b,item_name:$n,column_values:$c){id}}`,
       {b:SANDBOX_SAVES_BOARD_ID, n:(name||dflt).slice(0,255), c:JSON.stringify({[col]:{text:payload}})});
@@ -2864,9 +2923,9 @@ async function sbPortOpen(){
   // Mains: position i → TYPE{i}. Alternates (all 3 columns) collapse to ALTERNATE type, numbered
   // in column order (BOTTOM→VERSE→TOP) since Monday has a single ALTERNATE subitem type.
   const entries=[];
-  ['b','v','t'].forEach(z=>(sbState.zones[z]||[]).forEach((id,i)=>{ const m=byId[id]; if(m) entries.push({model:m, type:SB_TYPE[z], num:i+1}); }));
+  ['b','v','t'].forEach(z=>(sbState.zones[z]||[]).forEach((id,i)=>{ const m=byId[id]; if(m){ const nt=sbState.notes[String(id)]||{}; entries.push({model:m, type:SB_TYPE[z], num:i+1, pay:nt.pay||'', dates:nt.dates||''}); } }));
   let altNum=0;
-  ['ab','av','at'].forEach(z=>(sbState.zones[z]||[]).forEach(id=>{ const m=byId[id]; if(m){ altNum++; entries.push({model:m, type:'ALTERNATE', num:altNum}); } }));
+  ['ab','av','at'].forEach(z=>(sbState.zones[z]||[]).forEach(id=>{ const m=byId[id]; if(m){ altNum++; const nt=sbState.notes[String(id)]||{}; entries.push({model:m, type:'ALTERNATE', num:altNum, pay:nt.pay||'', dates:nt.dates||''}); } }));
   if(!entries.length){ showToast('Nothing to port','error'); return; }
   const tagOpt=(boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.id)===String(sbState.tag));
   await portShowPlan(null, null, `Sandbox “${tagOpt?tagOpt.label:sbState.tag}” → row “${portSelectedRowName||portSelectedRowId}” (order = subitem number)`, slots=>sbBuildPlan(entries, slots));
@@ -2878,15 +2937,17 @@ function sbBuildPlan(entries, slots){
   const actions=[], skipped=[];
   entries.forEach(en=>{
     const desired=en.type+en.num, mid=String(en.model.id);
+    // v7.29: pay/dates were attached to the entry in sbPortOpen (keeps this fn pure/testable).
+    const pay=en.pay||'', dates=en.dates||'';
     const slot=byName[desired.toUpperCase()];
     if(slot){
       const linked=(slot.linked||[]).map(String);
       if(linked.includes(mid)){ skipped.push({model:en.model, reason:'already in '+desired}); return; }
       const others=linked.filter(x=>x!==mid);
       let rep; if(others.length){ const k=kanbanItems.find(it=>String(it.id)===others[0]); rep=k?k.name:('id '+others[0]); }
-      actions.push({model:en.model, type:en.type, mode:'fill', slotId:slot.id, slotName:slot.name, replaces:rep});
+      actions.push({model:en.model, type:en.type, mode:'fill', slotId:slot.id, slotName:slot.name, replaces:rep, pay, dates});
     } else {
-      actions.push({model:en.model, type:en.type, mode:'create', slotName:desired});
+      actions.push({model:en.model, type:en.type, mode:'create', slotName:desired, pay, dates});
     }
   });
   return {actions, skipped};
@@ -2970,6 +3031,10 @@ async function portConfirm(){
       }
       const cvObj={[CASTING_LINK_COL]:{item_ids:[Number(a.model.id)]}};
       if(a.mode==='fill' && a.origName!==a.slotName) cvObj.name=a.slotName;   // rename an existing slot the user edited
+      // v7.29: sandbox port carries per-person pay/dates into the subitem columns.
+      // The plain 5-APPROVED port path leaves a.pay/a.dates unset, so these are safe no-ops there.
+      if(a.pay) cvObj['text_mm522jb4']=a.pay;
+      if(a.dates) cvObj['long_text_mm35h07x']={text:a.dates};
       await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
         {i:slotId,b:CASTING_SUBITEM_BOARD_ID,c:JSON.stringify(cvObj)});
       a.done=true; ok++;
@@ -3861,10 +3926,19 @@ window.addEventListener('beforeunload', (e)=>{
 // they upload on the normal Save. Limitation: JS-rendered galleries / login-walled sites (X, IG) won't yield
 // images — only static HTML + Bluesky's public API.
 let scrapeResults=[];
-async function scrapePhotos(){
-  const url=(document.getElementById('scrape-url').value||'').trim();
+// v7.29: scrape is now available in three contexts — full view (fv), interview (iv), and
+// new model (new). Each has its own scrape-url-{ctx}/scrape-btn-{ctx} input+button pair but
+// they share one picker modal + one scrapeResults array. scrapeCtx records which context
+// triggered the current scrape so scrapeImport() routes the chosen photos to the right
+// headshot/extra upload slots for that view (SCRAPE_TYPES). [headshotSlot, extraSlot]
+const SCRAPE_TYPES={fv:['fv-headshot','fv-extra'], iv:['iv-headshot','iv-extra'], new:['headshot','extra']};
+let scrapeCtx='fv';
+async function scrapePhotos(ctx){
+  ctx = SCRAPE_TYPES[ctx] ? ctx : 'fv';
+  scrapeCtx = ctx;
+  const url=(document.getElementById('scrape-url-'+ctx).value||'').trim();
   if(!url){ showToast('Paste a URL or Bluesky handle first','error'); return; }
-  const btn=document.getElementById('scrape-btn'); btn.disabled=true; const lbl=btn.textContent; btn.textContent='Scraping…';
+  const btn=document.getElementById('scrape-btn-'+ctx); btn.disabled=true; const lbl=btn.textContent; btn.textContent='Scraping…';
   try{
     const r=await fetch('/scrape-images?url='+encodeURIComponent(url),{headers:{'X-App-Auth':APP_PW}});
     const j=await r.json().catch(()=>({}));
@@ -3906,12 +3980,13 @@ async function scrapeImport(){
   };
   let added=0, failed=0, done=0;
   // headshot first so it lands in the headshot slot
+  const [hsSlot, exSlot]=SCRAPE_TYPES[scrapeCtx]||SCRAPE_TYPES.fv;
   const order=[hsIdx, ...keep.filter(i=>i!==hsIdx)];
   for(const i of order){
     st.textContent='Downloading '+(++done)+'/'+order.length+'…';
     try{
       const file=await grab(scrapeResults[i], i);
-      if(i===hsIdx) addPhotos([file],'fv-headshot'); else addPhotos([file],'fv-extra');
+      if(i===hsIdx) addPhotos([file],hsSlot); else addPhotos([file],exSlot);
       added++;
     }catch(e){ failed++; }
   }
@@ -4326,46 +4401,44 @@ function markDirty(){
 }
 
 // ── RENAME item (stage name) ──
-async function updateItemName(newName){
+// v7.29: Stage-name edits are now DEFERRED to Save, like every other field.
+// stageNameEdited() runs on blur of either the strip-name (full view) or iv-stage-name
+// (interview view) input: it just marks the form dirty and tells the user to Save. The
+// actual Monday rename happens in applyStageNameOnSave(), called from saveAll() before
+// the mode-specific save. This replaces the old updateItemName()/updateStageName() pair
+// which wrote to Monday immediately on blur.
+function stageNameEdited(newName){
   newName = (newName||'').trim();
-  if(!currentItem || !newName || newName === currentItem.name) return;
-  try {
-    await gql(`mutation($i:ID!,$b:ID!,$v:String!){change_simple_column_value(item_id:$i,board_id:$b,column_id:"name",value:$v){id}}`,
-      {i: currentItem.id, b: BOARD_ID, v: newName});
-    currentItem.name = newName;
-    // Update the cache entry too
-    if(fullBoardCache){
-      const cached = fullBoardCache.find(it=>it.id===currentItem.id);
-      if(cached) cached.name = newName;
-    }
-    // Update the combobox: if this candidate is the selected one, reflect new name
-    const combo = document.getElementById('candidate-combo');
-    if(combo && currentItem) combo.value = newName;
-    // Keep the Stage Name quick field in sync
-    const stageF = document.getElementById('iv-stage-name');
-    if(stageF) stageF.value = newName;
-    showToast('Stage name updated','success');
-  } catch(e) {
-    showToast('Rename failed: '+e.message,'error');
-    // Revert the input
-    const sn = document.getElementById('strip-name');
-    if(sn) sn.value = currentItem.name;
+  if(!currentItem) return;
+  markDirty();
+  // Only nudge if it actually differs from the saved name — avoids a toast on a no-op blur.
+  if(newName && newName !== currentItem.name){
+    showToast('Stage name changed — hit Save to apply','saving');
   }
 }
-
-// Stage Name field (interview Quick Fields) — renames the monday item, like the strip name input.
-async function updateStageName(newName){
-  newName = (newName||'').trim();
-  if(!currentItem || !newName || newName === currentItem.name){
-    // If blanked or unchanged, restore the field to the current name
-    const f = document.getElementById('iv-stage-name');
-    if(f && currentItem) f.value = currentItem.name;
-    return;
+// Perform the deferred rename on Save. Reads whichever stage-name input belongs to the
+// current mode (strip-name for full view, iv-stage-name for interview view). No-ops if the
+// name is blank or unchanged. On success updates currentItem.name + caches so repeat saves
+// no-op; on failure throws so saveAll() surfaces the error and the rest of the save aborts.
+async function applyStageNameOnSave(){
+  if(!currentItem) return;
+  const inputId = currentMode==='3' ? 'iv-stage-name' : 'strip-name';
+  const inp = document.getElementById(inputId);
+  const newName = (inp ? inp.value : '').trim();
+  if(!newName || newName === currentItem.name) return;
+  await gql(`mutation($i:ID!,$b:ID!,$v:String!){change_simple_column_value(item_id:$i,board_id:$b,column_id:"name",value:$v){id}}`,
+    {i: currentItem.id, b: BOARD_ID, v: newName});
+  currentItem.name = newName;
+  // Keep the board cache in sync so the combo/grid show the new name without a reload.
+  if(fullBoardCache){
+    const cached = fullBoardCache.find(it=>it.id===currentItem.id);
+    if(cached) cached.name = newName;
   }
-  await updateItemName(newName);
-  // Keep the Stage Name field reflecting the (possibly reverted) current name
-  const f = document.getElementById('iv-stage-name');
-  if(f) f.value = currentItem.name;
+  // Reflect the new name across both name inputs + the combobox.
+  const combo = document.getElementById('candidate-combo');
+  if(combo) combo.value = newName;
+  const stageF = document.getElementById('iv-stage-name'); if(stageF) stageF.value = newName;
+  const sn = document.getElementById('strip-name'); if(sn) sn.value = newName;
 }
 
 // ── SAVE (existing model) ──
@@ -4395,6 +4468,9 @@ async function saveAll(){
     }
   };
   try{
+    // v7.29: apply any deferred stage-name change first (full + interview views only;
+    // 'new' has no currentItem yet — its name is set by saveNewModel).
+    if(currentMode!=='new' && currentItem){ await applyStageNameOnSave(); }
     if(currentMode==='new'){ await saveNewModel('potential'); }
     else if(currentMode==='3'){ await saveAndUploadIv(); }   // interview view (fields + photos)
     else { await saveAndUploadFv(); }                          // full view (fields + photos)
@@ -5322,6 +5398,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.29: (1) SCRAPE PHOTOS now in the NEW MODEL and INTERVIEW tabs too (was full editor only) — each view has its own scrape box; scrapePhotos(ctx) routes imports to that view's headshot/extra slots via SCRAPE_TYPES. Full-editor scrape ids renamed to scrape-url-fv/scrape-btn-fv for consistency. (2) CASTING SANDBOX per-person shoot notes — each tile gets a ▾ caret opening a Pay Information + Dates Booked note; notes ride in the share link and the Monday save-state JSON (no new column). At Port they write into the subitem's Pay information (text_mm522jb4) + DATES BOOKED / GROUP (long_text_mm35h07x) columns; the plain 5-APPROVED port path is unaffected (safe no-op). (3) Stage-name edits are DEFERRED to Save like every other field — blur no longer writes to Monday immediately; it marks dirty and shows "Stage name changed — hit Save to apply", and saveAll() applies the rename via applyStageNameOnSave() before the mode save (full + interview views).
    v7.28: (1) Shoot-tag selector lifted to the TOP of the full editor (was buried in the last section). (2) SCRAPE PHOTOS — in the full editor, paste a Bluesky profile or a webpage URL and pull up to 10 candidate photos; pick which to keep + one headshot, and they're imported as headshot/extra uploads (saved to Monday on the normal Save). Server adds SSRF-guarded /scrape-images + /proxy-image (http/https only, public IPs only, redirect hops re-validated, behind app auth). Limitation: only Bluesky's public API + static-HTML pages work; JS-rendered/login-walled sites (X, Instagram) won't yield images.
    v7.27: (1) ALL MODELS now opens the full editor on click (like 5-APPROVED / 2 / 4) instead of the kanban modal — GRID_SCOPES.all gained full:true. (2) Shoot tags now show in the full editor for EVERY view (was 5-APPROVED only). (3) CARNAL MEDIA wordmark replaced with the logo image (public/logo-carnal.png) in the header and the login screen. (4) Heading font switched off "Syne" to a Myriad Pro → Source Sans 3 stack (real Myriad Pro if installed, else the free Myriad-alike); primary headings set to Black (900); body stays DM Mono. (5) Fixed the false "unsaved changes" prompt — markDirty is now suppressed while a record loads/populates, so it only fires on real user edits.
    v7.26: Duplicate tool — two additions. (1) "Not a duplicate": marks a group as different-people-same-name, keeps all records, and hides it PERMANENTLY and for everyone (stored on Monday in a "__DUP_IGNORE__" item on the save-states board, keyed by the record id-set; falls back to session-only if that Long Text column isn't set up). Distinct from "Skip (this session)" which is temporary. (2) "Keep one · delete rest": pick the ◉ keeper and delete the other record(s) WITHOUT merging any fields/photos — for when a duplicate is empty. Reuses the delete + retry + Recycle-Bin safety and the name guardrail.

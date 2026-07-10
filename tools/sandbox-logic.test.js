@@ -104,5 +104,28 @@ truthy(/^[A-Za-z0-9_-]+$/.test(enc), 'encoded link is URL-safe (no + / = chars)'
 eq(dec(enc), { t: '18', zones: undefined, z: { b:['1'], v:['2','3'], t:[], ab:[], av:['4'], at:[] } }.z ? { t:'18', z:{ b:['1'], v:['2','3'], t:[], ab:[], av:['4'], at:[] } } : null, 'round-trip preserves tag + zones exactly');
 eq(dec('%%%garbage%%%'), null, 'garbage decodes to null, not a crash');
 
+console.log('[6] v7.29 sandbox notes: pay/dates flow through sbBuildPlan');
+// entries carry pay/dates (attached upstream in sbPortOpen). Verify sbBuildPlan copies
+// them onto BOTH fill and create actions, and leaves them empty-string when absent.
+const sbNotesEntries = [
+  { model: { id: '701', name: 'Carol' }, type: 'TOP', num: 2, pay: '$1200 flat', dates: 'Aug 4-6' }, // fill TOP2
+  { model: { id: '702', name: 'Dan' },   type: 'TOP', num: 3, pay: '', dates: '' },                   // create TOP3, no note
+];
+const spN = sbBuildPlan(sbNotesEntries, sbSlots);
+eq(spN.actions.map(a => [a.model.name, a.mode, a.pay, a.dates]),
+  [['Carol','fill','$1200 flat','Aug 4-6'], ['Dan','create','','']],
+  'pay/dates copied onto fill + create actions (empty when absent)');
+
+console.log('[7] v7.29 notes codec round-trip (sbNormalizeNotes)');
+const notesEval = new Function(extractFn('sbNormalizeNotes') + '\nreturn {sbNormalizeNotes};');
+const { sbNormalizeNotes } = notesEval();
+eq(sbNormalizeNotes({ '700': { pay: '$500', dates: 'Sep 1' } }), { '700': { pay: '$500', dates: 'Sep 1' } },
+  'well-formed notes preserved');
+eq(sbNormalizeNotes({ '700': { pay: '', dates: '' }, '701': { pay: 'x', dates: '' } }), { '701': { pay: 'x', dates: '' } },
+  'entries with both fields blank are dropped');
+eq(sbNormalizeNotes(null), {}, 'null → empty object, not a crash');
+eq(sbNormalizeNotes({ '700': { pay: 42, dates: null } }), { '700': { pay: '42', dates: '' } },
+  'coerces non-string values to trimmed strings');
+
 console.log(`\n${n} assertions, ${fails} failed`);
 process.exit(fails ? 1 : 0);

@@ -256,13 +256,45 @@ has('suppressDirty=true;   // v7.27', 'guard engaged on load');
 /* v7.28 asserts */
 has('v7.28:', 'v7.28 deploy marker present');
 has("fv.insertBefore(blk, notes && notes.nextSibling", 'shoot tags lifted to top of editor');
-has('async function scrapePhotos()', 'scrape entry present');
+has('async function scrapePhotos(ctx)', 'scrape entry present');
 has('async function scrapeImport()', 'scrape import present');
 has("fetch('/scrape-images?url='", 'calls scrape endpoint');
 has("fetch('/proxy-image?url='", 'downloads via image proxy');
-has("addPhotos([file],'fv-headshot')", 'scraped headshot uses the normal upload path');
+has('addPhotos([file],hsSlot)', 'scraped headshot uses the normal upload path');
 has('id="scrape-modal"', 'scrape picker modal present');
-has('onclick="scrapePhotos()"', 'scrape button wired');
+has('onclick="scrapePhotos(\'fv\')"', 'scrape button wired (fv)');
+/* v7.29 asserts */
+has('v7.29:', 'v7.29 deploy marker present');
+// (1) scrape in three contexts
+has("const SCRAPE_TYPES={fv:['fv-headshot','fv-extra'], iv:['iv-headshot','iv-extra'], new:['headshot','extra']}", 'SCRAPE_TYPES map present');
+has('id="scrape-url-fv"', 'fv scrape input renamed');
+has('id="scrape-url-iv"', 'interview scrape input present');
+has('id="scrape-url-new"', 'new-model scrape input present');
+has('onclick="scrapePhotos(\'iv\')"', 'interview scrape button wired');
+has('onclick="scrapePhotos(\'new\')"', 'new-model scrape button wired');
+has('const [hsSlot, exSlot]=SCRAPE_TYPES[scrapeCtx]', 'scrapeImport routes via SCRAPE_TYPES');
+// (2) sandbox notes + port
+has('notes:{}', 'sbState carries notes');
+has('n:sbState.notes', 'notes encoded into share link');
+has('function sbNormalizeNotes(', 'notes normalizer present');
+has('sbNormalizeNotes(p&&p.n)', 'notes restored from share link');
+has('sbNormalizeNotes(s.data.notes)', 'notes restored from saved state');
+has('notes:sbState.notes', 'notes persisted in save-state payload');
+has('class="sb-note-caret', 'note caret rendered on tiles');
+has('function sbOpenNote(', 'sbOpenNote present');
+has('function sbSaveNote(', 'sbSaveNote present');
+has('id="sb-note-modal"', 'note modal present');
+has("if(a.pay) cvObj['text_mm522jb4']=a.pay", 'port writes Pay information column');
+has("if(a.dates) cvObj['long_text_mm35h07x']={text:a.dates}", 'port writes Dates Booked column');
+has('mode:\'fill\', slotId:slot.id, slotName:slot.name, replaces:rep, pay, dates', 'fill action carries pay/dates');
+has('mode:\'create\', slotName:desired, pay, dates', 'create action carries pay/dates');
+// (3) deferred stage-name save
+has('function stageNameEdited(', 'stageNameEdited present');
+has('async function applyStageNameOnSave(', 'applyStageNameOnSave present');
+has('Stage name changed — hit Save to apply', 'deferred stage-name toast present');
+has("if(currentMode!=='new' && currentItem){ await applyStageNameOnSave(); }", 'saveAll applies deferred stage name');
+has('onblur="stageNameEdited(this.value)"', 'stage-name inputs use deferred handler');
+lacks('onblur="updateItemName(this.value)"', 'old immediate-write stage-name handler removed');
 // Guard against duplicate element ids from the toolbar rebuild:
 ['am-title','am-search','am-sort','am-count','am-filterbtns','port-wrap','port-tag','port-btn','port-row-btn','port-row-picker','port-row-search','port-row-list',
  'sb-view','sb-tag','sb-count','sb-board','sb-empty','sb-row-btn','sb-row-picker','sb-row-search','sb-row-list','sb-progress','sb-loading','sb-load-status'].forEach(id=>{
