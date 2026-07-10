@@ -110,7 +110,24 @@ const lacks = (needle, label) => !src.includes(needle) ? ok(label) : bad(label, 
 has(`'2':{title:'2-POTENTIAL', ids:[10], full:true}`, 'GRID_SCOPES has 2-POTENTIAL → status idx 10, full editor');
 has(`'4':{title:'4-REVIEW', ids:[9], full:true}`, 'GRID_SCOPES has 4-REVIEW → status idx 9, full editor');
 has(`'5a':{title:'5-APPROVED', ids:[2,4,105], full:true}`, 'GRID_SCOPES 5a unchanged (2,4,105) + full flag');
-has(`GRID_SCOPES[gridScope] && GRID_SCOPES[gridScope].full) ? 'openApprovedEditor'`, 'tile routing driven by scope.full');
+has(`sc.interview ? 'openInterviewEditor' : (sc.full ? 'openApprovedEditor' : 'openKanbanModal')`, 'tile routing driven by scope (interview/full/kanban)');
+/* v7.30 asserts: interview picture grid */
+has('v7.30:', 'v7.30 deploy marker present');
+has("'3':{title:'3-INTERVIEW', ids:[7], full:true, interview:true}", 'interview scope added to GRID_SCOPES');
+has('async function openInterviewEditor(id)', 'openInterviewEditor present');
+has("buildSidebarNav('interview');", 'interview editor builds interview sidebar');
+has('const backToInterviewGrid = backToApprovedGrid', 'interview back-to-grid delegates to shared handler');
+has("if(mode==='3'){", 'setMode has a dedicated interview-grid branch');
+has("setGridScope('3');", 'interview branch sets grid scope 3');
+/* v7.31 asserts: interview field navigator + new-model scraper move */
+has('v7.31:', 'v7.31 deploy marker present');
+has('const IV_QUESTION_MAP', 'interview question map present');
+has("qw.style.display=(type==='full'||type==='interview')", 'interview sidebar shows the field search box');
+has('IV_QUESTION_MAP.forEach', 'interview sidebar builds field list from IV_QUESTION_MAP');
+has("['General Notes','iv-general-notes']", 'interview map targets real iv field ids');
+has("['Legal Name','ive-text_mknceqty']", 'interview map includes extra-section fields');
+lacks("d.dataset.ivSection='quick'", 'old quick/extra toggle nav removed');
+has('if(!fvOn && !ivOn) return;', 'scroll-spy runs in interview editor too');
 has(`if(mode==='5a'||mode==='2'||mode==='4'){`, 'setMode routes 2/4/5a to the grid');
 has(`setGridScope(mode);`, 'setMode passes the mode as grid scope');
 has("blk.style.display='';   // v7.27", 'shoot-tags editor block shows in every full-editor view');

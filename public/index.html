@@ -1175,8 +1175,9 @@
 
         </div><!-- /iv-quick-section -->
 
-        <!-- EXTRA FIELDS SECTION (hidden by default) -->
-        <div id="iv-extra-section" style="display:none">
+        <!-- EXTRA FIELDS SECTION (v7.31: always visible — one-scroll, navigated via sidebar) -->
+        <div id="iv-extra-section">
+          <div class="section-header" style="margin-top:8px"><div class="section-title">Extra Fields</div></div>
           <div class="field-grid single" style="margin-bottom:24px">
             <div class="field"><div class="field-label">Legal Name</div><input type="text" id="ive-text_mknceqty" placeholder="Full legal name" oninput="syncIvField('text_mknceqty',this.value)"></div>
             <div class="field"><div class="field-label">Date of Birth</div><input type="date" id="ive-dob" onchange="syncIvField('date_of_birth_mkncwsrj',this.value);onDobChange(this.value)"></div>
@@ -1210,6 +1211,10 @@
     <!-- NEW MODEL VIEW -->
     <div id="new-model-view" style="display:none">
       <div class="new-model-banner"><strong>New Model</strong>Fill in what you have. On save, this will be created in monday.com with status 2-POTENTIAL.</div>
+      <div class="scrape-row" style="margin-bottom:16px">
+        <input type="url" id="scrape-url-new" class="scrape-input" placeholder="Paste a Bluesky profile or a webpage with photos, then Scrape…">
+        <button type="button" class="fv-scrape-btn" id="scrape-btn-new" onclick="scrapePhotos('new')">🔎 Scrape photos</button>
+      </div>
       <div class="section active">
         <div class="section-header"><div class="section-title">New Model</div></div>
         <div class="field-grid">
@@ -1239,10 +1244,6 @@
 
           <!-- HEADSHOT -->
           <div class="field field-full">
-            <div class="scrape-row" style="margin-bottom:12px">
-              <input type="url" id="scrape-url-new" class="scrape-input" placeholder="Paste a Bluesky profile or a webpage with photos, then Scrape…">
-              <button type="button" class="fv-scrape-btn" id="scrape-btn-new" onclick="scrapePhotos('new')">🔎 Scrape photos</button>
-            </div>
             <div class="field-label">Headshot <span style="color:var(--text-dim);font-size:9px;letter-spacing:0">— 1 photo, goes to Headshot field in Monday</span></div>
             <div class="photo-zone" id="headshot-zone" ondragover="onDragOver(event,'headshot-zone')" ondragleave="onDragLeave('headshot-zone')" ondrop="onDrop(event,'headshot')">
               <input type="file" accept="image/*,.heic,.heif" onchange="onFileSelect(event,'headshot')">
@@ -1541,7 +1542,31 @@ const FULL_QUESTION_MAP = [
     ['Rating Notes','f-text_mm1znrfv'],['Rate Offered','f-text_mm1zb8xf'],['Date First Shot','f-date_mknb5z70'],
   ]],
 ];
-// Status index → hex colors
+// v7.31: interview-view field navigator map — same shape as FULL_QUESTION_MAP but pointing at
+// the iv-* / ive-* field ids, grouped under the two on-screen headings in display order. Drives
+// the searchable click-to-scroll sidebar list for the interview editor (one-scroll layout).
+const IV_QUESTION_MAP = [
+  ['Quick Fields', [
+    ['General Notes','iv-general-notes'],['Stage Name','iv-stage-name'],['Experience in Porn','iv-long_text_mm2mxr92'],
+    ['Other Studios?','iv-color_mm25jb44'],['Other Studios Notes','iv-long_text_mm252r65'],['FTM?','iv-color_mm1zk5e2'],['FTM Notes','iv-long_text_mm1zbe1t'],
+    ['Legal Name','iv-text_mknceqty'],['Location','iv-text_mkncbdr1'],['Email','iv-text_mknk1txg'],['Phone','iv-phone9ouk2t6x'],['Referred By','iv-long_text_mm1zhkyq'],
+    ['Twitter / X','iv-lien_internet'],['Instagram','iv-lien_internet9'],['Other Social Media','iv-lien_internet3'],['Age','iv-age-quick'],
+    ['Height','iv-text_mknc1sps'],['Height (metric)','iv-metric_h'],['Weight','iv-text_mm1yx2wg'],['Weight (metric)','iv-metric_w'],
+    ['Hair Color','iv-text_mkncjzx8'],['Eye Color','iv-text_mkncsqaq'],['Cock Size','iv-text_mm1y2znz'],['Cock Size (metric)','iv-metric_c'],['Cut vs Uncut','iv-display-dropdown_mkx04tbr'],
+    ['Shirt Size','iv-text_mknc62rg'],['Shoe Size','iv-text_mknc2t7g'],['Pant Size','iv-text_mknc808t'],['Role','iv-display-dropdown_mknbe0p0'],['Type','iv-display-dropdown_mm1zzwcg'],
+    ['Sexuality (on camera)','iv-display-dropdown_mm1by5q0'],['Ethnicity','iv-display-dropdown_mm1zcar6'],['Language(s)','iv-display-dropdown_mknb18b7'],['Passport','iv-color_mm26w6hs'],['State ID (state)','iv-text_mm1z66yj'],
+    ['Medical Allergies','iv-text_mkncgkwk'],['Food Restrictions','iv-text_mkncht8f'],['Experience Bottoming','iv-long_text_mm1zaqzq'],['Dick Enhancement','iv-display-dropdown_mm1ztytq'],
+    ['HIV','iv-color_mm1zzkz6'],['Syphilis','iv-color_mm1zbze8'],['Availability Notes','iv-long_text_mm1z9aeg'],['Collab House?','iv-color_mm1z2f56'],
+    ['Tattoos','iv-color_mm1zghx9'],['Tattoo Notes','iv-long_text_mm1zsdyv'],['Haircut?','iv-color_mm1zzwv8'],['Haircut Notes','iv-long_text_mm1zshaw'],
+    ['Rating — Intake','iv-numeric_mm1z34ca'],['Rating Notes','iv-text_mm1znrfv'],['Rate Offered','iv-text_mm1zb8xf'],
+  ]],
+  ['Extra Fields', [
+    ['Legal Name','ive-text_mknceqty'],['Date of Birth','ive-dob'],['Address','ive-text_mknct7cn'],['Location (general)','ive-display-dropdown_mm254xed'],['Citizenship','ive-display-dropdown_mm26n6qx'],
+    ['Twitter / X','ive-lien_internet'],['Instagram','ive-lien_internet9'],['Bluesky','ive-dup__of_facebook'],['OnlyFans','ive-text_mkncy7gf'],['JustForFans','ive-text_mknc3aty'],
+    ['Rating — Final','ive-numeric_mm1zjjrp'],['Date First Shot','ive-date_mknb5z70'],['2nd Form Notes','ive-long_text_mm252tt7'],['Model Input Notes','ive-long_text_mknct6wd'],
+    ['T-Shirt Size','ive-short_text0dkc9zdq'],['Suit Size','ive-text_mm1yf8cd'],['Neck Size','ive-text_mm2dwvec'],['Head Circumference','ive-text_mm2dqqdw'],['Site Compatibility','iv-compat-section'],
+  ]],
+];
 const STATUS_COLORS = {5:{bg:'#c4c4c4',fg:'#111'},8:{bg:'#cab641',fg:'#111'},10:{bg:'#ff6d3b',fg:'#fff'},7:{bg:'#ffcb00',fg:'#111'},9:{bg:'#579bfc',fg:'#fff'},2:{bg:'#037f4c',fg:'#fff'},3:{bg:'#df2f4a',fg:'#fff'},4:{bg:'#9d50dd',fg:'#fff'},105:{bg:'#00c875',fg:'#fff'}};
 const STATUS_LABELS = {5:'0-APPLICANT',8:'1-SCREEN',10:'2-POTENTIAL',7:'3-INTERVIEW',9:'4-REVIEW',2:'5-APPROVED',3:'5-REJECTED',4:'00 - ALL-STAR',105:'00 - EXCLUSIVE'};
 
@@ -1808,8 +1833,8 @@ AM_FILTERS.forEach(f=>{ (f.kind==='dropdown'?AM_DD_KEY:AM_ST_KEY)[f.col]=f.key; 
 let amFilters={};            // filter key -> Set of selected option ids (live set for the CURRENT scope)
 // Grid scopes: the same grid view serves ALL MODELS and 5-APPROVED, each with its own filters/search/sort.
 let gridScope='all';
-const GRID_SCOPES={ all:{title:'All Models', ids:null, full:true}, '2':{title:'2-POTENTIAL', ids:[10], full:true}, '4':{title:'4-REVIEW', ids:[9], full:true}, '5a':{title:'5-APPROVED', ids:[2,4,105], full:true} };
-let amState={ all:{filters:{},search:'',sort:'name-asc'}, '2':{filters:{},search:'',sort:'name-asc'}, '4':{filters:{},search:'',sort:'name-asc'}, '5a':{filters:{},search:'',sort:'name-asc'} };
+const GRID_SCOPES={ all:{title:'All Models', ids:null, full:true}, '2':{title:'2-POTENTIAL', ids:[10], full:true}, '3':{title:'3-INTERVIEW', ids:[7], full:true, interview:true}, '4':{title:'4-REVIEW', ids:[9], full:true}, '5a':{title:'5-APPROVED', ids:[2,4,105], full:true} };
+let amState={ all:{filters:{},search:'',sort:'name-asc'}, '2':{filters:{},search:'',sort:'name-asc'}, '3':{filters:{},search:'',sort:'name-asc'}, '4':{filters:{},search:'',sort:'name-asc'}, '5a':{filters:{},search:'',sort:'name-asc'} };
 let approvedFromGrid=false;
 function setGridScope(scope){
   if(gridScope===scope) return;
@@ -1902,7 +1927,8 @@ function renderAllModels(){
     const cached = m.head && kbHeadCache[m.head];
     const inner = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : `<span class="am-mono">${escapeHtml((m.name[0]||'?').toUpperCase())}</span>`;
     const sub = SF ? (m[SF.raw]||'—') : '';
-    const openFn = (GRID_SCOPES[gridScope] && GRID_SCOPES[gridScope].full) ? 'openApprovedEditor' : 'openKanbanModal';
+    const sc = GRID_SCOPES[gridScope] || {};
+    const openFn = sc.interview ? 'openInterviewEditor' : (sc.full ? 'openApprovedEditor' : 'openKanbanModal');
     return `<div class="am-tile" onclick="${openFn}('${m.id}')"><span class="am-caret">▾</span><div class="am-thumb" id="amthumb-${m.id}"${m.head?` data-head="${m.head}"`:''}>${inner}</div><div class="am-name">${escapeHtml(m.name)}</div><div class="am-sub">${escapeHtml(sub)}</div></div>`;
   }).join('');
   amObserve();
@@ -2524,7 +2550,10 @@ function qnavSpy(){
   _spyTick=requestAnimationFrame(()=>{
     _spyTick=null;
     const fv=document.getElementById('full-view');
-    if(!fv || fv.style.display==='none') return;
+    const iv=document.getElementById('interview-view');
+    const fvOn = fv && fv.style.display!=='none';
+    const ivOn = iv && iv.style.display!=='none';
+    if(!fvOn && !ivOn) return;   // v7.31: spy runs in either the full or interview editor
     const fa=document.getElementById('form-area'); const nav=document.getElementById('sidebar-nav'); if(!fa||!nav) return;
     const items=[...nav.querySelectorAll('.qnav-item')]; if(!items.length) return;
     const faTop=fa.getBoundingClientRect().top;
@@ -3136,8 +3165,23 @@ async function backToApprovedGrid(){
   document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
   activeGrid='am';
   show('am-view');
-  renderAllModels();   // same filters (state untouched), fresh data (store synced on save)
+  renderAllModels();   // gridScope is unchanged, so this returns to whichever grid we came from
 }
+// v7.30: interview grid entry — mirrors openApprovedEditor but lands in the interview-view
+// editor (buildSidebarNav('interview')) instead of the full editor. currentMode is already
+// '3' (setMode set it before showing the grid), so loadCandidate renders the interview view.
+async function openInterviewEditor(id){
+  approvedFromGrid=true;
+  hide('am-view'); activeGrid=null;
+  show('selector-bar');
+  const bb=document.getElementById('back-to-grid-btn'); if(bb) bb.style.display='';
+  buildSidebarNav('interview');
+  loadCandidatesForMode('3');    // fills the candidate combo in the background
+  await loadCandidate(id);       // renders the interview view (currentMode==='3')
+}
+// Shared back button (#back-to-grid-btn) delegates here; gridScope is preserved across the
+// editor round-trip, so renderAllModels() naturally shows the interview grid again.
+const backToInterviewGrid = backToApprovedGrid;
 
 // ── Shared-store sync for FULL-EDITOR saves (so grids reflect edits without a Refresh) ──
 function syncStoreFromCv(itemId, cv){
@@ -3578,6 +3622,24 @@ async function setMode(mode){
     if(kbLoadedOnce && kanbanItems.length){ renderAllModels(); } else { loadKanban(); }
     return;
   }
+  if(mode==='3'){
+    // v7.30: 3-INTERVIEW is now a photo grid too (filtered to status idx 7); tiles open the
+    // INTERVIEW editor via openInterviewEditor. Replaces the old search-combo entry flow.
+    hide('selector-bar');
+    hide('candidate-strip');
+    hide('empty-state');
+    hide('full-view');
+    hide('interview-view');
+    hide('new-model-view');
+    hide('dup-view');
+    buildSidebarNav('blank');
+    document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
+    activeGrid='am';
+    setGridScope('3');
+    show('am-view');
+    if(kbLoadedOnce && kanbanItems.length){ renderAllModels(); } else { loadKanban(); }
+    return;
+  }
   if(mode==='dup'){
     hide('selector-bar');
     hide('candidate-strip');
@@ -3615,19 +3677,11 @@ async function setMode(mode){
   show('empty-state');
   document.getElementById('empty-title').textContent = (mode==='batch') ? 'Select an imported model' : 'Select a candidate';
   document.getElementById('empty-sub').textContent='Choose from the list below';
-  if(mode==='3') document.getElementById('sidebar-notes-pin').classList.remove('visible');
-  buildSidebarNav(mode==='3'?'interview':'full');
+  buildSidebarNav('full');   // v7.30: mode 3 handled earlier as a grid; this fall-through is full-editor modes only
   await loadCandidatesForMode(mode);
 }
 
-function showIvSection(section){
-  document.getElementById('iv-quick-section').style.display = section==='quick' ? 'block' : 'none';
-  document.getElementById('iv-extra-section').style.display = section==='extra' ? 'block' : 'none';
-  document.querySelectorAll('#sidebar-nav .nav-item[data-iv-section]').forEach(item=>{
-    item.classList.toggle('active', item.dataset.ivSection === section);
-  });
-  document.getElementById('form-area').scrollTop = 0;
-}
+function showIvSection(){ /* v7.31: retired — interview editor is one-scroll now, navigated via the searchable sidebar list. Kept as a no-op in case any stale reference calls it. */ }
 
 function buildSidebarNav(type){
   const nav=document.getElementById('sidebar-nav');
@@ -3635,7 +3689,7 @@ function buildSidebarNav(type){
   const qs=document.getElementById('qnav-search');
   if(qs){ qs.value=''; }
   const qw=document.getElementById('qnav-search-wrap');
-  if(qw){ qw.style.display=(type==='full')?'block':'none'; }
+  if(qw){ qw.style.display=(type==='full'||type==='interview')?'block':'none'; }
   const qc=document.getElementById('qnav-clear');
   if(qc){ qc.style.display='none'; }
   if(type==='full'){
@@ -3652,9 +3706,20 @@ function buildSidebarNav(type){
       });
     });
   }else if(type==='interview'){
-    const label=document.createElement('div');label.className='nav-section-label';label.textContent='Interview';nav.appendChild(label);
-    const d=document.createElement('div');d.className='nav-item active';d.dataset.ivSection='quick';d.onclick=()=>showIvSection('quick');d.innerHTML='<div class="nav-item-dot"></div>Quick Fields';nav.appendChild(d);
-    const d2=document.createElement('div');d2.className='nav-item';d2.dataset.ivSection='extra';d2.onclick=()=>showIvSection('extra');d2.innerHTML='<div class="nav-item-dot"></div>Extra Fields';nav.appendChild(d2);
+    // v7.31: interview editor now uses the same searchable click-to-scroll list as the full
+    // editor (one-scroll — both Quick + Extra sections visible). Replaces the old
+    // Quick/Extra show-hide toggle.
+    IV_QUESTION_MAP.forEach(([section, questions])=>{
+      const label=document.createElement('div');label.className='qnav-group-label';label.textContent=section;nav.appendChild(label);
+      questions.forEach(([qLabel, targetId])=>{
+        const d=document.createElement('div');
+        d.className='qnav-item';
+        d.dataset.target=targetId;
+        d.textContent=qLabel;
+        d.onclick=()=>scrollToField(targetId);
+        nav.appendChild(d);
+      });
+    });
   }else if(type==='new'){
     const label=document.createElement('div');label.className='nav-section-label';label.textContent='New Model';nav.appendChild(label);
     const d=document.createElement('div');d.className='nav-item active';d.innerHTML='<div class="nav-item-dot"></div>Entry Form';nav.appendChild(d);
@@ -5398,6 +5463,8 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.31: (1) INTERVIEW editor field navigator — the interview tab's left sidebar now lists every field under "Quick Fields" and "Extra Fields" headings (same searchable click-to-scroll list as the full editor), with the field search box enabled. Clicking a field scrolls the form to it and flashes it; scroll-spy highlights the current field. The interview editor is now one-scroll (both sections always visible) instead of the old Quick/Extra show-hide toggle; showIvSection retired to a no-op. New IV_QUESTION_MAP drives the list. (2) NEW MODEL: the Bluesky/webpage scrape box moved to the very top of the section (right under the banner), above all fields.
+   v7.30: INTERVIEW tab is now a photo grid (like 5-APPROVED / 2 / 4), filtered to show only 3-INTERVIEW people (status idx 7). Opening the tab shows the thumbnail grid with search + filters; clicking a tile opens that person in the interview editor via openInterviewEditor, with a "← Back to grid" button. Replaces the old type-to-search combo entry flow. GRID_SCOPES gained '3' (interview:true); tile routing now picks openInterviewEditor for interview scope, openApprovedEditor for other full scopes, openKanbanModal otherwise.
    v7.29: (1) SCRAPE PHOTOS now in the NEW MODEL and INTERVIEW tabs too (was full editor only) — each view has its own scrape box; scrapePhotos(ctx) routes imports to that view's headshot/extra slots via SCRAPE_TYPES. Full-editor scrape ids renamed to scrape-url-fv/scrape-btn-fv for consistency. (2) CASTING SANDBOX per-person shoot notes — each tile gets a ▾ caret opening a Pay Information + Dates Booked note; notes ride in the share link and the Monday save-state JSON (no new column). At Port they write into the subitem's Pay information (text_mm522jb4) + DATES BOOKED / GROUP (long_text_mm35h07x) columns; the plain 5-APPROVED port path is unaffected (safe no-op). (3) Stage-name edits are DEFERRED to Save like every other field — blur no longer writes to Monday immediately; it marks dirty and shows "Stage name changed — hit Save to apply", and saveAll() applies the rename via applyStageNameOnSave() before the mode save (full + interview views).
    v7.28: (1) Shoot-tag selector lifted to the TOP of the full editor (was buried in the last section). (2) SCRAPE PHOTOS — in the full editor, paste a Bluesky profile or a webpage URL and pull up to 10 candidate photos; pick which to keep + one headshot, and they're imported as headshot/extra uploads (saved to Monday on the normal Save). Server adds SSRF-guarded /scrape-images + /proxy-image (http/https only, public IPs only, redirect hops re-validated, behind app auth). Limitation: only Bluesky's public API + static-HTML pages work; JS-rendered/login-walled sites (X, Instagram) won't yield images.
    v7.27: (1) ALL MODELS now opens the full editor on click (like 5-APPROVED / 2 / 4) instead of the kanban modal — GRID_SCOPES.all gained full:true. (2) Shoot tags now show in the full editor for EVERY view (was 5-APPROVED only). (3) CARNAL MEDIA wordmark replaced with the logo image (public/logo-carnal.png) in the header and the login screen. (4) Heading font switched off "Syne" to a Myriad Pro → Source Sans 3 stack (real Myriad Pro if installed, else the free Myriad-alike); primary headings set to Black (900); body stays DM Mono. (5) Fixed the false "unsaved changes" prompt — markDirty is now suppressed while a record loads/populates, so it only fires on real user edits.
