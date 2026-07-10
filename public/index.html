@@ -1661,6 +1661,7 @@ const KANBAN_COLOR = {'0':'#c4c4c4','1':'#cab641','2':'#ff6d3b','3':'#ffcb00','4
 const KB_STATUS_ORDER = [5,8,10,7,9,2,105,4,1,0,6,3,11,12]; // dropdown order (incl. Evernote/Duplicate so a card can be moved out)
 let kanbanItems = [];
 let kbHeadCache = {};
+let kbThumbCache = {}; // v7.33: assetId → small thumbnail url for grid tiles (full url stays in kbHeadCache)
 const KB_AUTO_THRESHOLD = 60;   // columns bigger than this load photos only on demand
 let kbBuckets = [];
 let kbColLoaded = {};           // colIndex -> true once photos requested
@@ -1927,7 +1928,7 @@ function renderAllModels(){
   if(note) note.textContent = (SF && res.missing) ? `${res.missing} of ${list.length} shown have no ${SF.label} on file — they're at the end` : '';
   const empty=document.getElementById('am-empty'); if(empty) empty.style.display = (list.length||!kanbanItems.length) ? 'none':'';
   grid.innerHTML=list.map(m=>{
-    const cached = m.head && kbHeadCache[m.head];
+    const cached = m.head && kbThumb(m.head);
     const inner = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : `<span class="am-mono">${escapeHtml((m.name[0]||'?').toUpperCase())}</span>`;
     const sub = SF ? (m[SF.raw]||'—') : '';
     const sc = GRID_SCOPES[gridScope] || {};
@@ -1937,7 +1938,7 @@ function renderAllModels(){
   amObserve();
 }
 
-// Lazy thumbnails: only fetch photo URLs for tiles as they scroll into view (batched, cached in kbHeadCache).
+// Lazy thumbnails: only fetch photo URLs for tiles as they scroll into view (batched, cached).
 function amObserve(){
   if(amIO) amIO.disconnect();
   amPending.clear();
@@ -1947,7 +1948,7 @@ function amObserve(){
       if(!e.isIntersecting) continue;
       amIO.unobserve(e.target);
       const h=e.target.dataset.head;
-      if(h && kbHeadCache[h]) amFillThumb(e.target);
+      if(h && kbThumbCache[h]) amFillThumb(e.target);
       else if(h){ amPending.add(h); queued=true; }
     }
     if(queued){ clearTimeout(amFlushTimer); amFlushTimer=setTimeout(amFlushThumbs,120); }
@@ -1961,7 +1962,7 @@ async function amFlushThumbs(){
   ids.forEach(h=>{ document.querySelectorAll('#am-grid .am-thumb[data-head="'+h+'"]').forEach(el=>amFillThumb(el)); });
 }
 function amFillThumb(el){
-  const u=kbHeadCache[el.dataset.head];
+  const u=kbThumb(el.dataset.head);
   if(!u || el.querySelector('img')) return;
   el.innerHTML=`<img loading="lazy" src="${escapeHtml(u)}" alt="">`;
 }
@@ -1969,6 +1970,9 @@ function amFillThumb(el){
 // Shared asset-URL fetcher: fills kbHeadCache, 40 ids per query, up to 4 queries in flight (both Kanban and All Models use this).
 async function fetchAssetUrls(assetIds, opts){
   opts=opts||{};
+  // v7.33: a needed asset is one missing from the FULL cache. We fetch public_url +
+  // url_thumbnail together and populate both caches; grids read the small thumb, while
+  // the lightbox/editor/recrop keep using the full public_url.
   const need=[...new Set((assetIds||[]).filter(a=>a && !kbHeadCache[a]))];
   if(!need.length){ if(opts.onProgress) opts.onProgress(0,0); return; }
   const size=opts.chunkSize||40;
@@ -1978,8 +1982,13 @@ async function fetchAssetUrls(assetIds, opts){
     while(next<chunks.length){
       const chunk=chunks[next++];
       try{
-        const data=await gql(`{assets(ids:[${chunk.join(',')}]){id public_url}}`);
-        (data.assets||[]).forEach(a=>{ if(a && a.public_url) kbHeadCache[String(a.id)]=a.public_url; });
+        const data=await gql(`{assets(ids:[${chunk.join(',')}]){id public_url url_thumbnail}}`);
+        (data.assets||[]).forEach(a=>{
+          if(!a) return;
+          if(a.public_url) kbHeadCache[String(a.id)]=a.public_url;
+          // Fall back to the full url if Monday returns no thumbnail (older/non-image assets).
+          kbThumbCache[String(a.id)] = a.url_thumbnail || a.public_url || '';
+        });
       }catch(e){}
       done+=chunk.length;
       if(opts.onProgress){ try{ opts.onProgress(done, need.length); }catch(e){} }
@@ -1987,6 +1996,8 @@ async function fetchAssetUrls(assetIds, opts){
   }
   await Promise.all(Array.from({length:Math.min(4,chunks.length)},()=>worker()));
 }
+// v7.33: small pre-generated thumbnail URLs for grid tiles (keyed by assetId, like kbHeadCache).
+function kbThumb(assetId){ const k=String(assetId); return kbThumbCache[k] || kbHeadCache[k] || ''; }
 
 // v7.23: "Date added" sort. The Evernote import wrote a DATE INPUT column; Monday-native records don't have
 // it. We discover that column by title once per board (its id differs across staging/prod, like the metric
@@ -2200,7 +2211,7 @@ function kbBuildColVal(field, val){
 function kanbanCardHtml(m){
   const notes = m.notes ? escapeHtml(m.notes.length>90 ? m.notes.slice(0,88)+'…' : m.notes) : '<span class="kb-empty">— no notes —</span>';
   const tw = m.twUrl ? `<a class="kb-tw" href="${escapeHtml(m.twUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Twitter ↗</a>` : '';
-  const cached = m.head ? kbHeadCache[m.head] : null;
+  const cached = m.head ? kbThumb(m.head) : null;
   const initial = escapeHtml((m.name||'?').trim().charAt(0).toUpperCase()||'?');
   const thumb = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : `<span class="kb-mono">${initial}</span>`;
   return `<div class="kb-card" data-id="${m.id}">
@@ -2256,7 +2267,7 @@ async function fetchKanbanHeadshotsForModels(models){
   const withHead=(models||[]).filter(m=>m.head);
   await fetchAssetUrls(withHead.map(m=>m.head)); // parallel chunks — big columns fill several times faster than the old serial loop
   withHead.forEach(m=>{
-    const u=kbHeadCache[m.head]; if(!u) return;
+    const u=kbThumb(m.head); if(!u) return;
     const el=document.getElementById('kbthumb-'+m.id);
     if(el && !el.querySelector('img')) el.innerHTML=`<img loading="lazy" src="${escapeHtml(u)}" alt="">`;
   });
@@ -2765,7 +2776,7 @@ async function renderSandbox(){
   const c=document.getElementById('sb-count'); if(c) c.textContent=mem.length?mem.length+' people':'';
   if(!mem.length){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag (approved statuses only). Tag people in the 5-APPROVED editor first.'; board.style.display='none'; return; }
   empty.style.display='none'; board.style.display='';
-  const tile=id=>{ const m=byId[id]; const url=(m&&m.head)?(kbHeadCache[String(m.head)]||''):''; const nt=sbState.notes[String(id)]; const hasNote=!!(nt&&(nt.pay||nt.dates)); return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret${hasNote?' has':''}" title="${hasNote?'Pay / dates noted — click to edit':'Add pay / dates note'}" onclick="sbOpenNote(event,'${id}')">▾</button></div>`; };
+  const tile=id=>{ const m=byId[id]; const url=(m&&m.head)?(kbThumb(m.head)||''):''; const nt=sbState.notes[String(id)]; const hasNote=!!(nt&&(nt.pay||nt.dates)); return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret${hasNote?' has':''}" title="${hasNote?'Pay / dates noted — click to edit':'Add pay / dates note'}" onclick="sbOpenNote(event,'${id}')">▾</button></div>`; };
   // A zone renders as fixed numbered slots (main ≥8, alt ≥4). Slot position = subitem number at Port.
   const slots=(z,alt)=>{ const ids=sbState.zones[z]||[]; const n=Math.max(alt?SB_ALT_MIN:SB_MIN_SLOTS, ids.length); let h='';
     for(let i=0;i<n;i++){ const id=ids[i]; const lbl=alt?'ALT':(SB_TYPE[z].slice(0,1)+(i+1));
@@ -2780,7 +2791,7 @@ async function renderSandbox(){
       </div>`; }).join('')+`</div>`;
   // Thumbnails stream in (smaller chunks → the 4 parallel workers engage and photos paint in waves),
   // filled by id so we never rebuild the board mid-load. A progress bar shows it's working.
-  const missing=mem.filter(m=>m.head && !kbHeadCache[String(m.head)]).map(m=>m.head);
+  const missing=mem.filter(m=>m.head && !kbThumbCache[String(m.head)]).map(m=>m.head);
   if(missing.length){
     sbProgress(0, missing.length);
     try{ await fetchAssetUrls(missing, {chunkSize:12, onProgress:(done,total)=>{ sbFillThumbs(byId); sbProgress(done,total); }}); }catch(e){}
@@ -2792,7 +2803,7 @@ function sbFillThumbs(byId){
   for(const z of Object.keys(sbState.zones)){
     for(const id of sbState.zones[z]){
       const m=byId[id]; if(!m||!m.head) continue;
-      const url=kbHeadCache[String(m.head)]; if(!url) continue;
+      const url=kbThumb(m.head); if(!url) continue;
       const el=document.getElementById('sbthumb-'+id);
       if(el && !el.firstChild) el.innerHTML=`<img loading="lazy" src="${escapeHtml(url)}" alt="">`;
     }
@@ -3809,6 +3820,25 @@ async function loadCandidatesForMode(mode){
     allCandidates = modeCache[key];
     renderCandidateList(allCandidates);
     if(combo){ combo.placeholder='Type to search candidates…'; }
+    if(loadBar) loadBar.classList.remove('active');
+    return;
+  }
+
+  // v7.33: derive the list from the already-loaded shared store instead of a fresh board walk.
+  // The grids load ALL items into kanbanItems (with statusIdx); the combo only needs id+name,
+  // so filtering the store by MODE_STATUS_IDS is exact and instant. Only for the main board;
+  // 'batch' lives on a different board and still fetches. Saves sync the store, so a derived
+  // list is exactly as fresh as the grids are.
+  if(mode!=='batch' && BOARD_ID===MAIN_BOARD_ID && kbLoadedOnce && kanbanItems.length){
+    const wanted = statusIds && statusIds.length ? new Set(statusIds) : null;
+    const items = kanbanItems
+      .filter(m => !wanted || wanted.has(m.statusIdx))
+      .map(m => ({id:m.id, name:m.name}))
+      .sort((a,b) => a.name.localeCompare(b.name));
+    modeCache[key] = items;
+    allCandidates = items;
+    renderCandidateList(items);
+    if(combo){ combo.placeholder = `Search ${items.length} candidate${items.length===1?'':'s'}…`; }
     if(loadBar) loadBar.classList.remove('active');
     return;
   }
@@ -5472,6 +5502,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.33: (photos + tabs speed) Grid tiles (All Models, Kanban, Sandbox) now load Monday's small url_thumbnail instead of the full-resolution public_url — 10-100× less image data; full images still used for the lightbox, editor, and recrop. Tabs 0/1/5-REJECTED and the editor's candidate combo now derive their lists from the already-loaded shared store (kanbanItems) instead of a fresh board walk — instant instead of multi-second on first open.
    v7.32: (wire speed + logo) Server now gzip-compresses all responses (index.html ~420KB→~108KB on the wire; every /api board page compresses ~4×) and long-caches static assets while keeping index.html revalidating so deploys still propagate instantly. Board loads page 500 items at a time instead of 200 (fewer round-trips). Date-input column id cached in sessionStorage (one lookup per session). Preconnect hints added for fonts + CDN. Logo swapped for a compressed 15KB / 300px version (was 199KB / 4114px). NOTE: touches server.js + package.json (adds the compression dependency) — deploying it restarts prod.
    v7.31: (1) INTERVIEW editor field navigator — the interview tab's left sidebar now lists every field under "Quick Fields" and "Extra Fields" headings (same searchable click-to-scroll list as the full editor), with the field search box enabled. Clicking a field scrolls the form to it and flashes it; scroll-spy highlights the current field. The interview editor is now one-scroll (both sections always visible) instead of the old Quick/Extra show-hide toggle; showIvSection retired to a no-op. New IV_QUESTION_MAP drives the list. (2) NEW MODEL: the Bluesky/webpage scrape box moved to the very top of the section (right under the banner), above all fields.
    v7.30: INTERVIEW tab is now a photo grid (like 5-APPROVED / 2 / 4), filtered to show only 3-INTERVIEW people (status idx 7). Opening the tab shows the thumbnail grid with search + filters; clicking a tile opens that person in the interview editor via openInterviewEditor, with a "← Back to grid" button. Replaces the old type-to-search combo entry flow. GRID_SCOPES gained '3' (interview:true); tile routing now picks openInterviewEditor for interview scope, openApprovedEditor for other full scopes, openKanbanModal otherwise.

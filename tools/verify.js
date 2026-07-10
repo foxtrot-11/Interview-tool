@@ -325,5 +325,14 @@ has("'limit:500'", 'board pager uses limit:500');
 has("sessionStorage.getItem('dateInputColId:'", 'date-input column id cached in session');
 has('rel="preconnect" href="https://fonts.gstatic.com"', 'font preconnect hint present');
 
+/* v7.33 asserts: photos + tabs speed */
+has('v7.33:', 'v7.33 deploy marker present');
+has('let kbThumbCache', 'thumbnail cache declared');
+has('id public_url url_thumbnail', 'asset fetch requests url_thumbnail');
+has('function kbThumb(', 'kbThumb helper present');
+has('kbThumb(el.dataset.head)', 'All Models grid fills from thumb');
+has('const url=kbThumb(m.head)', 'sandbox tiles fill from thumb');
+has('BOARD_ID===MAIN_BOARD_ID && kbLoadedOnce && kanbanItems.length', 'mode lists derive from shared store');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
