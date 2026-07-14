@@ -332,5 +332,16 @@ lacks('id public_url url_thumbnail', 'blurry url_thumbnail grid fetch NOT presen
 lacks('kbThumbCache', 'thumbnail cache NOT present (reverted)');
 lacks('function kbThumb(', 'kbThumb helper NOT present (reverted)');
 
+/* v7.34 asserts: med-thumb read side */
+has('v7.34:', 'v7.34 deploy marker present');
+has('const MED_THUMB_HEAD_COL', 'headshot med-thumb column map present');
+has('const MED_THUMB_EXTRA_COL', 'extra med-thumb column map present');
+has("'18419204393': 'file_mm54s1b9'", 'staging headshot med-thumb col mapped');
+has('function gridImgAsset(', 'grid image asset resolver present');
+has('const medCol = medHeadCol(); if(medCol) colIds.push(medCol)', 'loadKanban fetches headshot med-thumb col');
+has('let medHead=null;', 'medHead parsed per model');
+has('medThumbUrlBySource', 'editor strip pairs extras to med-thumbs');
+has('medthumb-(\\d+)\\.jpg', 'pairing keys off embedded source asset id');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

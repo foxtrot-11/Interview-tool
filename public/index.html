@@ -1505,6 +1505,27 @@
 let MAIN_BOARD_ID  = '3636652411';
 let BATCH_BOARD_ID = '18416230588';
 let BOARD_ID = MAIN_BOARD_ID;        // active board — switched by the EVERNOTE tab
+
+// v7.34: med-thumb columns (small 400px versions) per board. Grids/strips read these
+// instead of the full-size headshot/extras. Keyed by board id because the same client runs
+// against production (3636652411) or staging (18419204393) depending on /config, and the
+// batch board (18416230588) has its own ids too. Resolved live from BOARD_ID.
+const MED_THUMB_HEAD_COL = {
+  '3636652411':  'file_mm546zrn',   // production
+  '18419204393': 'file_mm54s1b9',   // staging
+  '18416230588': 'file_mm54fn4d',   // batch import
+};
+const MED_THUMB_EXTRA_COL = {
+  '3636652411':  'file_mm5412h',    // production
+  '18419204393': 'file_mm54jfwh',   // staging
+  '18416230588': 'file_mm54qnmn',   // batch import
+};
+function medHeadCol(){ return MED_THUMB_HEAD_COL[BOARD_ID] || null; }
+function medExtraCol(){ return MED_THUMB_EXTRA_COL[BOARD_ID] || null; }
+// v7.34: which asset id a grid tile should display for a model — the small med-thumb if it
+// was backfilled/generated, otherwise the full headshot (sharp, same as before). Either id
+// resolves to a URL through the normal fetchAssetUrls/kbHeadCache path.
+function gridImgAsset(m){ return (m && m.medHead) ? m.medHead : (m && m.head) || null; }
 let APP_PW = '';                     // shared password; sent as X-App-Auth on every data request (set at login)
 const GROUP_POTENTIAL = 'group_mm202zgr';
 const API_URL  = '/api';   // same-origin proxy; the token lives only on the server
@@ -1927,12 +1948,13 @@ function renderAllModels(){
   if(note) note.textContent = (SF && res.missing) ? `${res.missing} of ${list.length} shown have no ${SF.label} on file — they're at the end` : '';
   const empty=document.getElementById('am-empty'); if(empty) empty.style.display = (list.length||!kanbanItems.length) ? 'none':'';
   grid.innerHTML=list.map(m=>{
-    const cached = m.head && kbHeadCache[m.head];
+    const imgAsset = gridImgAsset(m);
+    const cached = imgAsset && kbHeadCache[imgAsset];
     const inner = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : `<span class="am-mono">${escapeHtml((m.name[0]||'?').toUpperCase())}</span>`;
     const sub = SF ? (m[SF.raw]||'—') : '';
     const sc = GRID_SCOPES[gridScope] || {};
     const openFn = sc.interview ? 'openInterviewEditor' : (sc.full ? 'openApprovedEditor' : 'openKanbanModal');
-    return `<div class="am-tile" onclick="${openFn}('${m.id}')"><span class="am-caret">▾</span><div class="am-thumb" id="amthumb-${m.id}"${m.head?` data-head="${m.head}"`:''}>${inner}</div><div class="am-name">${escapeHtml(m.name)}</div><div class="am-sub">${escapeHtml(sub)}</div></div>`;
+    return `<div class="am-tile" onclick="${openFn}('${m.id}')"><span class="am-caret">▾</span><div class="am-thumb" id="amthumb-${m.id}"${imgAsset?` data-head="${imgAsset}"`:''}>${inner}</div><div class="am-name">${escapeHtml(m.name)}</div><div class="am-sub">${escapeHtml(sub)}</div></div>`;
   }).join('');
   amObserve();
 }
@@ -2022,6 +2044,7 @@ async function loadKanban(){
     const dateCol = await resolveDateInputCol();
     const colIds = ["label","lien_internet","files_mkncw5nm","dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm254xed","dropdown_mkncp6xy","dropdown_mm1by5q0","dropdown_mm1zcar6","color_mm1zk5e2","color_mm1zghx9","text_mknc1sps","text_mm1yx2wg","text_mm1y2znz","dropdown_mkyj8js9"];
     if(dateCol) colIds.push(dateCol);
+    const medCol = medHeadCol(); if(medCol) colIds.push(medCol);   // v7.34: small headshot thumbnail
     const colIdsJson = JSON.stringify(colIds);
     const items=[]; let cursor=null, pages=0;
     do{
@@ -2036,6 +2059,8 @@ async function loadKanban(){
         const tx=id=>{ const v=pv(id); return (typeof v==='string')?v:''; };
         const statusIdx=st('label'); // ALL statuses kept now (incl. Duplicate + unset) — kanban excludes at bucket time; All Models shows everything
         let head=null; const fv=pv('files_mkncw5nm'); if(fv&&fv.files&&fv.files.length) head=fv.files[0].assetId;
+        // v7.34: small headshot thumbnail asset id (if backfilled). Grids prefer this over `head`.
+        let medHead=null; if(medCol){ const mv=pv(medCol); if(mv&&mv.files&&mv.files.length) medHead=mv.files[0].assetId; }
         const twUrl=(pv('lien_internet')||{}).url||'';
         const hRaw=tx('text_mknc1sps'), wRaw=tx('text_mm1yx2wg'), cRaw=tx('text_mm1y2znz');
         // Unified "date added": DATE INPUT (Evernote import) if present, else Monday created_at.
@@ -2044,7 +2069,7 @@ async function loadKanban(){
         let addedTs = diStr ? Date.parse(diStr) : NaN;
         if(!isFinite(addedTs)) addedTs = Date.parse(it.created_at||'');
         addedTs = isFinite(addedTs) ? addedTs : null;
-        items.push({id:it.id, name:(it.name||'').trim(), created_at:it.created_at||'', updated_at:it.updated_at||'', statusIdx, notes:'', notesLoaded:false, twUrl, head,
+        items.push({id:it.id, name:(it.name||'').trim(), created_at:it.created_at||'', updated_at:it.updated_at||'', statusIdx, notes:'', notesLoaded:false, twUrl, head, medHead,
           addedTs, addedLabel: addedTs ? new Date(addedTs).toISOString().slice(0,10) : '',
           f:{type:dd('dropdown_mm1zzwcg'),role:dd('dropdown_mknbe0p0'),loc:dd('dropdown_mm254xed'),site:dd('dropdown_mkncp6xy'),sex:dd('dropdown_mm1by5q0'),eth:dd('dropdown_mm1zcar6'),shoot:dd('dropdown_mkyj8js9'),ftm:st('color_mm1zk5e2'),tat:st('color_mm1zghx9')},
           hRaw,wRaw,cRaw,hIn:parseHeightIn(hRaw),wLb:parseWeightLb(wRaw),cIn:parseCockIn(cRaw)});
@@ -2200,7 +2225,8 @@ function kbBuildColVal(field, val){
 function kanbanCardHtml(m){
   const notes = m.notes ? escapeHtml(m.notes.length>90 ? m.notes.slice(0,88)+'…' : m.notes) : '<span class="kb-empty">— no notes —</span>';
   const tw = m.twUrl ? `<a class="kb-tw" href="${escapeHtml(m.twUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Twitter ↗</a>` : '';
-  const cached = m.head ? kbHeadCache[m.head] : null;
+  const imgAsset = gridImgAsset(m);
+  const cached = imgAsset ? kbHeadCache[imgAsset] : null;
   const initial = escapeHtml((m.name||'?').trim().charAt(0).toUpperCase()||'?');
   const thumb = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : `<span class="kb-mono">${initial}</span>`;
   return `<div class="kb-card" data-id="${m.id}">
@@ -2253,10 +2279,10 @@ async function loadKanbanColumnPhotos(i){
 }
 
 async function fetchKanbanHeadshotsForModels(models){
-  const withHead=(models||[]).filter(m=>m.head);
-  await fetchAssetUrls(withHead.map(m=>m.head)); // parallel chunks — big columns fill several times faster than the old serial loop
+  const withHead=(models||[]).filter(m=>gridImgAsset(m));
+  await fetchAssetUrls(withHead.map(m=>gridImgAsset(m))); // parallel chunks — big columns fill several times faster than the old serial loop
   withHead.forEach(m=>{
-    const u=kbHeadCache[m.head]; if(!u) return;
+    const u=kbHeadCache[gridImgAsset(m)]; if(!u) return;
     const el=document.getElementById('kbthumb-'+m.id);
     if(el && !el.querySelector('img')) el.innerHTML=`<img loading="lazy" src="${escapeHtml(u)}" alt="">`;
   });
@@ -2765,7 +2791,7 @@ async function renderSandbox(){
   const c=document.getElementById('sb-count'); if(c) c.textContent=mem.length?mem.length+' people':'';
   if(!mem.length){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag (approved statuses only). Tag people in the 5-APPROVED editor first.'; board.style.display='none'; return; }
   empty.style.display='none'; board.style.display='';
-  const tile=id=>{ const m=byId[id]; const url=(m&&m.head)?(kbHeadCache[String(m.head)]||''):''; const nt=sbState.notes[String(id)]; const hasNote=!!(nt&&(nt.pay||nt.dates)); return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret${hasNote?' has':''}" title="${hasNote?'Pay / dates noted — click to edit':'Add pay / dates note'}" onclick="sbOpenNote(event,'${id}')">▾</button></div>`; };
+  const tile=id=>{ const m=byId[id]; const ia=gridImgAsset(m); const url=ia?(kbHeadCache[ia]||''):''; const nt=sbState.notes[String(id)]; const hasNote=!!(nt&&(nt.pay||nt.dates)); return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret${hasNote?' has':''}" title="${hasNote?'Pay / dates noted — click to edit':'Add pay / dates note'}" onclick="sbOpenNote(event,'${id}')">▾</button></div>`; };
   // A zone renders as fixed numbered slots (main ≥8, alt ≥4). Slot position = subitem number at Port.
   const slots=(z,alt)=>{ const ids=sbState.zones[z]||[]; const n=Math.max(alt?SB_ALT_MIN:SB_MIN_SLOTS, ids.length); let h='';
     for(let i=0;i<n;i++){ const id=ids[i]; const lbl=alt?'ALT':(SB_TYPE[z].slice(0,1)+(i+1));
@@ -2780,7 +2806,7 @@ async function renderSandbox(){
       </div>`; }).join('')+`</div>`;
   // Thumbnails stream in (smaller chunks → the 4 parallel workers engage and photos paint in waves),
   // filled by id so we never rebuild the board mid-load. A progress bar shows it's working.
-  const missing=mem.filter(m=>m.head && !kbHeadCache[String(m.head)]).map(m=>m.head);
+  const missing=mem.filter(m=>gridImgAsset(m) && !kbHeadCache[String(gridImgAsset(m))]).map(m=>gridImgAsset(m));
   if(missing.length){
     sbProgress(0, missing.length);
     try{ await fetchAssetUrls(missing, {chunkSize:12, onProgress:(done,total)=>{ sbFillThumbs(byId); sbProgress(done,total); }}); }catch(e){}
@@ -2791,8 +2817,8 @@ async function renderSandbox(){
 function sbFillThumbs(byId){
   for(const z of Object.keys(sbState.zones)){
     for(const id of sbState.zones[z]){
-      const m=byId[id]; if(!m||!m.head) continue;
-      const url=kbHeadCache[String(m.head)]; if(!url) continue;
+      const m=byId[id]; const ia=m&&gridImgAsset(m); if(!ia) continue;
+      const url=kbHeadCache[String(ia)]; if(!url) continue;
       const el=document.getElementById('sbthumb-'+id);
       if(el && !el.firstChild) el.innerHTML=`<img loading="lazy" src="${escapeHtml(url)}" alt="">`;
     }
@@ -4634,9 +4660,12 @@ async function loadCandidatePhotos(itemId){
   document.getElementById('photo-controls').style.display = 'none';
 
   try {
+    const mHeadCol = medHeadCol(), mExtraCol = medExtraCol();
+    const medColIds = [mHeadCol, mExtraCol].filter(Boolean).map(c=>`"${c}"`).join(',');
+    const medColClause = medColIds ? `,${medColIds}` : '';
     const data = await gql(`{items(ids:[${itemId}]){
       assets{id public_url file_extension name}
-      column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}
+      column_values(ids:["files_mkncw5nm","file_mkp1n4bt"${medColClause}]){id value}
     }}`);
     const item = data?.items?.[0];
     if(!item) return;
@@ -4652,11 +4681,27 @@ async function loadCandidatePhotos(itemId){
     photoState.headshotEntries = colEntries('files_mkncw5nm');
     photoState.extraEntries    = colEntries('file_mkp1n4bt');
 
+    // v7.34: build sourceAssetId -> med-thumb public_url from the med-thumb columns.
+    // Med-thumbs are named `medthumb-<sourceAssetId>.jpg`, so we pair by that embedded id
+    // (not position) — robust to reordering/adds/deletes. Strip shows the small version;
+    // the lightbox still opens the full image.
+    const medThumbUrlBySource = {};
+    [mHeadCol, mExtraCol].filter(Boolean).forEach(col => {
+      colEntries(col).forEach(en => {
+        const m = String(en.name||'').match(/^medthumb-(\d+)\.jpg$/i);
+        const a = assetById[String(en.assetId)];
+        if(m && a && a.public_url) medThumbUrlBySource[m[1]] = a.public_url;
+      });
+    });
+
     const isImg = a => a && ['jpg','jpeg','png','webp','gif'].includes((a.file_extension||'').toLowerCase().replace('.',''));
 
     const build = (entries, isHeadshot) => entries.forEach(en => {
       const a = assetById[String(en.assetId)];
-      if(isImg(a)) candidatePhotos.push({ assetId: en.assetId, url: a.public_url, name: a.name, isHeadshot });
+      if(isImg(a)){
+        const thumbUrl = medThumbUrlBySource[String(en.assetId)] || a.public_url; // small if paired, else full
+        candidatePhotos.push({ assetId: en.assetId, url: a.public_url, thumbUrl, name: a.name, isHeadshot });
+      }
     });
     build(photoState.headshotEntries, true);
     build(photoState.extraEntries, false);
@@ -4683,7 +4728,7 @@ function renderPhotoGrid(){
     if(p.assetId === pendingHeadshotAssetId) cls += ' is-pending';
     else if(p.isHeadshot) cls += ' is-headshot';
     thumb.className = cls;
-    thumb.innerHTML = `<img src="${escapeHtml(p.url)}" title="${escapeHtml(p.name)}" loading="lazy">`;
+    thumb.innerHTML = `<img src="${escapeHtml(p.thumbUrl||p.url)}" title="${escapeHtml(p.name)}" loading="lazy">`;
     thumb.onclick = () => rechooseMode ? selectPendingHeadshot(p.assetId) : openLightbox(i);
     grid.appendChild(thumb);
   });
@@ -5491,6 +5536,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.34: (med-thumb read side) Grids (All Models, Kanban, Sandbox) now display the small "med-thumb" headshot when one exists (falling back to the full headshot if not), and the editor photo strip shows small med-thumbs for extras — paired to each full photo by the source asset id embedded in the med-thumb filename (medthumb-<assetId>.jpg), so it's robust to reordering. Full images are still used for the lightbox and the strip avatar. Adds per-board med-thumb column maps (MED_THUMB_HEAD_COL / MED_THUMB_EXTRA_COL for prod/staging/batch) and fetches the headshot med-thumb column in the bulk board load. This is the READ side only — generating med-thumbs on new uploads / regenerating on replace+recrop is the next release (v7.35); until then new uploads simply fall back to full images.
    v7.33: (tabs speed) Tabs 0/1/5-REJECTED and the editor's candidate combo now derive their lists from the already-loaded shared store (kanbanItems) instead of a fresh board walk — instant instead of multi-second on first open. Grid tiles keep loading the full headshot image (sharp), unchanged from v7.32. NOTE: an earlier draft of v7.33 tried Monday's url_thumbnail for grids — reverted because that thumbnail is a fixed tiny "thumb_small" (blurry when scaled up) and slower to serve than the stored image. Proper small-image handling comes in the med-thumb feature (own column, generated at upload + backfill).
    v7.32: (wire speed + logo) Server now gzip-compresses all responses (index.html ~420KB→~108KB on the wire; every /api board page compresses ~4×) and long-caches static assets while keeping index.html revalidating so deploys still propagate instantly. Board loads page 500 items at a time instead of 200 (fewer round-trips). Date-input column id cached in sessionStorage (one lookup per session). Preconnect hints added for fonts + CDN. Logo swapped for a compressed 15KB / 300px version (was 199KB / 4114px). NOTE: touches server.js + package.json (adds the compression dependency) — deploying it restarts prod.
    v7.31: (1) INTERVIEW editor field navigator — the interview tab's left sidebar now lists every field under "Quick Fields" and "Extra Fields" headings (same searchable click-to-scroll list as the full editor), with the field search box enabled. Clicking a field scrolls the form to it and flashes it; scroll-spy highlights the current field. The interview editor is now one-scroll (both sections always visible) instead of the old Quick/Extra show-hide toggle; showIvSection retired to a no-op. New IV_QUESTION_MAP drives the list. (2) NEW MODEL: the Bluesky/webpage scrape box moved to the very top of the section (right under the banner), above all fields.
