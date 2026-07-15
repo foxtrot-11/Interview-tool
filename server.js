@@ -450,15 +450,41 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
     if(!input) return res.status(400).json({ error:'url required' });
     const actor = parseBlueskyActor(input);
     if(actor){
-      const api = 'https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor='+encodeURIComponent(actor)+'&limit=40&filter=posts_with_media';
+      // v7.36.1: resolve the handle to a DID first. getAuthorFeed 400s on some handles it
+      // can't resolve directly; resolveHandle is the canonical lookup and gives a clear
+      // "profile not found" instead of a confusing 400. If the actor is already a DID, skip.
+      let feedActor = actor;
+      if(!/^did:/i.test(actor)){
+        try{
+          const rr = await safeFetch('https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle='+encodeURIComponent(actor), { headers:{ 'Accept':'application/json' } });
+          if(rr.ok){ const rj = await rr.json(); if(rj && rj.did) feedActor = rj.did; }
+          else if(rr.status===400) return res.status(404).json({ error:'Bluesky profile not found — the handle "'+actor+'" doesn\'t exist (it may have been renamed or deleted).' });
+        }catch(e){ /* fall through to getAuthorFeed with the raw handle */ }
+      }
+      const api = 'https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor='+encodeURIComponent(feedActor)+'&limit=40&filter=posts_with_media';
       const r = await safeFetch(api, { headers:{ 'Accept':'application/json' } });
-      if(!r.ok) return res.status(502).json({ error:'Bluesky fetch failed ('+r.status+') — check the handle' });
+      if(!r.ok) return res.status(502).json({ error:'Bluesky fetch failed ('+r.status+') — the profile may be empty, private, or the handle is wrong.' });
       const j = await r.json();
       const imgs=[]; const seen=new Set();
-      for(const it of (j.feed||[])){
-        const e = it.post && it.post.embed; if(!e){ continue; }
+      const push = (u, thumb)=>{ if(u && !seen.has(u)){ seen.add(u); imgs.push({ url:u, thumb:thumb||u }); } };
+      // v7.36.2: pull images from every common embed shape, not just image posts.
+      // Some profiles (e.g. video-only accounts) have no image embeds at all — their posts
+      // carry a still-frame `thumbnail` we can use. Also handle quote-posts with media
+      // (recordWithMedia, media nested one level down) and external link cards.
+      const harvest = (e)=>{
+        if(!e) return;
+        // direct image post, or media nested under recordWithMedia
         const arr = e.images || (e.media && e.media.images) || [];
-        for(const p of arr){ const u = p.fullsize || p.thumb; if(u && !seen.has(u)){ seen.add(u); imgs.push({ url:u, thumb:p.thumb||u }); } }
+        for(const p of arr){ push(p.fullsize || p.thumb, p.thumb); }
+        // video posts: use the still-frame thumbnail (direct or nested under media)
+        const vids = [e, e.media].filter(Boolean);
+        for(const v of vids){ if(v.thumbnail) push(v.thumbnail, v.thumbnail); }
+        // external link card thumbnail
+        const ext = e.external || (e.media && e.media.external);
+        if(ext && ext.thumb) push(ext.thumb, ext.thumb);
+      };
+      for(const it of (j.feed||[])){
+        harvest(it.post && it.post.embed);
         if(imgs.length>=10) break;
       }
       return res.json({ source:'bluesky', actor, images: imgs.slice(0,10) });

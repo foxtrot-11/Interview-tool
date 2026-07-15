@@ -371,5 +371,16 @@ has("ctx==='fv' ? 'f-dup__of_facebook'", 'scrape falls back to saved Bluesky lin
 { const btn=src.indexOf('id="scrape-btn-fv"'), inp=src.indexOf('id="scrape-url-fv"');
   (btn>0 && inp>0 && btn<inp ? ok : bad)('scrape button now left of URL field (fv)', 'button not before input'); }
 
+/* v7.36.1 asserts: scrape fixes */
+has('v7.36.1:', 'v7.36.1 deploy marker present');
+has("['scrape-url-fv','scrape-url-iv','scrape-url-new'].forEach", 'scrape fields cleared on model load');
+has('let usingSaved = false', 'auto-Bluesky no longer writes into the field');
+lacks("if(f) f.value = saved; // show what we're scraping", 'old field-write behavior removed');
+
+/* v7.36.2 assert: broadened Bluesky extraction (server.js) */
+{ const srv = fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
+  (srv.includes('if(v.thumbnail) push') && srv.includes('e.external || (e.media && e.media.external)') ? ok : bad)
+    ('v7.36.2 Bluesky scrape harvests video + external + recordWithMedia thumbs', 'server extraction not broadened'); }
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

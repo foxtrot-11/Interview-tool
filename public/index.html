@@ -4064,14 +4064,14 @@ async function scrapePhotos(ctx){
   let url=(document.getElementById('scrape-url-'+ctx).value||'').trim();
   // v7.36: if the field is empty, fall back to the model's saved Bluesky link (most records
   // already have one) so you don't have to copy it in. new-model has no saved record → skip.
+  // v7.36.1: DON'T write it into the field — the field is never reset on model switch, so a
+  // written-in value would bleed into the next model. Use it transparently for this call only.
+  let usingSaved = false;
   if(!url){
     const blueskyFieldId = ctx==='fv' ? 'f-dup__of_facebook' : (ctx==='iv' ? 'ive-dup__of_facebook' : null);
     const savedEl = blueskyFieldId ? document.getElementById(blueskyFieldId) : null;
     const saved = savedEl ? (savedEl.value||'').trim() : '';
-    if(saved){
-      url = saved;
-      const f=document.getElementById('scrape-url-'+ctx); if(f) f.value = saved; // show what we're scraping
-    }
+    if(saved){ url = saved; usingSaved = true; }
   }
   if(!url){ showToast('Paste a URL, or add a Bluesky link to the record first','error'); return; }
   const btn=document.getElementById('scrape-btn-'+ctx); btn.disabled=true; const lbl=btn.textContent; btn.textContent='Scraping…';
@@ -4151,6 +4151,9 @@ async function loadCandidate(itemId){
   if(fullEditorDirty() && (!currentItem || String(itemId||'')!==String(currentItem.id))){
     if(!(await gateFullEditor())) return;   // switching candidates with unsaved edits
   }
+  // v7.36.1: reset the scrape URL boxes on every model load so a link (pasted or auto-filled)
+  // never carries over from a previously-viewed model.
+  ['scrape-url-fv','scrape-url-iv','scrape-url-new'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   suppressDirty=true;   // v7.27: guard the whole load/populate; cleared once fields + photos have settled
   if(!itemId){
     resetForm();show('empty-state');
@@ -5658,6 +5661,8 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.36.2: (scrape — video/other embeds) Bluesky scrape now pulls images from every common post shape, not just image posts. Video-only profiles (e.g. derekkage.com) previously returned "No photos found" because the code only read image embeds; it now also uses each video post's still-frame thumbnail, plus recordWithMedia (quote-post) media and external link-card thumbnails. (Touches server.js.)
+   v7.36.1: (scrape fixes) (a) Auto-Bluesky no longer writes the saved link into the scrape field — it uses it transparently for that one scrape — and the three scrape URL boxes are now cleared on every model load, so no link (pasted OR auto-filled) bleeds into the next model. (b) Server resolves a Bluesky handle to its DID before fetching the feed (getAuthorFeed 400s on some handles), and a non-existent handle now returns a clear "Bluesky profile not found — the handle doesn't exist" instead of a confusing generic 400. (Touches server.js.)
    v7.36: (med-thumb hardening + scrape UX) Fixes from Fable's review. (Finding 2) setHeadMedThumb no longer races its own clear: it only clears the headshot med-thumb column when it actually has a file, and waits 800ms for the clear to settle before uploading the new one — new-model creates hit the empty path and skip both. (Finding 1) Every headshot replace/recrop/promote runs through rearrangePhotos, which re-uploads extras with NEW asset ids and breaks all medthumb-<oldId>.jpg pairings; those five flows now also call clearExtraMedThumbs() so dead thumbs don't orphan forever (strip falls back to full until a backfill re-run regenerates paired thumbs). (Finding 3) Extra med-thumb generation no longer blocks each upload inline — thumbs are collected and awaited via Promise.allSettled after the photo loop, so photo-heavy saves aren't ~2× slower. SCRAPE UX: the Scrape button now sits to the LEFT of the URL field (was far right, hard to find); and if the URL field is empty, Scrape falls back to the model's saved Bluesky link (dup__of_facebook) so you don't have to copy it in. (Server unchanged.)
    v7.35: (med-thumb write side) New photo uploads now generate a med-thumb so the backfill never goes stale. makeMedThumb() renders a 400px JPEG client-side (handles HEIC via the existing decoder, skips silently on a bad file). New headshots (new-model, headshot-replace in interview/full, kanban-modal headshot) call setHeadMedThumb() to clear+write the single headshot med-thumb from the uploaded file. New extras (everywhere, incl. scraped imports which ride the same path) call addExtraMedThumb() which uploads a paired medthumb-<assetId>.jpg. All med-thumb work is best-effort — if it fails, the photo still saves and the grid falls back to full. Headshot changes we DON'T regenerate for (recrop, promote-existing-photo, kanban promote) call clearHeadMedThumb() so the grid falls back to the full headshot until a later save/backfill. uploadFileToMonday now returns the new asset id. (Server unchanged.)
    v7.34: (med-thumb read side) Grids (All Models, Kanban, Sandbox) now display the small "med-thumb" headshot when one exists (falling back to the full headshot if not), and the editor photo strip shows small med-thumbs for extras — paired to each full photo by the source asset id embedded in the med-thumb filename (medthumb-<assetId>.jpg), so it's robust to reordering. Full images are still used for the lightbox and the strip avatar. Adds per-board med-thumb column maps (MED_THUMB_HEAD_COL / MED_THUMB_EXTRA_COL for prod/staging/batch) and fetches the headshot med-thumb column in the bulk board load. This is the READ side only — generating med-thumbs on new uploads / regenerating on replace+recrop is the next release (v7.35); until then new uploads simply fall back to full images.
