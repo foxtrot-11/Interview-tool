@@ -343,5 +343,33 @@ has('let medHead=null;', 'medHead parsed per model');
 has('medThumbUrlBySource', 'editor strip pairs extras to med-thumbs');
 has('medthumb-(\\d+)\\.jpg', 'pairing keys off embedded source asset id');
 
+/* v7.35 asserts: med-thumb write side */
+has('v7.35:', 'v7.35 deploy marker present');
+has('async function makeMedThumb(', 'makeMedThumb generator present');
+has('async function setHeadMedThumb(', 'setHeadMedThumb helper present');
+has('async function clearHeadMedThumb(', 'clearHeadMedThumb helper present');
+has('async function addExtraMedThumb(', 'addExtraMedThumb helper present');
+has('return j?.data?.add_file_to_column?.id', 'uploadFileToMonday returns new asset id');
+has('await setHeadMedThumb(newId, file)', 'new-model headshot generates med-thumb');
+has('addExtraMedThumb(newId, file, exId)', 'new-model extras generate paired med-thumbs');
+has('await setHeadMedThumb(currentItem.id, file)', 'headshot-replace regenerates med-thumb');
+has('await clearHeadMedThumb(itemId)', 'recrop clears head med-thumb (fallback to full)');
+has('await clearHeadMedThumb(currentItem.id)', 'promote-existing clears head med-thumb');
+has('`medthumb-${fullAssetId}.jpg`', 'extra med-thumb named by source asset id (pairing)');
+
+/* v7.36 asserts: med-thumb hardening + scrape UX */
+has('v7.36:', 'v7.36 deploy marker present');
+has('async function clearExtraMedThumbs(', 'clearExtraMedThumbs helper present (Finding 1)');
+has('setTimeout(r, 800)', 'setHeadMedThumb settles after clear (Finding 2)');
+has('if(hasExisting)', 'setHeadMedThumb only clears when column non-empty (Finding 2)');
+has('Promise.allSettled(ivMedThumbJobs)', 'interview extras thumbs run in parallel (Finding 3)');
+has('Promise.allSettled(fvMedThumbJobs)', 'full-view extras thumbs run in parallel (Finding 3)');
+has('Promise.allSettled(nmMedThumbJobs)', 'new-model extras thumbs run in parallel (Finding 3)');
+{ const n2=(src.match(/clearExtraMedThumbs\(/g)||[]).length;
+  (n2>=6 ? ok : bad)(`clearExtraMedThumbs wired into all 5 rearrange flows (${n2} refs incl. def)`, `only ${n2}`); }
+has("ctx==='fv' ? 'f-dup__of_facebook'", 'scrape falls back to saved Bluesky link when URL empty');
+{ const btn=src.indexOf('id="scrape-btn-fv"'), inp=src.indexOf('id="scrape-url-fv"');
+  (btn>0 && inp>0 && btn<inp ? ok : bad)('scrape button now left of URL field (fv)', 'button not before input'); }
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

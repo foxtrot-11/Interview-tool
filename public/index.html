@@ -842,8 +842,8 @@
     <!-- Shared photo upload (full-view modes: applicant → approved/rejected) -->
     <div id="fv-upload-section" style="display:none;margin-bottom:20px">
       <div class="scrape-row">
-        <input type="url" id="scrape-url-fv" class="scrape-input" placeholder="Paste a Bluesky profile or a webpage with photos, then Scrape…">
         <button type="button" class="fv-scrape-btn" id="scrape-btn-fv" onclick="scrapePhotos('fv')">🔎 Scrape photos</button>
+        <input type="url" id="scrape-url-fv" class="scrape-input" placeholder="Leave blank to use the saved Bluesky link, or paste a URL…">
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap">
         <div style="flex:1;min-width:240px">
@@ -1143,8 +1143,8 @@
 
         <!-- PHOTO UPLOAD IN INTERVIEW -->
         <div class="scrape-row" style="margin-top:24px">
-          <input type="url" id="scrape-url-iv" class="scrape-input" placeholder="Paste a Bluesky profile or a webpage with photos, then Scrape…">
           <button type="button" class="fv-scrape-btn" id="scrape-btn-iv" onclick="scrapePhotos('iv')">🔎 Scrape photos</button>
+          <input type="url" id="scrape-url-iv" class="scrape-input" placeholder="Leave blank to use the saved Bluesky link, or paste a URL…">
         </div>
         <div class="iv-upload-section">
           <div class="iv-upload-label">Replace Headshot → Monday</div>
@@ -1215,8 +1215,8 @@
     <div id="new-model-view" style="display:none">
       <div class="new-model-banner"><strong>New Model</strong>Fill in what you have. On save, this will be created in monday.com with status 2-POTENTIAL.</div>
       <div class="scrape-row" style="margin-bottom:16px">
-        <input type="url" id="scrape-url-new" class="scrape-input" placeholder="Paste a Bluesky profile or a webpage with photos, then Scrape…">
         <button type="button" class="fv-scrape-btn" id="scrape-btn-new" onclick="scrapePhotos('new')">🔎 Scrape photos</button>
+        <input type="url" id="scrape-url-new" class="scrape-input" placeholder="Paste a Bluesky profile or a webpage with photos, then Scrape…">
       </div>
       <div class="section active">
         <div class="section-header"><div class="section-title">New Model</div></div>
@@ -2389,6 +2389,8 @@ async function kbApplyHeadshot(id){
   try{
     const rest=kbModalPhotos.filter(p=>String(p.assetId)!==String(assetId)).map(p=>p.assetId);
     await rearrangePhotos(id,[assetId],rest);
+    await clearHeadMedThumb(id);   // v7.35: promoted an existing photo — drop stale thumb, fall back to full
+    await clearExtraMedThumbs(id);   // v7.36 (Finding 1): rearrange reassigned extra ids — clear dead pairings
     kbPendingHeadshot=null; kbRechooseMode=false;
     kbHsProgressDone(true);
     await kbLoadModalPhotos(id);   // reload from Monday to confirm the change stuck
@@ -2417,7 +2419,8 @@ async function kbUploadPhoto(kind, input){
   try{
     if(kind==='extra'){
       kbPhotoMsg('Uploading photo… 0%');
-      await uploadFileToMonday(id,'file_mkp1n4bt',file,pct=>kbPhotoMsg('Uploading photo… '+Math.round(pct*100)+'%'));
+      const exId=await uploadFileToMonday(id,'file_mkp1n4bt',file,pct=>kbPhotoMsg('Uploading photo… '+Math.round(pct*100)+'%'));
+      await addExtraMedThumb(id, file, exId);   // v7.35: paired small version
       await kbLoadModalPhotos(id);
       kbPhotoMsg('Photo uploaded ✓');
     } else {
@@ -2433,6 +2436,7 @@ async function kbUploadPhoto(kind, input){
         await rearrangePhotos(id,[added.assetId],rest);
         await kbLoadModalPhotos(id);
       }
+      await setHeadMedThumb(id, file);   // v7.35: regenerate small headshot from the new file
       kbRefreshCardThumb(id);
       kbPhotoMsg('Headshot uploaded ✓');
     }
@@ -2530,6 +2534,8 @@ async function saveRecrop(){
     if(!newId) throw new Error('uploaded crop not found on Monday');
     st.textContent='Setting as headshot on Monday… (a few seconds)';
     await rearrangePhotos(itemId,[newId],[oldHead,...extrasBefore].filter(x=>x!=null));
+    await clearHeadMedThumb(itemId);   // v7.35: recrop changed the headshot — drop stale thumb, fall back to full
+    await clearExtraMedThumbs(itemId);   // v7.36 (Finding 1): rearrange reassigned extra ids — clear dead pairings
     st.textContent='Refreshing…';
     const kbOpen=document.getElementById('kb-modal').classList.contains('open') && String(kbModalItemId)===String(itemId);
     if(kbOpen){
@@ -4055,8 +4061,19 @@ let scrapeCtx='fv';
 async function scrapePhotos(ctx){
   ctx = SCRAPE_TYPES[ctx] ? ctx : 'fv';
   scrapeCtx = ctx;
-  const url=(document.getElementById('scrape-url-'+ctx).value||'').trim();
-  if(!url){ showToast('Paste a URL or Bluesky handle first','error'); return; }
+  let url=(document.getElementById('scrape-url-'+ctx).value||'').trim();
+  // v7.36: if the field is empty, fall back to the model's saved Bluesky link (most records
+  // already have one) so you don't have to copy it in. new-model has no saved record → skip.
+  if(!url){
+    const blueskyFieldId = ctx==='fv' ? 'f-dup__of_facebook' : (ctx==='iv' ? 'ive-dup__of_facebook' : null);
+    const savedEl = blueskyFieldId ? document.getElementById(blueskyFieldId) : null;
+    const saved = savedEl ? (savedEl.value||'').trim() : '';
+    if(saved){
+      url = saved;
+      const f=document.getElementById('scrape-url-'+ctx); if(f) f.value = saved; // show what we're scraping
+    }
+  }
+  if(!url){ showToast('Paste a URL, or add a Bluesky link to the record first','error'); return; }
   const btn=document.getElementById('scrape-btn-'+ctx); btn.disabled=true; const lbl=btn.textContent; btn.textContent='Scraping…';
   try{
     const r=await fetch('/scrape-images?url='+encodeURIComponent(url),{headers:{'X-App-Auth':APP_PW}});
@@ -4780,6 +4797,8 @@ async function applyHeadshotSwap(){
   const restIds = all.filter(e => e.assetId !== pendingHeadshotAssetId).map(e => e.assetId);
 
   await rearrangePhotos(currentItem.id, [chosen.assetId], restIds);
+  await clearHeadMedThumb(currentItem.id);   // v7.35: promoted an existing photo — drop stale thumb, fall back to full
+  await clearExtraMedThumbs(currentItem.id);   // v7.36 (Finding 1): rearrange reassigned extra ids — clear dead pairings
 
   pendingHeadshotAssetId = null;
   rechooseMode = false;
@@ -4977,14 +4996,14 @@ async function uploadFileToMonday(itemId, columnId, file, onProgress){
   fd.append('columnId', columnId);
   fd.append('file', sendFile, sendFile.name);
 
-  await new Promise((resolve, reject) => {
+  const j = await new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.upload.onprogress = e => { if(e.lengthComputable && onProgress) onProgress(e.loaded/e.total); };
     xhr.onload = () => {
       try {
-        const j = JSON.parse(xhr.responseText);
-        if (xhr.status >= 400 || j.error) reject(new Error(j.error || ('HTTP ' + xhr.status)));
-        else resolve(j);
+        const jj = JSON.parse(xhr.responseText);
+        if (xhr.status >= 400 || jj.error) reject(new Error(jj.error || ('HTTP ' + xhr.status)));
+        else resolve(jj);
       } catch(e) { reject(new Error('Upload failed: HTTP ' + xhr.status)); }
     };
     xhr.onerror = () => reject(new Error('Network error'));
@@ -4992,6 +5011,93 @@ async function uploadFileToMonday(itemId, columnId, file, onProgress){
     xhr.setRequestHeader('X-App-Auth', APP_PW);
     xhr.send(fd);
   });
+  // v7.35: return the new asset id (Monday's add_file_to_column response) so callers can
+  // name a matching med-thumb. Existing callers that ignore the return are unaffected.
+  try { return j?.data?.add_file_to_column?.id || null; } catch(e) { return null; }
+}
+
+// v7.35 — MED-THUMB WRITE SIDE ------------------------------------------------------------
+// Generate a small ~400px JPEG from a source image File (mirrors the backfill script's
+// sharp settings). Returns a File, or null if the image can't be decoded (bad/corrupt file)
+// — callers treat null as "skip the thumb", never as a save failure.
+async function makeMedThumb(fileIn){
+  try{
+    const file = await decodeHeicIfNeeded(fileIn);   // reuse the HEIC path the app already has
+    if(!file || !file.type || !file.type.startsWith('image/')) return null;
+    const dataUrl = await new Promise((res, rej) => { const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(new Error('read failed')); r.readAsDataURL(file); });
+    const img = await new Promise((res, rej) => { const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error('decode failed')); im.src=dataUrl; });
+    let { width, height } = img;
+    const MAX = 400;                                 // 400px long edge, keep aspect ratio, never upscale
+    if(width >= height && width > MAX){ height = Math.round(height * MAX / width); width = MAX; }
+    else if(height > width && height > MAX){ width = Math.round(width * MAX / height); height = MAX; }
+    const canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
+    if(!blob) return null;
+    return new File([blob], 'medthumb.jpg', { type: 'image/jpeg' });
+  }catch(e){ console.warn('med-thumb generation skipped:', e.message); return null; }
+}
+
+// Set the model's HEADSHOT med-thumb from a source file: clear the (single-file) column and
+// upload one fresh small version. The grid reads files[0] of this column, so the filename is
+// irrelevant here (no id pairing needed for the headshot). Best-effort: never throws.
+async function setHeadMedThumb(itemId, sourceFile){
+  const col = medHeadCol(); if(!col || !sourceFile) return;
+  try{
+    const thumb = await makeMedThumb(sourceFile); if(!thumb) return;
+    // v7.36 (Finding 2): only clear if the column actually has something, and wait for the
+    // clear to settle before uploading — otherwise the fresh thumb can be eaten by an
+    // in-flight clear (same race the server's /rearrange-photos guards against). New-model
+    // creates hit the empty path and skip both the clear and the 800ms wait entirely.
+    let hasExisting = false;
+    try{
+      const cur = await gql(`{items(ids:[${itemId}]){column_values(ids:["${col}"]){value}}}`);
+      const v = cur?.items?.[0]?.column_values?.[0]?.value;
+      if(v){ try{ hasExisting = ((JSON.parse(v).files)||[]).length > 0; }catch{} }
+    }catch(e){}
+    if(hasExisting){
+      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+        {i:String(itemId), b:BOARD_ID, c:JSON.stringify({[col]:{clear_all:true}})});
+      await new Promise(r=>setTimeout(r, 800)); // let the clear settle (monday is eventually-consistent)
+    }
+    await uploadFileToMonday(itemId, col, thumb);
+  }catch(e){ console.warn('setHeadMedThumb skipped:', e.message); }
+}
+
+// Clear the model's headshot med-thumb (used when the headshot changes via a flow we don't
+// regenerate for — recrop / promote-existing / kanban headshot). Grid falls back to the full
+// headshot until a later save or backfill regenerates it. Best-effort: never throws.
+async function clearHeadMedThumb(itemId){
+  const col = medHeadCol(); if(!col) return;
+  try{
+    await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+      {i:String(itemId), b:BOARD_ID, c:JSON.stringify({[col]:{clear_all:true}})});
+  }catch(e){ console.warn('clearHeadMedThumb skipped:', e.message); }
+}
+
+// v7.36 (Finding 1): clear ALL of a model's EXTRA med-thumbs. Any headshot replace / recrop /
+// promote runs through /rearrange-photos, which re-uploads every extra with a NEW asset id —
+// so every medthumb-<oldId>.jpg pairing is now dead and would otherwise sit orphaned forever.
+// Clearing them keeps the column clean; the strip falls back to full-res until a backfill
+// re-run regenerates paired thumbs. Best-effort: never throws.
+async function clearExtraMedThumbs(itemId){
+  const col = medExtraCol(); if(!col) return;
+  try{
+    await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+      {i:String(itemId), b:BOARD_ID, c:JSON.stringify({[col]:{clear_all:true}})});
+  }catch(e){ console.warn('clearExtraMedThumbs skipped:', e.message); }
+}
+
+// Add an EXTRA med-thumb paired to a just-uploaded full extra. Named medthumb-<fullAssetId>.jpg
+// so the editor strip can pair small<->full by embedded id. Best-effort: never throws.
+async function addExtraMedThumb(itemId, sourceFile, fullAssetId){
+  const col = medExtraCol(); if(!col || !sourceFile || !fullAssetId) return;
+  try{
+    const thumb = await makeMedThumb(sourceFile); if(!thumb) return;
+    const named = new File([thumb], `medthumb-${fullAssetId}.jpg`, { type:'image/jpeg' });
+    await uploadFileToMonday(itemId, col, named);
+  }catch(e){ console.warn('addExtraMedThumb skipped:', e.message); }
 }
 
 // Foolproof photo move/copy: server downloads real bytes of an existing asset and
@@ -5129,6 +5235,7 @@ async function saveNewModel(targetMode){
           await uploadFileToMonday(newId, 'files_mkncw5nm', file, pct => {
             setProgress(((stepsDone + pct)/totalSteps)*100);
           });
+          await setHeadMedThumb(newId, file);   // v7.35: small headshot version for grids
           setUploadStep(stepList, si, 'done', `✓ Headshot: ${file.name}`);
         }catch(e){
           setUploadStep(stepList, si, 'error', `✗ Headshot failed: ${e.message}`);
@@ -5137,19 +5244,22 @@ async function saveNewModel(targetMode){
       }
 
       // Extra photos
+      const nmMedThumbJobs = []; // v7.36 (Finding 3): parallel thumbs; settle after the loop
       for(let i=0; i<extraFiles.length; i++){
         const file = extraFiles[i];
         const si = addUploadStep(stepList, `Uploading extra ${i+1}/${extraFiles.length}: ${file.name}...`, 'active');
         try{
-          await uploadFileToMonday(newId, 'file_mkp1n4bt', file, pct => {
+          const exId = await uploadFileToMonday(newId, 'file_mkp1n4bt', file, pct => {
             setProgress(((stepsDone + pct)/totalSteps)*100);
           });
+          nmMedThumbJobs.push(addExtraMedThumb(newId, file, exId));   // v7.35: paired small version (v7.36: parallel)
           setUploadStep(stepList, si, 'done', `✓ ${file.name}`);
         }catch(e){
           setUploadStep(stepList, si, 'error', `✗ ${file.name} failed: ${e.message}`);
         }
         tick();
       }
+      if(nmMedThumbJobs.length) await Promise.allSettled(nmMedThumbJobs);
     }
 
     setProgress(100, 'Done!');
@@ -5232,6 +5342,9 @@ async function saveAndUploadIv(){
       const extrasToKeep = [...oldExtras.map(e=>e.assetId), ...oldHead.map(e=>e.assetId)];
       await rearrangePhotos(currentItem.id, [newEntry.assetId], extrasToKeep);
 
+      await clearExtraMedThumbs(currentItem.id);   // v7.36 (Finding 1): rearrange reassigned extra ids — clear dead pairings
+      await setHeadMedThumb(currentItem.id, file);   // v7.35: regenerate small headshot from the new file
+
       setUploadStep(steps, si, 'done', '✓ Headshot replaced: '+file.name);
     }catch(e){
       setUploadStep(steps, si, 'error', '✗ Headshot: '+e.message);
@@ -5239,22 +5352,25 @@ async function saveAndUploadIv(){
   }
 
   // ---- EXTRA PHOTOS ----
+  const ivMedThumbJobs = []; // v7.36 (Finding 3): don't block each upload on its thumb; settle at the end
   for(let i=0; i<ivExtraFiles.length; i++){
     const file = ivExtraFiles[i];
     const si = addUploadStep(steps, `Uploading ${file.name}...`, 'active');
     try{
-      await uploadFileToMonday(currentItem.id, 'file_mkp1n4bt', file, pct=>{
+      const exId = await uploadFileToMonday(currentItem.id, 'file_mkp1n4bt', file, pct=>{
         const base = haveHeadshot ? 50 : 0;
         const span = haveHeadshot ? 50 : 100;
         const total = Math.round(base + ((i+pct)/ivExtraFiles.length)*span);
         bar.style.width = total+'%';
         document.getElementById('iv-upload-pct').textContent = total+'%';
       });
+      ivMedThumbJobs.push(addExtraMedThumb(currentItem.id, file, exId));   // v7.35: paired small version (v7.36: parallel)
       setUploadStep(steps, si, 'done', '✓ '+file.name);
     }catch(e){
       setUploadStep(steps, si, 'error', '✗ '+file.name+': '+e.message);
     }
   }
+  if(ivMedThumbJobs.length) await Promise.allSettled(ivMedThumbJobs); // finish thumbs before the grid reloads
   bar.style.width='100%';
   document.getElementById('iv-upload-pct').textContent='100%';
   document.getElementById('iv-upload-label').textContent='Done!';
@@ -5308,6 +5424,9 @@ async function saveAndUploadFv(){
       const extrasToKeep = [...oldExtras.map(e=>e.assetId), ...oldHead.map(e=>e.assetId)];
       await rearrangePhotos(currentItem.id, [newEntry.assetId], extrasToKeep);
 
+      await clearExtraMedThumbs(currentItem.id);   // v7.36 (Finding 1): rearrange reassigned extra ids — clear dead pairings
+      await setHeadMedThumb(currentItem.id, file);   // v7.35: regenerate small headshot from the new file
+
       setUploadStep(steps, si, 'done', '✓ Headshot replaced: '+file.name);
     }catch(e){
       setUploadStep(steps, si, 'error', '✗ Headshot: '+e.message);
@@ -5315,22 +5434,25 @@ async function saveAndUploadFv(){
   }
 
   // ---- EXTRA PHOTOS ----
+  const fvMedThumbJobs = []; // v7.36 (Finding 3): don't block each upload on its thumb; settle at the end
   for(let i=0; i<fvExtraFiles.length; i++){
     const file = fvExtraFiles[i];
     const si = addUploadStep(steps, `Uploading ${file.name}...`, 'active');
     try{
-      await uploadFileToMonday(currentItem.id, 'file_mkp1n4bt', file, pct=>{
+      const exId = await uploadFileToMonday(currentItem.id, 'file_mkp1n4bt', file, pct=>{
         const base = haveHeadshot ? 50 : 0;
         const span = haveHeadshot ? 50 : 100;
         const total = Math.round(base + ((i+pct)/fvExtraFiles.length)*span);
         bar.style.width = total+'%';
         document.getElementById('fv-upload-pct').textContent = total+'%';
       });
+      fvMedThumbJobs.push(addExtraMedThumb(currentItem.id, file, exId));   // v7.35: paired small version (v7.36: parallel)
       setUploadStep(steps, si, 'done', '✓ '+file.name);
     }catch(e){
       setUploadStep(steps, si, 'error', '✗ '+file.name+': '+e.message);
     }
   }
+  if(fvMedThumbJobs.length) await Promise.allSettled(fvMedThumbJobs); // finish thumbs before the grid reloads
   bar.style.width='100%';
   document.getElementById('fv-upload-pct').textContent='100%';
   document.getElementById('fv-upload-label').textContent='Done!';
@@ -5536,6 +5658,8 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.36: (med-thumb hardening + scrape UX) Fixes from Fable's review. (Finding 2) setHeadMedThumb no longer races its own clear: it only clears the headshot med-thumb column when it actually has a file, and waits 800ms for the clear to settle before uploading the new one — new-model creates hit the empty path and skip both. (Finding 1) Every headshot replace/recrop/promote runs through rearrangePhotos, which re-uploads extras with NEW asset ids and breaks all medthumb-<oldId>.jpg pairings; those five flows now also call clearExtraMedThumbs() so dead thumbs don't orphan forever (strip falls back to full until a backfill re-run regenerates paired thumbs). (Finding 3) Extra med-thumb generation no longer blocks each upload inline — thumbs are collected and awaited via Promise.allSettled after the photo loop, so photo-heavy saves aren't ~2× slower. SCRAPE UX: the Scrape button now sits to the LEFT of the URL field (was far right, hard to find); and if the URL field is empty, Scrape falls back to the model's saved Bluesky link (dup__of_facebook) so you don't have to copy it in. (Server unchanged.)
+   v7.35: (med-thumb write side) New photo uploads now generate a med-thumb so the backfill never goes stale. makeMedThumb() renders a 400px JPEG client-side (handles HEIC via the existing decoder, skips silently on a bad file). New headshots (new-model, headshot-replace in interview/full, kanban-modal headshot) call setHeadMedThumb() to clear+write the single headshot med-thumb from the uploaded file. New extras (everywhere, incl. scraped imports which ride the same path) call addExtraMedThumb() which uploads a paired medthumb-<assetId>.jpg. All med-thumb work is best-effort — if it fails, the photo still saves and the grid falls back to full. Headshot changes we DON'T regenerate for (recrop, promote-existing-photo, kanban promote) call clearHeadMedThumb() so the grid falls back to the full headshot until a later save/backfill. uploadFileToMonday now returns the new asset id. (Server unchanged.)
    v7.34: (med-thumb read side) Grids (All Models, Kanban, Sandbox) now display the small "med-thumb" headshot when one exists (falling back to the full headshot if not), and the editor photo strip shows small med-thumbs for extras — paired to each full photo by the source asset id embedded in the med-thumb filename (medthumb-<assetId>.jpg), so it's robust to reordering. Full images are still used for the lightbox and the strip avatar. Adds per-board med-thumb column maps (MED_THUMB_HEAD_COL / MED_THUMB_EXTRA_COL for prod/staging/batch) and fetches the headshot med-thumb column in the bulk board load. This is the READ side only — generating med-thumbs on new uploads / regenerating on replace+recrop is the next release (v7.35); until then new uploads simply fall back to full images.
    v7.33: (tabs speed) Tabs 0/1/5-REJECTED and the editor's candidate combo now derive their lists from the already-loaded shared store (kanbanItems) instead of a fresh board walk — instant instead of multi-second on first open. Grid tiles keep loading the full headshot image (sharp), unchanged from v7.32. NOTE: an earlier draft of v7.33 tried Monday's url_thumbnail for grids — reverted because that thumbnail is a fixed tiny "thumb_small" (blurry when scaled up) and slower to serve than the stored image. Proper small-image handling comes in the med-thumb feature (own column, generated at upload + backfill).
    v7.32: (wire speed + logo) Server now gzip-compresses all responses (index.html ~420KB→~108KB on the wire; every /api board page compresses ~4×) and long-caches static assets while keeping index.html revalidating so deploys still propagate instantly. Board loads page 500 items at a time instead of 200 (fewer round-trips). Date-input column id cached in sessionStorage (one lookup per session). Preconnect hints added for fonts + CDN. Logo swapped for a compressed 15KB / 300px version (was 199KB / 4114px). NOTE: touches server.js + package.json (adds the compression dependency) — deploying it restarts prod.
