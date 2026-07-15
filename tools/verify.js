@@ -382,5 +382,14 @@ lacks("if(f) f.value = saved; // show what we're scraping", 'old field-write beh
   (srv.includes('if(v.thumbnail) push') && srv.includes('e.external || (e.media && e.media.external)') ? ok : bad)
     ('v7.36.2 Bluesky scrape harvests video + external + recordWithMedia thumbs', 'server extraction not broadened'); }
 
+/* v7.36.3 asserts: scrape picker UX */
+has('v7.36.3:', 'v7.36.3 deploy marker present');
+has('function scrapeSelectAll(', 'select all/none helper present');
+has('function scrapeSyncHsAvailability(', 'headshot availability sync present');
+has('onclick="scrapeSelectAll(false)"', 'Select none button wired');
+has('type="checkbox" class="scrape-hsr"', 'headshot is a checkbox (not radio)');
+lacks('type="radio" name="scrape-hs"', 'old forced-radio headshot removed');
+has('let hsIdx = hsEl ? Number(hsEl.dataset.i) : -1', 'import allows zero headshot');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

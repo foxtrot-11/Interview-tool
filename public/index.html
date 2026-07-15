@@ -42,6 +42,8 @@
   .scrape-cell img{width:100%;height:150px;object-fit:cover;display:block;background:var(--surface2)}
   .scrape-cell label{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:5px;padding:5px 8px;cursor:pointer}
   .scrape-cell label input{cursor:pointer}
+  .scrape-cell label input:disabled{cursor:default}
+  .scrape-cell.hs-locked label:last-child{opacity:.4} /* v7.36.3: headshot taken by another cell / not kept */
   .pw-logo-img{height:42px;width:auto;display:block;margin:0 auto 24px}
   .logo span{color:var(--text-muted);font-weight:400}
 
@@ -1443,6 +1445,8 @@
         <div id="scrape-grid" class="scrape-grid"></div>
         <div class="unsaved-actions" style="margin-top:14px">
           <button class="kb-save" id="scrape-import-btn" onclick="scrapeImport()">Import selected</button>
+          <button class="kb-hs-cancel" type="button" onclick="scrapeSelectAll(false)">Select none</button>
+          <button class="kb-hs-cancel" type="button" onclick="scrapeSelectAll(true)">Select all</button>
           <button class="kb-hs-cancel" onclick="scrapeClose()">Cancel</button>
           <span class="am-count" id="scrape-status"></span>
         </div>
@@ -4090,21 +4094,55 @@ async function scrapePhotos(ctx){
 }
 function renderScrapeGrid(source){
   document.getElementById('scrape-note').textContent =
-    (source==='bluesky'?'From Bluesky. ':'From the page. ')+'Tick the ones to keep, choose one as the headshot, then Import.';
+    (source==='bluesky'?'From Bluesky. ':'From the page. ')+'Tick the ones to keep; optionally mark one as the headshot. Use “Select none” to start from scratch.';
   document.getElementById('scrape-grid').innerHTML = scrapeResults.map((im,i)=>`
     <div class="scrape-cell" id="scrape-cell-${i}">
       <img src="${escapeHtml(im.thumb||im.url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="document.getElementById('scrape-cell-${i}').classList.add('broken')">
-      <label><input type="checkbox" class="scrape-cb" data-i="${i}" checked> keep</label>
-      <label><input type="radio" name="scrape-hs" class="scrape-hsr" data-i="${i}" ${i===0?'checked':''}> headshot</label>
+      <label><input type="checkbox" class="scrape-cb" data-i="${i}" checked onchange="scrapeCbChanged(${i})"> keep</label>
+      <label><input type="checkbox" class="scrape-hsr" data-i="${i}" onchange="scrapeHsChanged(${i})"> headshot</label>
     </div>`).join('');
+}
+// v7.36.3: bulk keep/unkeep. Unchecking "keep" also clears that cell's headshot mark.
+function scrapeSelectAll(on){
+  document.querySelectorAll('.scrape-cb').forEach(cb=>{ cb.checked=!!on; });
+  if(!on) document.querySelectorAll('.scrape-hsr').forEach(hs=>{ hs.checked=false; });
+  scrapeSyncHsAvailability();
+}
+// Headshot is at-most-one: checking one clears the others; you can also uncheck to have none.
+function scrapeHsChanged(i){
+  const el=document.querySelector('.scrape-hsr[data-i="'+i+'"]');
+  if(el && el.checked){
+    document.querySelectorAll('.scrape-hsr').forEach(hs=>{ if(hs!==el) hs.checked=false; });
+    // marking a headshot implies keeping it
+    const cb=document.querySelector('.scrape-cb[data-i="'+i+'"]'); if(cb) cb.checked=true;
+  }
+  scrapeSyncHsAvailability();
+}
+// If "keep" is turned off, that cell can't be the headshot.
+function scrapeCbChanged(i){
+  const cb=document.querySelector('.scrape-cb[data-i="'+i+'"]');
+  if(cb && !cb.checked){ const hs=document.querySelector('.scrape-hsr[data-i="'+i+'"]'); if(hs) hs.checked=false; }
+  scrapeSyncHsAvailability();
+}
+// Grey out (disable) every other headshot box once one is chosen; re-enable when none is.
+function scrapeSyncHsAvailability(){
+  const chosen=document.querySelector('.scrape-hsr:checked');
+  document.querySelectorAll('.scrape-hsr').forEach(hs=>{
+    const cb=document.querySelector('.scrape-cb[data-i="'+hs.dataset.i+'"]');
+    const keep = cb ? cb.checked : true;
+    // disabled if: another cell owns the headshot, OR this cell isn't kept
+    hs.disabled = (chosen && hs!==chosen) || !keep;
+    hs.closest('.scrape-cell')?.classList.toggle('hs-locked', hs.disabled && !hs.checked);
+  });
 }
 function scrapeClose(){ document.getElementById('scrape-modal')?.classList.remove('open'); }
 async function scrapeImport(){
   const keep=[...document.querySelectorAll('.scrape-cb:checked')].map(c=>Number(c.dataset.i));
   if(!keep.length){ showToast('Select at least one photo','error'); return; }
   const hsEl=document.querySelector('.scrape-hsr:checked');
-  let hsIdx = hsEl ? Number(hsEl.dataset.i) : keep[0];
-  if(!keep.includes(hsIdx)) hsIdx=keep[0];
+  // v7.36.3: headshot is optional now. -1 means "no headshot" → everything imports as extras.
+  let hsIdx = hsEl ? Number(hsEl.dataset.i) : -1;
+  if(hsIdx>=0 && !keep.includes(hsIdx)) hsIdx=-1;
   const btn=document.getElementById('scrape-import-btn'), st=document.getElementById('scrape-status');
   btn.disabled=true;
   const grab=async(im,i)=>{
@@ -4115,9 +4153,9 @@ async function scrapeImport(){
     return new File([blob],'scraped_'+Date.now()+'_'+i+'.'+ext,{type:blob.type||'image/jpeg'});
   };
   let added=0, failed=0, done=0;
-  // headshot first so it lands in the headshot slot
+  // headshot first (if any) so it lands in the headshot slot
   const [hsSlot, exSlot]=SCRAPE_TYPES[scrapeCtx]||SCRAPE_TYPES.fv;
-  const order=[hsIdx, ...keep.filter(i=>i!==hsIdx)];
+  const order = hsIdx>=0 ? [hsIdx, ...keep.filter(i=>i!==hsIdx)] : keep;
   for(const i of order){
     st.textContent='Downloading '+(++done)+'/'+order.length+'…';
     try{
@@ -5661,6 +5699,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.36.3: (scrape picker UX) The scraped-photos picker gets "Select all" / "Select none" buttons so you can start empty and pick just a few. Headshot is now an uncheckable checkbox instead of a forced radio: you can mark one or none. Marking one greys out (disables) the headshot box on every other cell; unchecking it re-enables them. Unchecking "keep" on a cell also clears its headshot mark and disables it. Import now allows zero headshot — everything kept goes in as extras — and still routes a chosen headshot to the headshot slot.
    v7.36.2: (scrape — video/other embeds) Bluesky scrape now pulls images from every common post shape, not just image posts. Video-only profiles (e.g. derekkage.com) previously returned "No photos found" because the code only read image embeds; it now also uses each video post's still-frame thumbnail, plus recordWithMedia (quote-post) media and external link-card thumbnails. (Touches server.js.)
    v7.36.1: (scrape fixes) (a) Auto-Bluesky no longer writes the saved link into the scrape field — it uses it transparently for that one scrape — and the three scrape URL boxes are now cleared on every model load, so no link (pasted OR auto-filled) bleeds into the next model. (b) Server resolves a Bluesky handle to its DID before fetching the feed (getAuthorFeed 400s on some handles), and a non-existent handle now returns a clear "Bluesky profile not found — the handle doesn't exist" instead of a confusing generic 400. (Touches server.js.)
    v7.36: (med-thumb hardening + scrape UX) Fixes from Fable's review. (Finding 2) setHeadMedThumb no longer races its own clear: it only clears the headshot med-thumb column when it actually has a file, and waits 800ms for the clear to settle before uploading the new one — new-model creates hit the empty path and skip both. (Finding 1) Every headshot replace/recrop/promote runs through rearrangePhotos, which re-uploads extras with NEW asset ids and breaks all medthumb-<oldId>.jpg pairings; those five flows now also call clearExtraMedThumbs() so dead thumbs don't orphan forever (strip falls back to full until a backfill re-run regenerates paired thumbs). (Finding 3) Extra med-thumb generation no longer blocks each upload inline — thumbs are collected and awaited via Promise.allSettled after the photo loop, so photo-heavy saves aren't ~2× slower. SCRAPE UX: the Scrape button now sits to the LEFT of the URL field (was far right, hard to find); and if the URL field is empty, Scrape falls back to the model's saved Bluesky link (dup__of_facebook) so you don't have to copy it in. (Server unchanged.)
