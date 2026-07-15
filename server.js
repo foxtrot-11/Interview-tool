@@ -500,12 +500,29 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
 
 app.get('/proxy-image', dataLimiter, requireAuth, async (req, res) => {
   try{
-    const r = await safeFetch(String(req.query.url||''), { headers:{ 'User-Agent':'Mozilla/5.0 (compatible; CarnalTool/1.0)' } });
+    const reqUrl = String(req.query.url||'');
+    const r = await safeFetch(reqUrl, { headers:{ 'User-Agent':'Mozilla/5.0 (compatible; CarnalTool/1.0)' } });
     if(!r.ok) return res.status(502).json({ error:'fetch failed ('+r.status+')' });
-    const ct = r.headers.get('content-type')||'application/octet-stream';
-    if(!/^image\//i.test(ct)) return res.status(415).json({ error:'not an image' });
+    let ct = r.headers.get('content-type')||'application/octet-stream';
     const buf = Buffer.from(await r.arrayBuffer());
     if(buf.length > 15000000) return res.status(413).json({ error:'image too large' });
+    // v7.36.4: some CDNs (e.g. Bluesky video thumbnails at video.cdn.bsky.app) serve real
+    // JPEGs/PNGs with a generic application/octet-stream content-type. Accept the response
+    // if the content-type is image/*, OR the bytes sniff as a known image format. This keeps
+    // the proxy from becoming an arbitrary-content relay while allowing mislabelled images.
+    const sniff = (b)=>{
+      if(b.length<4) return null;
+      if(b[0]===0xFF && b[1]===0xD8) return 'image/jpeg';
+      if(b[0]===0x89 && b[1]===0x50 && b[2]===0x4E && b[3]===0x47) return 'image/png';
+      if(b[0]===0x47 && b[1]===0x49 && b[2]===0x46) return 'image/gif';
+      if(b.length>=12 && b.toString('ascii',0,4)==='RIFF' && b.toString('ascii',8,12)==='WEBP') return 'image/webp';
+      return null;
+    };
+    if(!/^image\//i.test(ct)){
+      const sniffed = sniff(buf);
+      if(!sniffed) return res.status(415).json({ error:'not an image' });
+      ct = sniffed; // relabel with the true type so the client saves the right extension
+    }
     res.set('Content-Type', ct); res.set('Cache-Control','private, max-age=300'); res.send(buf);
   }catch(e){ res.status(400).json({ error: e.message||String(e) }); }
 });

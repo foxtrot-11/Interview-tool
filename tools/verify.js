@@ -391,5 +391,10 @@ has('type="checkbox" class="scrape-hsr"', 'headshot is a checkbox (not radio)');
 lacks('type="radio" name="scrape-hs"', 'old forced-radio headshot removed');
 has('let hsIdx = hsEl ? Number(hsEl.dataset.i) : -1', 'import allows zero headshot');
 
+/* v7.36.4 assert: proxy-image byte sniffing (server.js) */
+{ const srv = fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
+  (srv.includes('const sniff = (b)=>{') && srv.includes("ct = sniffed") ? ok : bad)
+    ('v7.36.4 /proxy-image sniffs mislabelled image bytes', 'proxy-image sniff not present'); }
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
