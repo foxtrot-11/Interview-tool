@@ -414,5 +414,11 @@ lacks('cv.index===0 || cv.index===4', '#6 old CASTING+CREW filter removed');
 has("if(shootTagsDirty && currentMode!=='new' && String(BOARD_ID)===String(MAIN_BOARD_ID))", 'v7.37.1 shoot-tag save fires from interview view too');
 lacks("if(shootTagsDirty && currentMode==='5a'", 'v7.37.1 stale 5a-only shoot-tag gate removed');
 
+/* v7.37.2 asserts: sandbox scope broadened */
+has('v7.37.2:', 'v7.37.2 deploy marker present');
+has('const SB_EXCLUDE_STATUS = new Set([3,0,6,11,12])', 'sandbox excludes rejected/retired/delete/evernote/dup');
+has('!SB_EXCLUDE_STATUS.has(m.statusIdx)', 'sandbox filters by exclusion, not approved-only');
+lacks("GRID_SCOPES['5a'].ids.includes(m.statusIdx) && m.f && Array.isArray(m.f.shoot)", 'old approved-only sandbox filter removed');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

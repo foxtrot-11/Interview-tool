@@ -2812,8 +2812,11 @@ function sbPickTag(id){
 }
 function sbMembers(tagId){
   const roleOpts=boardDropdownOptions['dropdown_mknbe0p0']||[];
+  // v7.37.2: pull anyone who carries this shoot tag, regardless of pipeline status —
+  // EXCEPT clearly-out statuses: 3=REJECTED, 0=RETIRED, 6=DELETE, 11=EVERNOTE, 12=DUPLICATE.
+  const SB_EXCLUDE_STATUS = new Set([3,0,6,11,12]);
   return kanbanItems
-    .filter(m=>GRID_SCOPES['5a'].ids.includes(m.statusIdx) && m.f && Array.isArray(m.f.shoot) && m.f.shoot.includes(Number(tagId)))
+    .filter(m=>!SB_EXCLUDE_STATUS.has(m.statusIdx) && m.f && Array.isArray(m.f.shoot) && m.f.shoot.includes(Number(tagId)))
     .map(m=>({id:String(m.id), name:m.name, head:m.head, roleLabels:(m.f.role||[]).map(rid=>{const o=roleOpts.find(x=>Number(x.id)===Number(rid)); return o?String(o.label):'';}).filter(Boolean)}))
     .sort((a,b)=>a.name.localeCompare(b.name));
 }
@@ -2850,7 +2853,7 @@ async function renderSandbox(){
   if(!sbState.tag){ empty.style.display=''; empty.textContent='Pick a shoot tag to load its people.'; board.style.display='none'; const c=document.getElementById('sb-count'); if(c)c.textContent=''; return; }
   const mem=sbSyncMembership(); const byId={}; mem.forEach(m=>byId[m.id]=m);
   const c=document.getElementById('sb-count'); if(c) c.textContent=mem.length?mem.length+' people':'';
-  if(!mem.length){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag (approved statuses only). Tag people in the 5-APPROVED editor first.'; board.style.display='none'; return; }
+  if(!mem.length){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag yet (rejected, retired, delete, duplicate, and Evernote-import models are excluded). Add the tag to a model first — from any editor.'; board.style.display='none'; return; }
   empty.style.display='none'; board.style.display='';
   const tile=id=>{ const m=byId[id]; const ia=gridImgAsset(m); const url=ia?(kbHeadCache[ia]||''):''; const nt=sbState.notes[String(id)]; const hasNote=!!(nt&&(nt.pay||nt.dates)); return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret${hasNote?' has':''}" title="${hasNote?'Pay / dates noted — click to edit':'Add pay / dates note'}" onclick="sbOpenNote(event,'${id}')">▾</button></div>`; };
   // A zone renders as fixed numbered slots (main ≥8, alt ≥4). Slot position = subitem number at Port.
@@ -5796,6 +5799,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.37.2: (casting sandbox scope) The sandbox now loads anyone who carries the selected shoot tag regardless of pipeline status, EXCEPT rejected(3)/retired(0)/delete(6)/evernote(11)/duplicate(12). Previously it only loaded approved-group statuses (2/4/105), so a tagged 3-INTERVIEW model wouldn't appear. Empty-state message updated to match.
    v7.37.1: (bugfix) Shoot tags added from the 3-INTERVIEW view were silently dropped on Save — the shoot-tag write in saveRecord was gated to currentMode==='5a' (5-APPROVED) only, so from the interview view (mode '3') it never fired. Widened the gate to fire for any non-'new' view on the main board (full editor 5a/2/4 AND interview 3). Existing-tag load was already correct (shared populateForm), so this only fixes the save.
    v7.37: (grid/tab tweaks) Five staging-requested changes. (#1) SHOOT TAGS are now available directly in the 3-INTERVIEW view, under General Notes — same shootTags state + Save path as the full editor, searchable add/remove. (#2) The CASTING SANDBOX shoot-tag selector is now a searchable picker (was a plain dropdown). (#3) The "Port shoot tag to Monday" control is retired from the 5-APPROVED grid (porting lives in the CASTING SANDBOX now). (#4) All model grids default to newest-first (by date added / created_at) instead of Name A→Z. (#6) "Port to casting row" now lists CASTING-type rows only (TYPE index 0), excluding CREW. NOTE: the editable-grid feature (inline rating + shoot-tag on tiles with a grid-level save) is intentionally NOT here — it's the separate next release.
    v7.36.4: (scrape download fix) /proxy-image now accepts image bytes that a CDN serves with a generic content-type. Bluesky video thumbnails (video.cdn.bsky.app) are real JPEGs but come back as application/octet-stream, so the previous "must be image/*" check rejected them → "0 photos added, 1 failed" when importing from a video-only profile. It now sniffs the leading magic bytes (JPEG/PNG/GIF/WEBP) and accepts + correctly relabels genuine images, while still rejecting non-image content (so the proxy stays safe). (Touches server.js.)
