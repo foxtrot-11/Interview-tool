@@ -410,5 +410,9 @@ has('const on=false;', '#3 port control hidden on 5-APPROVED');
 has('grp===CASTING_TOP_GROUP && cv && cv.index===0', '#6 port rows = CASTING only (no CREW)');
 lacks('cv.index===0 || cv.index===4', '#6 old CASTING+CREW filter removed');
 
+/* v7.37.1 assert: shoot-tag save not gated to 5a-only */
+has("if(shootTagsDirty && currentMode!=='new' && String(BOARD_ID)===String(MAIN_BOARD_ID))", 'v7.37.1 shoot-tag save fires from interview view too');
+lacks("if(shootTagsDirty && currentMode==='5a'", 'v7.37.1 stale 5a-only shoot-tag gate removed');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
