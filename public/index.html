@@ -1089,6 +1089,19 @@
         <div class="iv-notes-sticky">
           <div class="field-label">General Notes</div>
           <textarea id="iv-general-notes" placeholder="General observations..." oninput="document.getElementById('sidebar-general-notes').value=this.value;markDirty()"></textarea>
+          <!-- v7.37 (#1): shoot tags in the 3-INTERVIEW view, under General Notes. Shares shootTags state + Save path with the full editor. -->
+          <div id="iv-shoot-tags-block" style="margin-top:12px">
+            <div class="field-label">SHOOT TAGS</div>
+            <div class="shoot-boxes" id="iv-shoot-boxes"></div>
+            <div class="shoot-picker-wrap">
+              <button type="button" class="shoot-arrow" onclick="event.stopPropagation();toggleIvShootPicker()">+ Add tag ▾</button>
+              <div class="shoot-picker" id="iv-shoot-picker" onclick="event.stopPropagation()">
+                <input type="text" id="iv-shoot-picker-search" placeholder="Search tags… (Enter adds)" autocomplete="off" oninput="renderIvShootPicker()" onkeydown="if(event.key==='Enter'){event.preventDefault();ivShootPickerEnter();}">
+                <div class="shoot-picker-list" id="iv-shoot-picker-list"></div>
+              </div>
+            </div>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:4px">Click a box to remove it. New tags are created on Monday when you Save.</div>
+          </div>
         </div>
 
 <div class="field-grid single">
@@ -1375,7 +1388,13 @@
         </div>
         <div class="am-toolbar-row">
           <span class="tb-label">Shoot tag</span>
-          <select id="sb-tag" class="am-sort" onchange="sbTagChanged()"></select>
+          <span class="port-row-wrap">
+            <button type="button" id="sb-tag-btn" class="am-sort" style="max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="event.stopPropagation();sbToggleTagPicker()">Shoot tag… ▾</button>
+            <div class="shoot-picker port-row-picker" id="sb-tag-picker" onclick="event.stopPropagation()">
+              <input type="text" id="sb-tag-search" placeholder="Search tags…" autocomplete="off" oninput="sbRenderTagList()" onkeydown="if(event.key==='Enter'){event.preventDefault();sbTagEnter();}">
+              <div class="shoot-picker-list" id="sb-tag-list"></div>
+            </div>
+          </span>
           <span class="tb-sep"></span>
           <button class="am-clear" onclick="sbCopyLink()">🔗 Copy share link</button>
           <button class="am-clear" onclick="sbSaveState()">💾 Save state</button>
@@ -1862,13 +1881,13 @@ let amFilters={};            // filter key -> Set of selected option ids (live s
 // Grid scopes: the same grid view serves ALL MODELS and 5-APPROVED, each with its own filters/search/sort.
 let gridScope='all';
 const GRID_SCOPES={ all:{title:'All Models', ids:null, full:true}, '2':{title:'2-POTENTIAL', ids:[10], full:true}, '3':{title:'3-INTERVIEW', ids:[7], full:true, interview:true}, '4':{title:'4-REVIEW', ids:[9], full:true}, '5a':{title:'5-APPROVED', ids:[2,4,105], full:true} };
-let amState={ all:{filters:{},search:'',sort:'name-asc'}, '2':{filters:{},search:'',sort:'name-asc'}, '3':{filters:{},search:'',sort:'name-asc'}, '4':{filters:{},search:'',sort:'name-asc'}, '5a':{filters:{},search:'',sort:'name-asc'} };
+let amState={ all:{filters:{},search:'',sort:'date-desc'}, '2':{filters:{},search:'',sort:'date-desc'}, '3':{filters:{},search:'',sort:'date-desc'}, '4':{filters:{},search:'',sort:'date-desc'}, '5a':{filters:{},search:'',sort:'date-desc'} };
 let approvedFromGrid=false;
 function setGridScope(scope){
   if(gridScope===scope) return;
-  amState[gridScope]={ filters:amFilters, search:(document.getElementById('am-search')||{}).value||'', sort:(document.getElementById('am-sort')||{}).value||'name-asc' };
+  amState[gridScope]={ filters:amFilters, search:(document.getElementById('am-search')||{}).value||'', sort:(document.getElementById('am-sort')||{}).value||'date-desc' };
   gridScope=scope;
-  const st=amState[scope]||(amState[scope]={filters:{},search:'',sort:'name-asc'});
+  const st=amState[scope]||(amState[scope]={filters:{},search:'',sort:'date-desc'});
   amFilters=st.filters;
   const si=document.getElementById('am-search'); if(si) si.value=st.search;
   const so=document.getElementById('am-sort'); if(so) so.value=st.sort;
@@ -2618,7 +2637,7 @@ function qnavSpy(){
   });
 }
 document.getElementById('form-area')?.addEventListener('scroll', qnavSpy, {passive:true});
-document.addEventListener('click', e=>{ if(!e.target.closest('.shoot-picker-wrap')) closeShootPicker(); if(!e.target.closest('.port-row-wrap')) closeRowPicker(); });
+document.addEventListener('click', e=>{ if(!e.target.closest('.shoot-picker-wrap')){ closeShootPicker(); closeIvShootPicker(); } if(!e.target.closest('.port-row-wrap')) closeRowPicker(); });
 
 // ── PORT TO CASTING STACK (v7.13) ──
 // Pushes every 5-APPROVED-scope model carrying a chosen shoot tag into a chosen
@@ -2663,7 +2682,9 @@ function portBuildPlan(models, slots, typeOf){
 
 function portToggleUI(){
   const w=document.getElementById('port-wrap'); if(!w) return;
-  const on=(gridScope==='5a');
+  // v7.37 (#3): the "Port shoot tag to Monday" control is retired from the 5-APPROVED grid
+  // (the casting-stack porting now lives in the CASTING SANDBOX). Kept in code, always hidden.
+  const on=false;
   w.style.display=on?'flex':'none';
   if(on){ portPopulateTags(); portLoadRows(false); }
 }
@@ -2678,7 +2699,9 @@ function portFilterRows(items){
   return (items||[]).filter(it=>{
     const cv=(it.column_values||[])[0];
     const grp=it.group&&it.group.id;
-    return grp===CASTING_TOP_GROUP && cv && (cv.index===0 || cv.index===4);   // TYPE = CASTING(0) or CREW(4)
+    // v7.37 (#6): CASTING only — TYPE column index 0. CREW (index 4) is excluded (we only
+    // use this porting flow for casting right now).
+    return grp===CASTING_TOP_GROUP && cv && cv.index===0;
   }).map(it=>({id:it.id,name:it.name})).sort((a,b)=>a.name.localeCompare(b.name));
 }
 let portSelectedRowId='', portSelectedRowName='', portRowOpts=[];
@@ -2705,7 +2728,7 @@ function toggleRowPicker(){
   const open=p.classList.toggle('open');
   if(open){ const s=document.getElementById('port-row-search'); if(s){ s.value=''; s.focus(); } portRenderRowList(); }
 }
-function closeRowPicker(){ ['port-row-picker','sb-row-picker'].forEach(id=>{ const p=document.getElementById(id); if(p) p.classList.remove('open'); }); }
+function closeRowPicker(){ ['port-row-picker','sb-row-picker','sb-tag-picker'].forEach(id=>{ const p=document.getElementById(id); if(p) p.classList.remove('open'); }); }
 function portRenderRowList(){
   const list=document.getElementById('port-row-list'); if(!list) return;
   const q=((document.getElementById('port-row-search')||{}).value||'').trim().toLowerCase();
@@ -2751,26 +2774,57 @@ function sbNormalizeNotes(n){
   return out;
 }
 function sbInitUI(){
-  const sel=document.getElementById('sb-tag'); if(!sel) return;
-  const cur=sel.value;
-  const opts=(boardDropdownOptions[SHOOT_COL]||[]).slice().sort((a,b)=>String(a.label).localeCompare(String(b.label)));
-  sel.innerHTML='<option value="">Shoot tag…</option>'+opts.map(o=>`<option value="${o.id}">${escapeHtml(String(o.label))}</option>`).join('');
-  if(cur) sel.value=cur; else if(sbState.tag) sel.value=String(sbState.tag);
+  // v7.37 (#2): searchable single-select tag picker (replaces the plain <select id="sb-tag">).
+  sbSyncTagButton();
   portLoadRows(false);
   sbLoadSaves(false);
 }
+function sbTagOptions(){
+  return (boardDropdownOptions[SHOOT_COL]||[]).slice().sort((a,b)=>String(a.label).localeCompare(String(b.label)));
+}
+function sbSyncTagButton(){
+  const btn=document.getElementById('sb-tag-btn'); if(!btn) return;
+  const cur=sbState.tag ? (boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.id)===String(sbState.tag)) : null;
+  btn.textContent=(cur?String(cur.label):'Shoot tag…')+' ▾';
+}
+function sbToggleTagPicker(){
+  const p=document.getElementById('sb-tag-picker'); if(!p) return;
+  closeRowPicker();
+  const open=!p.classList.contains('open'); p.classList.toggle('open',open);
+  if(open){ const s=document.getElementById('sb-tag-search'); if(s){ s.value=''; s.focus(); } sbRenderTagList(); }
+}
+function sbRenderTagList(){
+  const list=document.getElementById('sb-tag-list'); if(!list) return;
+  const q=((document.getElementById('sb-tag-search')||{}).value||'').trim().toLowerCase();
+  const opts=sbTagOptions().filter(o=>!q || String(o.label).toLowerCase().includes(q));
+  list.innerHTML = opts.length
+    ? opts.map(o=>`<div class="shoot-opt${String(o.id)===String(sbState.tag)?' sel':''}" onclick="sbPickTag('${o.id}')">${String(o.id)===String(sbState.tag)?'✓ ':''}${escapeHtml(String(o.label))}</div>`).join('')
+    : '<div class="shoot-opt dim">No matching tags</div>';
+}
+function sbTagEnter(){
+  const q=((document.getElementById('sb-tag-search')||{}).value||'').trim().toLowerCase();
+  const first=sbTagOptions().filter(o=>!q || String(o.label).toLowerCase().includes(q))[0];
+  if(first) sbPickTag(first.id);
+}
+function sbPickTag(id){
+  const p=document.getElementById('sb-tag-picker'); if(p) p.classList.remove('open');
+  sbTagChanged(String(id));
+}
 function sbMembers(tagId){
   const roleOpts=boardDropdownOptions['dropdown_mknbe0p0']||[];
+  // v7.37.2: pull anyone who carries this shoot tag, regardless of pipeline status —
+  // EXCEPT clearly-out statuses: 3=REJECTED, 0=RETIRED, 6=DELETE, 11=EVERNOTE, 12=DUPLICATE.
+  const SB_EXCLUDE_STATUS = new Set([3,0,6,11,12]);
   return kanbanItems
-    .filter(m=>GRID_SCOPES['5a'].ids.includes(m.statusIdx) && m.f && Array.isArray(m.f.shoot) && m.f.shoot.includes(Number(tagId)))
+    .filter(m=>!SB_EXCLUDE_STATUS.has(m.statusIdx) && m.f && Array.isArray(m.f.shoot) && m.f.shoot.includes(Number(tagId)))
     .map(m=>({id:String(m.id), name:m.name, head:m.head, roleLabels:(m.f.role||[]).map(rid=>{const o=roleOpts.find(x=>Number(x.id)===Number(rid)); return o?String(o.label):'';}).filter(Boolean)}))
     .sort((a,b)=>a.name.localeCompare(b.name));
 }
 function sbDefaultZone(roleLabels){ const t=portDecideType(roleLabels); return t==='VERSE'?'v':t==='TOP'?'t':t==='BOTTOM'?'b':'av'; }
-function sbTagChanged(){
-  const v=document.getElementById('sb-tag').value;
+function sbTagChanged(v){
   sbState={tag:v||null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}, notes:{}};
   sbSelected=null;
+  sbSyncTagButton();
   renderSandbox();
 }
 // Keep zones consistent with reality: drop ids that lost the tag/status, dedupe, default-place new ones.
@@ -2794,12 +2848,12 @@ async function renderSandbox(){
   if(sbPending){
     const p=sbPending; sbPending=null;
     sbState={tag:(p&&p.t)?String(p.t):null, zones:sbNormalizeZones(p&&p.z), notes:sbNormalizeNotes(p&&p.n)};
-    const sel=document.getElementById('sb-tag'); if(sel&&sbState.tag) sel.value=String(sbState.tag);
+    sbSyncTagButton();
   }
   if(!sbState.tag){ empty.style.display=''; empty.textContent='Pick a shoot tag to load its people.'; board.style.display='none'; const c=document.getElementById('sb-count'); if(c)c.textContent=''; return; }
   const mem=sbSyncMembership(); const byId={}; mem.forEach(m=>byId[m.id]=m);
   const c=document.getElementById('sb-count'); if(c) c.textContent=mem.length?mem.length+' people':'';
-  if(!mem.length){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag (approved statuses only). Tag people in the 5-APPROVED editor first.'; board.style.display='none'; return; }
+  if(!mem.length){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag yet (rejected, retired, delete, duplicate, and Evernote-import models are excluded). Add the tag to a model first — from any editor.'; board.style.display='none'; return; }
   empty.style.display='none'; board.style.display='';
   const tile=id=>{ const m=byId[id]; const ia=gridImgAsset(m); const url=ia?(kbHeadCache[ia]||''):''; const nt=sbState.notes[String(id)]; const hasNote=!!(nt&&(nt.pay||nt.dates)); return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret${hasNote?' has':''}" title="${hasNote?'Pay / dates noted — click to edit':'Add pay / dates note'}" onclick="sbOpenNote(event,'${id}')">▾</button></div>`; };
   // A zone renders as fixed numbered slots (main ≥8, alt ≥4). Slot position = subitem number at Port.
@@ -2933,7 +2987,7 @@ function sbRenderSaves(){
 function sbLoadSave(id){
   const s=sbSaves.find(x=>String(x.id)===String(id)); if(!s||!s.data){ showToast('Could not load that save','error'); return; }
   sbState={tag:s.data.tag?String(s.data.tag):null, zones:sbNormalizeZones(s.data.zones), notes:sbNormalizeNotes(s.data.notes)};
-  const sel=document.getElementById('sb-tag'); if(sel&&sbState.tag) sel.value=String(sbState.tag);
+  sbSyncTagButton();
   sbSelected=null; renderSandbox();
   showToast('Loaded “'+(s.name||'')+'”','success');
 }
@@ -3254,11 +3308,54 @@ const SHOOT_COL='dropdown_mkyj8js9';
 let shootTags=[], shootTagsDirty=false;
 let shootPickerOpts=[];
 function renderShootChips(){   // name kept (populateForm + refreshShootOptions call it) — now renders compat-style boxes + the picker
-  const c=document.getElementById('shoot-boxes'); if(!c) return;
-  c.innerHTML = shootTags.length
+  const boxesHtml = shootTags.length
     ? shootTags.map((t,i)=>`<button type="button" class="compat-btn shoot-box" title="Click to remove" onclick="removeShootTag(${i})">${escapeHtml(t)} ✕</button>`).join('')
     : '<span class="kb-empty">— no shoot tags —</span>';
+  const c=document.getElementById('shoot-boxes'); if(c) c.innerHTML = boxesHtml;
+  const ivc=document.getElementById('iv-shoot-boxes'); if(ivc) ivc.innerHTML = boxesHtml; // v7.37 (#1): interview view mirror
   renderShootPicker();
+  renderIvShootPicker();
+}
+// v7.37 (#1): interview-view shoot-tag picker — thin wrappers over the SAME shootTags state.
+function toggleIvShootPicker(){
+  const p=document.getElementById('iv-shoot-picker'); if(!p) return;
+  const open=p.classList.toggle('open');
+  if(open){ const s=document.getElementById('iv-shoot-picker-search'); if(s){ s.value=''; s.focus(); } renderIvShootPicker(); }
+}
+function closeIvShootPicker(){ const p=document.getElementById('iv-shoot-picker'); if(p) p.classList.remove('open'); }
+function renderIvShootPicker(){
+  const list=document.getElementById('iv-shoot-picker-list'); if(!list) return;
+  const sEl=document.getElementById('iv-shoot-picker-search');
+  const raw=(sEl?sEl.value:'').trim(); const q=raw.toLowerCase();
+  const all=(boardDropdownOptions[SHOOT_COL]||[]).map(o=>String(o.label));
+  const opts=all.filter(l=>!q||l.toLowerCase().includes(q));
+  const sel=l=>shootTags.some(x=>x.toLowerCase()===l.toLowerCase());
+  let html=opts.map(l=>`<div class="shoot-opt${sel(l)?' sel':''}" onclick="ivShootPickerPick('${encodeURIComponent(l)}')">${sel(l)?'✓ ':''}${escapeHtml(l)}</div>`).join('');
+  if(raw && !all.some(l=>l.toLowerCase()===q)) html+=`<div class="shoot-opt create" onclick="ivShootPickerCreate()">+ Create “${escapeHtml(raw)}”</div>`;
+  list.innerHTML=html||'<div class="shoot-opt dim">no tags yet — type to create one</div>';
+}
+function ivShootPickerPick(enc){
+  const l=decodeURIComponent(enc);
+  const i=shootTags.findIndex(x=>x.toLowerCase()===l.toLowerCase());
+  if(i>=0) shootTags.splice(i,1); else shootTags.push(l);
+  shootTagsDirty=true; markDirty(); renderShootChips();
+}
+function ivShootPickerCreate(){
+  const s=document.getElementById('iv-shoot-picker-search'); const t=(s?s.value:'').trim(); if(!t) return;
+  if(!shootTags.some(x=>x.toLowerCase()===t.toLowerCase())){ shootTags.push(t); shootTagsDirty=true; markDirty(); }
+  if(s) s.value='';
+  renderShootChips();
+}
+function ivShootPickerEnter(){
+  const s=document.getElementById('iv-shoot-picker-search'); const raw=(s?s.value:'').trim(); if(!raw) return;
+  const q=raw.toLowerCase();
+  const all=(boardDropdownOptions[SHOOT_COL]||[]).map(o=>String(o.label));
+  const match=all.find(l=>l.toLowerCase()===q);
+  if(match){
+    if(!shootTags.some(x=>x.toLowerCase()===match.toLowerCase())){ shootTags.push(match); shootTagsDirty=true; markDirty(); }
+    if(s) s.value='';
+    renderShootChips();
+  } else { ivShootPickerCreate(); }
 }
 function toggleShootPicker(){
   const p=document.getElementById('shoot-picker'); if(!p) return;
@@ -4667,8 +4764,11 @@ async function saveRecord(){
     await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
       {i:currentItem.id,b:BOARD_ID,c:JSON.stringify(cv)});
     syncStoreFromCv(currentItem.id, cv);   // grids reflect this save without a Refresh
-    // SHOOT TAGS: separate mutation so create_labels_if_missing:true is scoped to this column only
-    if(shootTagsDirty && currentMode==='5a' && String(BOARD_ID)===String(MAIN_BOARD_ID)){
+    // SHOOT TAGS: separate mutation so create_labels_if_missing:true is scoped to this column only.
+    // v7.37.1: fire for any view that exposes the shoot-tag control on a real model on the main
+    // board — full editor (5a/2/4) AND the interview view (3). Was gated to '5a' only, which
+    // silently dropped tags added from 3-INTERVIEW.
+    if(shootTagsDirty && currentMode!=='new' && String(BOARD_ID)===String(MAIN_BOARD_ID)){
       await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:true){id}}`,
         {i:currentItem.id,b:BOARD_ID,c:JSON.stringify({[SHOOT_COL]:{labels:shootTags}})});
       shootTagsDirty=false;
@@ -5699,6 +5799,9 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.37.2: (casting sandbox scope) The sandbox now loads anyone who carries the selected shoot tag regardless of pipeline status, EXCEPT rejected(3)/retired(0)/delete(6)/evernote(11)/duplicate(12). Previously it only loaded approved-group statuses (2/4/105), so a tagged 3-INTERVIEW model wouldn't appear. Empty-state message updated to match.
+   v7.37.1: (bugfix) Shoot tags added from the 3-INTERVIEW view were silently dropped on Save — the shoot-tag write in saveRecord was gated to currentMode==='5a' (5-APPROVED) only, so from the interview view (mode '3') it never fired. Widened the gate to fire for any non-'new' view on the main board (full editor 5a/2/4 AND interview 3). Existing-tag load was already correct (shared populateForm), so this only fixes the save.
+   v7.37: (grid/tab tweaks) Five staging-requested changes. (#1) SHOOT TAGS are now available directly in the 3-INTERVIEW view, under General Notes — same shootTags state + Save path as the full editor, searchable add/remove. (#2) The CASTING SANDBOX shoot-tag selector is now a searchable picker (was a plain dropdown). (#3) The "Port shoot tag to Monday" control is retired from the 5-APPROVED grid (porting lives in the CASTING SANDBOX now). (#4) All model grids default to newest-first (by date added / created_at) instead of Name A→Z. (#6) "Port to casting row" now lists CASTING-type rows only (TYPE index 0), excluding CREW. NOTE: the editable-grid feature (inline rating + shoot-tag on tiles with a grid-level save) is intentionally NOT here — it's the separate next release.
    v7.36.4: (scrape download fix) /proxy-image now accepts image bytes that a CDN serves with a generic content-type. Bluesky video thumbnails (video.cdn.bsky.app) are real JPEGs but come back as application/octet-stream, so the previous "must be image/*" check rejected them → "0 photos added, 1 failed" when importing from a video-only profile. It now sniffs the leading magic bytes (JPEG/PNG/GIF/WEBP) and accepts + correctly relabels genuine images, while still rejecting non-image content (so the proxy stays safe). (Touches server.js.)
    v7.36.3: (scrape picker UX) The scraped-photos picker gets "Select all" / "Select none" buttons so you can start empty and pick just a few. Headshot is now an uncheckable checkbox instead of a forced radio: you can mark one or none. Marking one greys out (disables) the headshot box on every other cell; unchecking it re-enables them. Unchecking "keep" on a cell also clears its headshot mark and disables it. Import now allows zero headshot — everything kept goes in as extras — and still routes a chosen headshot to the headshot slot.
    v7.36.2: (scrape — video/other embeds) Bluesky scrape now pulls images from every common post shape, not just image posts. Video-only profiles (e.g. derekkage.com) previously returned "No photos found" because the code only read image embeds; it now also uses each video post's still-frame thumbnail, plus recordWithMedia (quote-post) media and external link-card thumbnails. (Touches server.js.)

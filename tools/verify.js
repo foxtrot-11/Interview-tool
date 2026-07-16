@@ -131,10 +131,10 @@ has('if(!fvOn && !ivOn) return;', 'scroll-spy runs in interview editor too');
 has(`if(mode==='5a'||mode==='2'||mode==='4'){`, 'setMode routes 2/4/5a to the grid');
 has(`setGridScope(mode);`, 'setMode passes the mode as grid scope');
 has("blk.style.display='';   // v7.27", 'shoot-tags editor block shows in every full-editor view');
-has(`const on=(gridScope==='5a');`, 'Port row stays 5-APPROVED-only');
+has(`const on=false;`, 'Port row control retired from grids (#3)');
 has(`scope:'5a'`, 'Shoot Tags FILTER stays 5-APPROVED-only');
-has(`'2':{filters:{},search:'',sort:'name-asc'}`, 'amState has per-tab memory for 2');
-has(`'4':{filters:{},search:'',sort:'name-asc'}`, 'amState has per-tab memory for 4');
+has(`'2':{filters:{},search:'',sort:'date-desc'}`, 'amState has per-tab memory for 2');
+has(`'4':{filters:{},search:'',sort:'date-desc'}`, 'amState has per-tab memory for 4');
 has(`class="tb-label">Sort<`, 'SORT label present in toolbar');
 has(`class="tb-label">Port shoot tag to Monday<`, 'Port label restyled to match SORT');
 has(`class="am-toolbar-row" id="port-wrap"`, 'Port controls are their own toolbar row');
@@ -395,6 +395,30 @@ has('let hsIdx = hsEl ? Number(hsEl.dataset.i) : -1', 'import allows zero headsh
 { const srv = fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
   (srv.includes('const sniff = (b)=>{') && srv.includes("ct = sniffed") ? ok : bad)
     ('v7.36.4 /proxy-image sniffs mislabelled image bytes', 'proxy-image sniff not present'); }
+
+/* v7.37 asserts: grid/tab tweaks */
+has('v7.37:', 'v7.37 deploy marker present');
+has('id="iv-shoot-tags-block"', '#1 interview shoot-tags block present');
+has('function ivShootPickerPick(', '#1 interview shoot-tag picker present');
+has("const ivc=document.getElementById('iv-shoot-boxes')", '#1 chips mirror to interview view');
+has('id="sb-tag-picker"', '#2 sandbox tag searchable picker present');
+has('function sbRenderTagList(', '#2 sandbox tag list renderer present');
+lacks('onchange="sbTagChanged()"', '#2 old plain sandbox tag select removed');
+has('const on=false;', '#3 port control hidden on 5-APPROVED');
+{ const n=(src.match(/sort:'date-desc'/g)||[]).length;
+  (n>=5 ? ok : bad)(`#4 grids default to newest-first (${n} scopes)`, `only ${n}`); }
+has('grp===CASTING_TOP_GROUP && cv && cv.index===0', '#6 port rows = CASTING only (no CREW)');
+lacks('cv.index===0 || cv.index===4', '#6 old CASTING+CREW filter removed');
+
+/* v7.37.1 assert: shoot-tag save not gated to 5a-only */
+has("if(shootTagsDirty && currentMode!=='new' && String(BOARD_ID)===String(MAIN_BOARD_ID))", 'v7.37.1 shoot-tag save fires from interview view too');
+lacks("if(shootTagsDirty && currentMode==='5a'", 'v7.37.1 stale 5a-only shoot-tag gate removed');
+
+/* v7.37.2 asserts: sandbox scope broadened */
+has('v7.37.2:', 'v7.37.2 deploy marker present');
+has('const SB_EXCLUDE_STATUS = new Set([3,0,6,11,12])', 'sandbox excludes rejected/retired/delete/evernote/dup');
+has('!SB_EXCLUDE_STATUS.has(m.statusIdx)', 'sandbox filters by exclusion, not approved-only');
+lacks("GRID_SCOPES['5a'].ids.includes(m.statusIdx) && m.f && Array.isArray(m.f.shoot)", 'old approved-only sandbox filter removed');
 
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
