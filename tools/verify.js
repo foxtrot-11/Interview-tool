@@ -442,5 +442,16 @@ has('function gridFitChips(', 'chip +N overflow fitter present');
 has('am-chip-more', '+N overflow chip present');
 has('tile.classList.add(\'picker-open\')', 'picker toggle sets picker-open');
 
+/* v7.39 asserts: rating step + sandbox polish + UX steps */
+has('v7.39:', 'v7.39 deploy marker present');
+has('step="1"', 'grid rating steps by whole integers');
+has("noteState = (hasPay&&hasDates)?'both'", 'sandbox note caret is 3-state');
+has('.sb-note-caret.note-partial', 'yellow partial note state CSS present');
+has('.sb-note-caret.note-both', 'green complete note state CSS present');
+has('class="sb-step-num">1<', 'sandbox step 1 present');
+has('class="sb-step-num">4<', 'sandbox step 4 present');
+has('Send to casting row', 'port button relabeled friendly');
+lacks('⇪ Port this arrangement', 'old dense port label removed');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
