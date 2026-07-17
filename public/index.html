@@ -199,23 +199,31 @@
   .am-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
   .am-tile{position:relative;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s}
   .am-tile:hover{border-color:var(--accent)}
-  .am-caret{position:absolute;top:6px;right:6px;z-index:2;background:rgba(0,0,0,.55);color:#fff;border-radius:5px;padding:2px 7px;font-size:11px;pointer-events:none}
+  /* v7.38.1: .am-caret removed — was a dead decorative affordance */
   .am-thumb{width:100%;aspect-ratio:1/1;background:var(--surface);display:flex;align-items:center;justify-content:center;overflow:hidden}
   .am-thumb img{width:100%;height:100%;object-fit:cover;display:block}
   .am-mono{font-size:36px;color:var(--text-dim);font-weight:700;font-family:var(--font-display)}
   .am-name{padding:7px 9px 2px;font-size:13px;font-weight:600;color:var(--text);line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:34px}
   .am-sub{padding:0 9px 8px;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);min-height:15px}
-  /* v7.38 editable grid */
+  /* v7.38 / v7.38.1 editable grid */
   .am-tile.am-dirty{border-color:var(--accent,#a78bfa);box-shadow:inset 3px 0 0 var(--accent,#a78bfa)}
-  .am-rate-row{display:flex;align-items:center;gap:6px;padding:2px 9px 4px}
-  .am-rate-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em}
+  .am-tile.picker-open{overflow:visible;z-index:40}          /* escape clip so the tag picker is visible */
+  .am-thumb{border-radius:7px 7px 0 0}                        /* keep rounded top corners when tile overflow is visible */
+  .am-field-row{display:flex;align-items:center;gap:8px;padding:2px 9px}
+  .am-field-row:first-of-type{padding-top:4px}
+  .am-flabel{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;flex:none;width:70px}
   .am-rate-input{width:52px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:3px 6px}
   .am-rate-input:focus{outline:none;border-color:var(--accent,#a78bfa)}
-  .am-tags-row{display:flex;align-items:flex-start;gap:6px;padding:0 9px 8px;flex-wrap:wrap}
-  .am-chips{display:flex;flex-wrap:wrap;gap:3px;flex:1;min-width:0}
-  .am-chip{font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--text-muted);white-space:nowrap}
-  .am-tag-btn{font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text-muted);padding:2px 7px;cursor:pointer;white-space:nowrap}
+  .am-tags-row{position:relative;padding-bottom:2px}
+  .am-chips{display:flex;flex-wrap:nowrap;gap:3px;flex:1;min-width:0;overflow:hidden;height:19px;align-items:center}
+  .am-chip{font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--text-muted);white-space:nowrap;flex:none;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .am-chip-more{cursor:pointer;color:var(--text);border-color:var(--accent,#a78bfa)}
+  .am-tag-btn{font-size:13px;line-height:1;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text-muted);padding:2px 8px;cursor:pointer;flex:none}
   .am-tag-btn:hover{border-color:var(--accent,#a78bfa);color:var(--text)}
+  .am-date-row{padding-bottom:8px}
+  .am-date-val{font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+  /* per-tile tag picker: anchored to the tag row, tile-wide (overrides the 280px toolbar picker) */
+  .am-tags-row .shoot-picker{position:absolute;top:calc(100% + 2px);left:9px;right:9px;width:auto;min-width:0;z-index:80}
   .amtag-search{width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;padding:4px 7px;margin-bottom:4px}
   .grid-save-bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--accent,#a78bfa);border-radius:8px;padding:9px 14px;margin-bottom:12px}
   .grid-save-bar .gsb-dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#a78bfa);flex:none}
@@ -2040,11 +2048,21 @@ function gridSetRating(id, raw){
 }
 
 // ---- SHOOT-TAG edit (buffer only; searchable picker per tile) ----
+function gridCloseAllTagPickers(){
+  document.querySelectorAll('[id^="amtag-picker-"]').forEach(p=>p.classList.remove('open'));
+  document.querySelectorAll('.am-tile.picker-open').forEach(t=>t.classList.remove('picker-open'));
+}
 function gridToggleTagPicker(id){
-  closeRowPicker(); document.querySelectorAll('[id^="amtag-picker-"]').forEach(p=>p.classList.remove('open'));
+  closeRowPicker();
   const p=document.getElementById('amtag-picker-'+id); if(!p) return;
-  const open=!p.classList.contains('open'); p.classList.toggle('open',open);
-  if(open){ const s=document.getElementById('amtag-search-'+id); if(s){ s.value=''; s.focus(); } gridRenderTagList(id); }
+  const willOpen=!p.classList.contains('open');
+  gridCloseAllTagPickers();   // close any other open picker first
+  if(willOpen){
+    p.classList.add('open');
+    const tile=document.getElementById('amtile-'+id); if(tile) tile.classList.add('picker-open'); // escape overflow:hidden clip
+    const s=document.getElementById('amtag-search-'+id); if(s){ s.value=''; s.focus(); }
+    gridRenderTagList(id);
+  }
 }
 function gridTagOptions(){ return (boardDropdownOptions[SHOOT_COL]||[]).map(o=>String(o.label)); }
 function gridRenderTagList(id){
@@ -2083,8 +2101,39 @@ function gridTagEnter(id){
 }
 function gridRefreshChips(id){
   const m=gridModel(id); const c=document.getElementById('amchips-'+id); if(!m||!c) return;
-  c.innerHTML=gridShootLabels(m).map(l=>`<span class="am-chip">${escapeHtml(l)}</span>`).join('');
+  const chips=gridShootLabels(m);
+  c.innerHTML=chips.map((l,ci)=>`<span class="am-chip" data-ci="${ci}">${escapeHtml(l)}</span>`).join('')
+    +`<span class="am-chip am-chip-more" id="ammore-${id}" style="display:none" onclick="event.stopPropagation();gridToggleTagPicker('${id}')"></span>`;
+  requestAnimationFrame(()=>gridFitChips(id));
 }
+// v7.38.1: single-line chip overflow. Show chips until one won't fit, then collapse the rest
+// into a "+N" chip (which opens the picker). Never grows the tile.
+function gridFitChips(id){
+  const c=document.getElementById('amchips-'+id); if(!c) return;
+  const more=document.getElementById('ammore-'+id); if(!more) return;
+  const realChips=[...c.querySelectorAll('.am-chip:not(.am-chip-more)')];
+  // reset: show all, hide +N
+  realChips.forEach(ch=>ch.style.display='');
+  more.style.display='none'; more.textContent='';
+  const avail=c.clientWidth; if(!avail) return;
+  const RESERVE=34; // room for the +N chip
+  let hiddenFrom=-1;
+  for(let i=0;i<realChips.length;i++){
+    const ch=realChips[i];
+    const right=ch.offsetLeft+ch.offsetWidth;
+    // if this chip overflows, and it's not the only chip, start hiding from here
+    const limit = avail - ((i<realChips.length-1)?RESERVE:0);
+    if(right>limit){ hiddenFrom=i; break; }
+  }
+  if(hiddenFrom>=0){
+    // ensure at least one chip stays visible
+    if(hiddenFrom===0) hiddenFrom=1;
+    let hidden=0;
+    for(let i=hiddenFrom;i<realChips.length;i++){ realChips[i].style.display='none'; hidden++; }
+    if(hidden>0){ more.textContent='+'+hidden; more.style.display=''; }
+  }
+}
+function gridFitAllChips(){ document.querySelectorAll('[id^="amchips-"]').forEach(c=>{ const id=c.id.slice('amchips-'.length); gridFitChips(id); }); }
 function gridMarkTileDirty(id){
   const t=document.getElementById('amtile-'+id); if(t) t.classList.toggle('am-dirty', !!gridEdits[id]);
 }
@@ -2184,7 +2233,6 @@ function renderAllModels(){
     const imgAsset = gridImgAsset(m);
     const cached = imgAsset && kbHeadCache[imgAsset];
     const inner = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : `<span class="am-mono">${escapeHtml((m.name[0]||'?').toUpperCase())}</span>`;
-    const sub = SF ? (m[SF.raw]||'—') : '';
     const sc = GRID_SCOPES[gridScope] || {};
     const openFn = sc.interview ? 'openInterviewEditor' : (sc.full ? 'openApprovedEditor' : 'openKanbanModal');
     const dirty = !!gridEdits[m.id];
@@ -2192,32 +2240,40 @@ function renderAllModels(){
     const ratVal = gridRatingValue(m);
     const ratStr = (ratVal!=null && ratVal!=='') ? String(ratVal) : '';
     const chips = gridShootLabels(m); // buffer override → stored labels
-    const chipsHtml = chips.length ? chips.map(l=>`<span class="am-chip">${escapeHtml(l)}</span>`).join('') : '';
+    const chipsHtml = chips.map((l,ci)=>`<span class="am-chip" data-ci="${ci}">${escapeHtml(l)}</span>`).join('');
+    // v7.38.1: show the metric sort value as an extra line ONLY when sorting by a non-date field
+    // (a date sort would just duplicate the DATE CREATED row below).
+    const sortIsDate = (SF && SF.raw==='addedLabel');
+    const metricLine = (SF && !sortIsDate) ? (m[SF.raw]||'—') : '';
+    const dateStr = m.addedLabel || '—';
     return `<div class="am-tile${dirty?' am-dirty':''}" id="amtile-${m.id}" onclick="${openFn}('${m.id}')">
-      <span class="am-caret">▾</span>
       <div class="am-thumb" id="amthumb-${m.id}"${imgAsset?` data-head="${imgAsset}"`:''}>${inner}</div>
       <div class="am-name">${escapeHtml(m.name)}</div>
-      <div class="am-rate-row" onclick="event.stopPropagation()">
-        <span class="am-rate-label">Rating</span>
+      <div class="am-field-row am-rate-row" onclick="event.stopPropagation()">
+        <span class="am-flabel">Rating</span>
         <input type="number" class="am-rate-input" min="1" max="10" step="0.1" value="${escapeHtml(ratStr)}" placeholder="—"
           oninput="gridSetRating('${m.id}', this.value)" onclick="event.stopPropagation()">
       </div>
-      <div class="am-tags-row" onclick="event.stopPropagation()">
-        <div class="am-chips" id="amchips-${m.id}">${chipsHtml}</div>
-        <span class="port-row-wrap">
-          <button type="button" class="am-tag-btn" onclick="event.stopPropagation();gridToggleTagPicker('${m.id}')">+ tag ▾</button>
-          <div class="shoot-picker port-row-picker" id="amtag-picker-${m.id}" onclick="event.stopPropagation()">
-            <input type="text" class="amtag-search" id="amtag-search-${m.id}" placeholder="Search / create…" autocomplete="off"
-              oninput="gridRenderTagList('${m.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();gridTagEnter('${m.id}');}">
-            <div class="shoot-picker-list" id="amtag-list-${m.id}"></div>
-          </div>
-        </span>
+      <div class="am-field-row am-tags-row" onclick="event.stopPropagation()">
+        <span class="am-flabel">Tag</span>
+        <div class="am-chips" id="amchips-${m.id}">${chipsHtml}<span class="am-chip am-chip-more" id="ammore-${m.id}" style="display:none" onclick="event.stopPropagation();gridToggleTagPicker('${m.id}')"></span></div>
+        <button type="button" class="am-tag-btn" onclick="event.stopPropagation();gridToggleTagPicker('${m.id}')" title="Add / edit tags">+</button>
+        <div class="shoot-picker" id="amtag-picker-${m.id}" onclick="event.stopPropagation()">
+          <input type="text" class="amtag-search" id="amtag-search-${m.id}" placeholder="Search / create…" autocomplete="off"
+            oninput="gridRenderTagList('${m.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();gridTagEnter('${m.id}');}">
+          <div class="shoot-picker-list" id="amtag-list-${m.id}"></div>
+        </div>
       </div>
-      ${sub?`<div class="am-sub">${escapeHtml(sub)}</div>`:''}
+      <div class="am-field-row am-date-row">
+        <span class="am-flabel">Date created</span>
+        <span class="am-date-val">${escapeHtml(dateStr)}</span>
+      </div>
+      ${metricLine?`<div class="am-sub">${escapeHtml(SF.label)}: ${escapeHtml(metricLine)}</div>`:''}
     </div>`;
   }).join('');
   gridRenderSaveBar();
   amObserve();
+  requestAnimationFrame(gridFitAllChips);   // v7.38.1: compute +N overflow after layout
 }
 
 // Lazy thumbnails: only fetch photo URLs for tiles as they scroll into view (batched, cached in kbHeadCache).
@@ -2877,7 +2933,7 @@ function qnavSpy(){
   });
 }
 document.getElementById('form-area')?.addEventListener('scroll', qnavSpy, {passive:true});
-document.addEventListener('click', e=>{ if(!e.target.closest('.shoot-picker-wrap')){ closeShootPicker(); closeIvShootPicker(); } if(!e.target.closest('.port-row-wrap')){ closeRowPicker(); document.querySelectorAll('[id^="amtag-picker-"]').forEach(p=>p.classList.remove('open')); } });
+document.addEventListener('click', e=>{ if(!e.target.closest('.shoot-picker-wrap')){ closeShootPicker(); closeIvShootPicker(); } if(!e.target.closest('.port-row-wrap')) closeRowPicker(); if(!e.target.closest('.am-tags-row')) gridCloseAllTagPickers(); });
 
 // ── PORT TO CASTING STACK (v7.13) ──
 // Pushes every 5-APPROVED-scope model carrying a chosen shoot tag into a chosen
@@ -6047,6 +6103,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.38.1: (editable-grid tile fix) Fixes the v7.38 tile UI per testing. The tag picker was rendering but being clipped invisible by the tile's overflow:hidden — tiles now flip to overflow:visible while their picker is open (thumbnail keeps its own clip), and the per-tile picker is anchored tile-wide to the tag row instead of the 280px toolbar width, so tags list and create work. Removed the stray decorative caret. Tile now has three uniform label rows — RATING, TAG, DATE CREATED — matching styles. Tags render on a single line that never grows the tile: chips until they run out of room, then a "+N" chip that opens the picker (which shows the full list with ✓ marks). A metric sort value still shows as an extra line when sorting by height/weight/etc., omitted when sorting by date (would duplicate DATE CREATED).
    v7.38: (editable grid — #5) Grid tiles (All Models + all status scopes) now show and edit the Final rating and shoot tags inline, without opening the model. Under each name: the current rating (Final, falling back to Intake for display) as a 1–10 input, and the shoot-tag chips with a searchable "+ tag" picker (add/remove/create). Edits go into an in-memory buffer (gridEdits) — NOTHING writes to Monday until you click Save. A sticky "N unsaved changes" bar appears above the grid with Save changes / Discard. Save batch-writes each model using the same mutation shapes as the editor (Final rating via change_multiple_column_values; shoot tags via create_labels_if_missing), then remaps new label ids so the grid + sandbox reflect them without a reload. Guards: opening a model that has pending grid edits prompts to save first; switching tabs / leaving the grid / closing the page warns about unsaved grid edits; a board Refresh clears the (now-stale) buffer. loadKanban now also fetches the two rating columns. All client-side.
    v7.37.2: (casting sandbox scope) The sandbox now loads anyone who carries the selected shoot tag regardless of pipeline status, EXCEPT rejected(3)/retired(0)/delete(6)/evernote(11)/duplicate(12). Previously it only loaded approved-group statuses (2/4/105), so a tagged 3-INTERVIEW model wouldn't appear. Empty-state message updated to match.
    v7.37.1: (bugfix) Shoot tags added from the 3-INTERVIEW view were silently dropped on Save — the shoot-tag write in saveRecord was gated to currentMode==='5a' (5-APPROVED) only, so from the interview view (mode '3') it never fired. Widened the gate to fire for any non-'new' view on the main board (full editor 5a/2/4 AND interview 3). Existing-tag load was already correct (shared populateForm), so this only fixes the save.

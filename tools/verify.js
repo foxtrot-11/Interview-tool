@@ -433,5 +433,14 @@ has("['numeric_mm1zjjrp']: val", 'grid saves Final rating column');
 has('gridEdits={};   // v7.38: board reloaded', 'stale grid edits cleared on reload');
 has('|| kbModalDirty() || gridHasEdits()', 'beforeunload warns on grid edits');
 
+/* v7.38.1 asserts: editable-grid tile fix */
+has('v7.38.1:', 'v7.38.1 deploy marker present');
+lacks('<span class="am-caret">', 'stray tile caret removed');
+has('Date created', 'DATE CREATED label row present');
+has('.am-tile.picker-open{overflow:visible', 'tile escapes clip while picker open');
+has('function gridFitChips(', 'chip +N overflow fitter present');
+has('am-chip-more', '+N overflow chip present');
+has('tile.classList.add(\'picker-open\')', 'picker toggle sets picker-open');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
