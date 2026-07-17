@@ -420,5 +420,18 @@ has('const SB_EXCLUDE_STATUS = new Set([3,0,6,11,12])', 'sandbox excludes reject
 has('!SB_EXCLUDE_STATUS.has(m.statusIdx)', 'sandbox filters by exclusion, not approved-only');
 lacks("GRID_SCOPES['5a'].ids.includes(m.statusIdx) && m.f && Array.isArray(m.f.shoot)", 'old approved-only sandbox filter removed');
 
+/* v7.38 asserts: editable grid */
+has('v7.38:', 'v7.38 deploy marker present');
+has('let gridEdits = {}', 'grid edits buffer present');
+has('function gridSetRating(', 'inline rating editor present');
+has('function gridToggleTag(', 'inline shoot-tag editor present');
+has('function gridSaveAll(', 'grid batch save present');
+has('function gridGateOpen(', 'conflict gate present');
+has('numeric_mm1z34ca","numeric_mm1zjjrp"', 'loadKanban fetches rating columns');
+has("rIntake:num('numeric_mm1z34ca'),rFinal:num('numeric_mm1zjjrp')", 'ratings parsed into store');
+has("['numeric_mm1zjjrp']: val", 'grid saves Final rating column');
+has('gridEdits={};   // v7.38: board reloaded', 'stale grid edits cleared on reload');
+has('|| kbModalDirty() || gridHasEdits()', 'beforeunload warns on grid edits');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

@@ -205,6 +205,24 @@
   .am-mono{font-size:36px;color:var(--text-dim);font-weight:700;font-family:var(--font-display)}
   .am-name{padding:7px 9px 2px;font-size:13px;font-weight:600;color:var(--text);line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:34px}
   .am-sub{padding:0 9px 8px;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);min-height:15px}
+  /* v7.38 editable grid */
+  .am-tile.am-dirty{border-color:var(--accent,#a78bfa);box-shadow:inset 3px 0 0 var(--accent,#a78bfa)}
+  .am-rate-row{display:flex;align-items:center;gap:6px;padding:2px 9px 4px}
+  .am-rate-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em}
+  .am-rate-input{width:52px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:3px 6px}
+  .am-rate-input:focus{outline:none;border-color:var(--accent,#a78bfa)}
+  .am-tags-row{display:flex;align-items:flex-start;gap:6px;padding:0 9px 8px;flex-wrap:wrap}
+  .am-chips{display:flex;flex-wrap:wrap;gap:3px;flex:1;min-width:0}
+  .am-chip{font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--text-muted);white-space:nowrap}
+  .am-tag-btn{font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text-muted);padding:2px 7px;cursor:pointer;white-space:nowrap}
+  .am-tag-btn:hover{border-color:var(--accent,#a78bfa);color:var(--text)}
+  .amtag-search{width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;padding:4px 7px;margin-bottom:4px}
+  .grid-save-bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--accent,#a78bfa);border-radius:8px;padding:9px 14px;margin-bottom:12px}
+  .grid-save-bar .gsb-dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#a78bfa);flex:none}
+  .grid-save-bar .gsb-text{font-size:13px;color:var(--text);flex:1}
+  .grid-save-bar .gsb-save{background:var(--accent,#a78bfa);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .grid-save-bar .gsb-save:disabled{opacity:.6;cursor:default}
+  .grid-save-bar .gsb-discard{background:transparent;color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer}
   .am-empty{padding:48px;text-align:center;color:var(--text-muted);font-family:var(--font-mono);font-size:13px}
   /* ── Unsaved-changes dialog ── */
   .unsaved-modal{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center}
@@ -1885,6 +1903,9 @@ let amState={ all:{filters:{},search:'',sort:'date-desc'}, '2':{filters:{},searc
 let approvedFromGrid=false;
 function setGridScope(scope){
   if(gridScope===scope) return;
+  // v7.38: switching tabs would hide pending grid edits — confirm first.
+  if(gridHasEdits() && !confirm('You have unsaved grid changes. Switch tabs and discard them?')) return;
+  if(gridHasEdits()) gridEdits={};
   amState[gridScope]={ filters:amFilters, search:(document.getElementById('am-search')||{}).value||'', sort:(document.getElementById('am-sort')||{}).value||'date-desc' };
   gridScope=scope;
   const st=amState[scope]||(amState[scope]={filters:{},search:'',sort:'date-desc'});
@@ -1958,6 +1979,195 @@ function amUpdateFbtn(key){ const f=AM_FILTERS.find(x=>x.key===key); const b=doc
 function amClearFilters(){ amFilters={}; document.querySelectorAll('#am-filterbtns input[type=checkbox]').forEach(c=>c.checked=false); AM_FILTERS.forEach(f=>amUpdateFbtn(f.key)); const s=document.getElementById('am-search'); if(s) s.value=''; renderAllModels(); }
 function amOnSearch(){ clearTimeout(amSearchTimer); amSearchTimer=setTimeout(renderAllModels,150); }
 
+// ── v7.38: EDITABLE GRID ──────────────────────────────────────────────────────────────────
+// Pending, unsaved tile edits: { [itemId]: { rating?:number|null, shoot?:[labels] } }.
+// Nothing is written to Monday until Save. Tiles with pending edits show a dirty accent.
+let gridEdits = {};
+
+function gridHasEdits(){ return Object.keys(gridEdits).length>0; }
+function gridEditCount(){ return Object.keys(gridEdits).length; }
+
+// Current display/edit value for a model's Final rating: buffer override wins, else stored
+// final, else stored intake (fallback display).
+function gridRatingValue(m){
+  const e=gridEdits[m.id];
+  if(e && 'rating' in e) return e.rating==null?'':e.rating;
+  const f=m.f||{};
+  if(f.rFinal!=null) return f.rFinal;
+  if(f.rIntake!=null) return f.rIntake;
+  return '';
+}
+// Current shoot-tag LABELS for a model: buffer override wins, else stored ids → labels.
+function gridShootLabels(m){
+  const e=gridEdits[m.id];
+  if(e && 'shoot' in e) return e.shoot.slice();
+  const opts=boardDropdownOptions[SHOOT_COL]||[];
+  return ((m.f&&m.f.shoot)||[]).map(id=>{const o=opts.find(x=>Number(x.id)===Number(id));return o?String(o.label):null;}).filter(Boolean);
+}
+function gridModel(id){ return kanbanItems.find(x=>String(x.id)===String(id)); }
+
+// Does a buffered edit actually differ from what's stored? (so we can drop no-op edits)
+function gridEditIsMeaningful(id){
+  const m=gridModel(id), e=gridEdits[id]; if(!m||!e) return false;
+  let diff=false;
+  if('rating' in e){
+    const storedFinal = (m.f&&m.f.rFinal!=null)?m.f.rFinal:null;
+    const now = (e.rating===''||e.rating==null)?null:Number(e.rating);
+    if(now!==storedFinal) diff=true;
+  }
+  if('shoot' in e){
+    const stored=gridShootLabelsStored(m).slice().sort();
+    const now=e.shoot.slice().sort();
+    if(stored.length!==now.length || stored.some((v,i)=>v!==now[i])) diff=true;
+  }
+  return diff;
+}
+function gridShootLabelsStored(m){
+  const opts=boardDropdownOptions[SHOOT_COL]||[];
+  return ((m.f&&m.f.shoot)||[]).map(id=>{const o=opts.find(x=>Number(x.id)===Number(id));return o?String(o.label):null;}).filter(Boolean);
+}
+
+// ---- RATING edit ----
+function gridSetRating(id, raw){
+  const m=gridModel(id); if(!m) return;
+  const val = (raw===''||raw==null) ? '' : Math.max(1, Math.min(10, Number(raw)));
+  gridEdits[id] = gridEdits[id] || {};
+  gridEdits[id].rating = (val===''?null:val);
+  if(!gridEditIsMeaningful(id)) delete gridEdits[id].rating;
+  if(gridEdits[id] && Object.keys(gridEdits[id]).length===0) delete gridEdits[id];
+  gridMarkTileDirty(id);
+  gridRenderSaveBar();
+}
+
+// ---- SHOOT-TAG edit (buffer only; searchable picker per tile) ----
+function gridToggleTagPicker(id){
+  closeRowPicker(); document.querySelectorAll('[id^="amtag-picker-"]').forEach(p=>p.classList.remove('open'));
+  const p=document.getElementById('amtag-picker-'+id); if(!p) return;
+  const open=!p.classList.contains('open'); p.classList.toggle('open',open);
+  if(open){ const s=document.getElementById('amtag-search-'+id); if(s){ s.value=''; s.focus(); } gridRenderTagList(id); }
+}
+function gridTagOptions(){ return (boardDropdownOptions[SHOOT_COL]||[]).map(o=>String(o.label)); }
+function gridRenderTagList(id){
+  const list=document.getElementById('amtag-list-'+id); if(!list) return;
+  const m=gridModel(id); if(!m) return;
+  const sEl=document.getElementById('amtag-search-'+id); const raw=(sEl?sEl.value:'').trim(); const q=raw.toLowerCase();
+  const current=new Set(gridShootLabels(m).map(l=>l.toLowerCase()));
+  const opts=gridTagOptions().filter(l=>!q||l.toLowerCase().includes(q));
+  let html=opts.map(l=>`<div class="shoot-opt${current.has(l.toLowerCase())?' sel':''}" onclick="gridToggleTag('${id}','${encodeURIComponent(l)}')">${current.has(l.toLowerCase())?'✓ ':''}${escapeHtml(l)}</div>`).join('');
+  if(raw && !gridTagOptions().some(l=>l.toLowerCase()===q)) html+=`<div class="shoot-opt create" onclick="gridCreateTag('${id}')">+ Create “${escapeHtml(raw)}”</div>`;
+  list.innerHTML=html||'<div class="shoot-opt dim">no tags yet — type to create</div>';
+}
+function gridToggleTag(id, enc){
+  const label=decodeURIComponent(enc); const m=gridModel(id); if(!m) return;
+  const cur=gridShootLabels(m);
+  const i=cur.findIndex(x=>x.toLowerCase()===label.toLowerCase());
+  if(i>=0) cur.splice(i,1); else cur.push(label);
+  gridEdits[id]=gridEdits[id]||{}; gridEdits[id].shoot=cur;
+  if(!gridEditIsMeaningful(id)) delete gridEdits[id].shoot;
+  if(gridEdits[id] && Object.keys(gridEdits[id]).length===0) delete gridEdits[id];
+  gridRefreshChips(id); gridRenderTagList(id); gridMarkTileDirty(id); gridRenderSaveBar();
+}
+function gridCreateTag(id){
+  const s=document.getElementById('amtag-search-'+id); const t=(s?s.value:'').trim(); if(!t) return;
+  const m=gridModel(id); if(!m) return;
+  const cur=gridShootLabels(m);
+  if(!cur.some(x=>x.toLowerCase()===t.toLowerCase())) cur.push(t);
+  gridEdits[id]=gridEdits[id]||{}; gridEdits[id].shoot=cur;
+  if(s) s.value='';
+  gridRefreshChips(id); gridRenderTagList(id); gridMarkTileDirty(id); gridRenderSaveBar();
+}
+function gridTagEnter(id){
+  const s=document.getElementById('amtag-search-'+id); const raw=(s?s.value:'').trim(); if(!raw) return;
+  const match=gridTagOptions().find(l=>l.toLowerCase()===raw.toLowerCase());
+  if(match) gridToggleTag(id, encodeURIComponent(match)); else gridCreateTag(id);
+}
+function gridRefreshChips(id){
+  const m=gridModel(id); const c=document.getElementById('amchips-'+id); if(!m||!c) return;
+  c.innerHTML=gridShootLabels(m).map(l=>`<span class="am-chip">${escapeHtml(l)}</span>`).join('');
+}
+function gridMarkTileDirty(id){
+  const t=document.getElementById('amtile-'+id); if(t) t.classList.toggle('am-dirty', !!gridEdits[id]);
+}
+
+// ---- SAVE BAR ----
+function gridRenderSaveBar(){
+  let bar=document.getElementById('grid-save-bar');
+  const n=gridEditCount();
+  if(!n){ if(bar) bar.style.display='none'; return; }
+  if(!bar){
+    bar=document.createElement('div'); bar.id='grid-save-bar'; bar.className='grid-save-bar';
+    const grid=document.getElementById('am-grid');
+    if(grid && grid.parentElement) grid.parentElement.insertBefore(bar, grid);
+  }
+  bar.style.display='flex';
+  bar.innerHTML=`<span class="gsb-dot"></span><span class="gsb-text">${n} unsaved change${n===1?'':'s'} on this grid</span>
+    <button type="button" class="gsb-save" onclick="gridSaveAll()">Save changes</button>
+    <button type="button" class="gsb-discard" onclick="gridDiscardAll()">Discard</button>`;
+}
+function gridDiscardAll(){
+  if(!gridHasEdits()) return;
+  if(!confirm('Discard all unsaved grid changes?')) return;
+  gridEdits={}; renderAllModels();
+}
+
+// ---- BATCH SAVE ----
+async function gridSaveAll(){
+  const ids=Object.keys(gridEdits); if(!ids.length) return;
+  const bar=document.getElementById('grid-save-bar');
+  const saveBtn=bar&&bar.querySelector('.gsb-save');
+  if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='Saving…'; }
+  let ok=0, fail=0;
+  const savedShootLabels={}; // id → labels we wrote (for id remap after refreshShootOptions)
+  for(const id of ids){
+    const e=gridEdits[id]; const m=gridModel(id); if(!m||!e){ continue; }
+    try{
+      // Rating (Final) via the same mutation shape saveRecord uses.
+      if('rating' in e){
+        const val = e.rating==null ? '' : String(e.rating);
+        await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+          {i:String(id), b:BOARD_ID, c:JSON.stringify({['numeric_mm1zjjrp']: val})});
+        if(m.f) m.f.rFinal = e.rating==null?null:Number(e.rating);
+      }
+      // Shoot tags via the create_labels_if_missing mutation (same as saveRecord).
+      if('shoot' in e){
+        await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:true){id}}`,
+          {i:String(id), b:BOARD_ID, c:JSON.stringify({[SHOOT_COL]:{labels:e.shoot}})});
+        savedShootLabels[id]=e.shoot.slice();
+      }
+      delete gridEdits[id]; ok++;
+    }catch(err){ console.error('grid save failed for',id,err); fail++; }
+  }
+  // Shoot-tag writes may have created new labels — refresh options, then remap stored ids so
+  // the grid + sandbox reflect the new tags without a full reload.
+  if(Object.keys(savedShootLabels).length){
+    try{ await refreshShootOptions(); }catch(e){}
+    const opts=boardDropdownOptions[SHOOT_COL]||[];
+    for(const id in savedShootLabels){
+      const m=gridModel(id); if(!m||!m.f) continue;
+      m.f.shoot=savedShootLabels[id].map(t=>{const o=opts.find(x=>String(x.label).toLowerCase()===t.toLowerCase());return o?Number(o.id):null;}).filter(v=>v!=null);
+    }
+  }
+  renderAllModels();
+  if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='Save changes'; }
+  showToast(`Saved ${ok} model${ok===1?'':'s'}${fail?`, ${fail} failed`:''}`, fail?'error':'success');
+}
+
+// Conflict guard: if a model has pending grid edits, prompt to save them before opening it in
+// an editor. Returns true if it's safe to proceed with opening.
+async function gridGateOpen(id){
+  if(!gridEdits[id]) return true;
+  const yes = confirm('This model has unsaved grid changes. Save them before opening the editor?\n\nOK = save then open · Cancel = keep editing on the grid');
+  if(!yes) return false;
+  // Save just this one model's edits
+  const only={}; only[id]=gridEdits[id];
+  const saved=gridEdits; gridEdits=only;
+  await gridSaveAll();
+  // restore any other pending edits that weren't for this id
+  for(const k in saved){ if(k!==id) gridEdits[k]=saved[k]; }
+  gridRenderSaveBar();
+  return true;
+}
+
 function renderAllModels(){
   const grid=document.getElementById('am-grid'); if(!grid) return;
   amBuildFilters();
@@ -1977,8 +2187,36 @@ function renderAllModels(){
     const sub = SF ? (m[SF.raw]||'—') : '';
     const sc = GRID_SCOPES[gridScope] || {};
     const openFn = sc.interview ? 'openInterviewEditor' : (sc.full ? 'openApprovedEditor' : 'openKanbanModal');
-    return `<div class="am-tile" onclick="${openFn}('${m.id}')"><span class="am-caret">▾</span><div class="am-thumb" id="amthumb-${m.id}"${imgAsset?` data-head="${imgAsset}"`:''}>${inner}</div><div class="am-name">${escapeHtml(m.name)}</div><div class="am-sub">${escapeHtml(sub)}</div></div>`;
+    const dirty = !!gridEdits[m.id];
+    // v7.38: current Final rating (buffer override → stored final → stored intake fallback)
+    const ratVal = gridRatingValue(m);
+    const ratStr = (ratVal!=null && ratVal!=='') ? String(ratVal) : '';
+    const chips = gridShootLabels(m); // buffer override → stored labels
+    const chipsHtml = chips.length ? chips.map(l=>`<span class="am-chip">${escapeHtml(l)}</span>`).join('') : '';
+    return `<div class="am-tile${dirty?' am-dirty':''}" id="amtile-${m.id}" onclick="${openFn}('${m.id}')">
+      <span class="am-caret">▾</span>
+      <div class="am-thumb" id="amthumb-${m.id}"${imgAsset?` data-head="${imgAsset}"`:''}>${inner}</div>
+      <div class="am-name">${escapeHtml(m.name)}</div>
+      <div class="am-rate-row" onclick="event.stopPropagation()">
+        <span class="am-rate-label">Rating</span>
+        <input type="number" class="am-rate-input" min="1" max="10" step="0.1" value="${escapeHtml(ratStr)}" placeholder="—"
+          oninput="gridSetRating('${m.id}', this.value)" onclick="event.stopPropagation()">
+      </div>
+      <div class="am-tags-row" onclick="event.stopPropagation()">
+        <div class="am-chips" id="amchips-${m.id}">${chipsHtml}</div>
+        <span class="port-row-wrap">
+          <button type="button" class="am-tag-btn" onclick="event.stopPropagation();gridToggleTagPicker('${m.id}')">+ tag ▾</button>
+          <div class="shoot-picker port-row-picker" id="amtag-picker-${m.id}" onclick="event.stopPropagation()">
+            <input type="text" class="amtag-search" id="amtag-search-${m.id}" placeholder="Search / create…" autocomplete="off"
+              oninput="gridRenderTagList('${m.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();gridTagEnter('${m.id}');}">
+            <div class="shoot-picker-list" id="amtag-list-${m.id}"></div>
+          </div>
+        </span>
+      </div>
+      ${sub?`<div class="am-sub">${escapeHtml(sub)}</div>`:''}
+    </div>`;
   }).join('');
+  gridRenderSaveBar();
   amObserve();
 }
 
@@ -2065,7 +2303,7 @@ async function loadKanban(){
   try{
     setLoad('Loading models… (first load can take ~30–60s on a cold start)');
     const dateCol = await resolveDateInputCol();
-    const colIds = ["label","lien_internet","files_mkncw5nm","dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm254xed","dropdown_mkncp6xy","dropdown_mm1by5q0","dropdown_mm1zcar6","color_mm1zk5e2","color_mm1zghx9","text_mknc1sps","text_mm1yx2wg","text_mm1y2znz","dropdown_mkyj8js9"];
+    const colIds = ["label","lien_internet","files_mkncw5nm","dropdown_mm1zzwcg","dropdown_mknbe0p0","dropdown_mm254xed","dropdown_mkncp6xy","dropdown_mm1by5q0","dropdown_mm1zcar6","color_mm1zk5e2","color_mm1zghx9","text_mknc1sps","text_mm1yx2wg","text_mm1y2znz","dropdown_mkyj8js9","numeric_mm1z34ca","numeric_mm1zjjrp"];
     if(dateCol) colIds.push(dateCol);
     const medCol = medHeadCol(); if(medCol) colIds.push(medCol);   // v7.34: small headshot thumbnail
     const colIdsJson = JSON.stringify(colIds);
@@ -2092,15 +2330,17 @@ async function loadKanban(){
         let addedTs = diStr ? Date.parse(diStr) : NaN;
         if(!isFinite(addedTs)) addedTs = Date.parse(it.created_at||'');
         addedTs = isFinite(addedTs) ? addedTs : null;
+        const num=id=>{ const v=pv(id); if(v==null||v==='') return null; const raw=(typeof v==='object')?(v.number??v.value):v; if(raw===''||raw==null) return null; const n=Number(raw); return isFinite(n)?n:null; };
         items.push({id:it.id, name:(it.name||'').trim(), created_at:it.created_at||'', updated_at:it.updated_at||'', statusIdx, notes:'', notesLoaded:false, twUrl, head, medHead,
           addedTs, addedLabel: addedTs ? new Date(addedTs).toISOString().slice(0,10) : '',
-          f:{type:dd('dropdown_mm1zzwcg'),role:dd('dropdown_mknbe0p0'),loc:dd('dropdown_mm254xed'),site:dd('dropdown_mkncp6xy'),sex:dd('dropdown_mm1by5q0'),eth:dd('dropdown_mm1zcar6'),shoot:dd('dropdown_mkyj8js9'),ftm:st('color_mm1zk5e2'),tat:st('color_mm1zghx9')},
+          f:{type:dd('dropdown_mm1zzwcg'),role:dd('dropdown_mknbe0p0'),loc:dd('dropdown_mm254xed'),site:dd('dropdown_mkncp6xy'),sex:dd('dropdown_mm1by5q0'),eth:dd('dropdown_mm1zcar6'),shoot:dd('dropdown_mkyj8js9'),ftm:st('color_mm1zk5e2'),tat:st('color_mm1zghx9'),rIntake:num('numeric_mm1z34ca'),rFinal:num('numeric_mm1zjjrp')},
           hRaw,wRaw,cRaw,hIn:parseHeightIn(hRaw),wLb:parseWeightLb(wRaw),cIn:parseCockIn(cRaw)});
       });
       cursor=page.cursor; pages++;
       setLoad(`Loading models… ${items.length} loaded`);
     } while(cursor && pages<40); // page through the WHOLE board (stops as soon as cursor runs out)
     kanbanItems=items;
+    gridEdits={};   // v7.38: board reloaded — any pending tile edits are now stale
     kbColLoaded={};
     kbLoadedOnce=true;
     loaders.forEach(l=>l.style.display='none');
@@ -2637,7 +2877,7 @@ function qnavSpy(){
   });
 }
 document.getElementById('form-area')?.addEventListener('scroll', qnavSpy, {passive:true});
-document.addEventListener('click', e=>{ if(!e.target.closest('.shoot-picker-wrap')){ closeShootPicker(); closeIvShootPicker(); } if(!e.target.closest('.port-row-wrap')) closeRowPicker(); });
+document.addEventListener('click', e=>{ if(!e.target.closest('.shoot-picker-wrap')){ closeShootPicker(); closeIvShootPicker(); } if(!e.target.closest('.port-row-wrap')){ closeRowPicker(); document.querySelectorAll('[id^="amtag-picker-"]').forEach(p=>p.classList.remove('open')); } });
 
 // ── PORT TO CASTING STACK (v7.13) ──
 // Pushes every 5-APPROVED-scope model carrying a chosen shoot tag into a chosen
@@ -3246,6 +3486,7 @@ async function gateFullEditor(){
 
 // ── 5-APPROVED grid: enter full editor from a tile, Back returns to the grid untouched ──
 async function openApprovedEditor(id){
+  if(!(await gridGateOpen(id))) return;   // v7.38: pending grid edits for this model → save-or-cancel
   approvedFromGrid=true;
   hide('am-view'); activeGrid=null;
   show('selector-bar');
@@ -3270,6 +3511,7 @@ async function backToApprovedGrid(){
 // editor (buildSidebarNav('interview')) instead of the full editor. currentMode is already
 // '3' (setMode set it before showing the grid), so loadCandidate renders the interview view.
 async function openInterviewEditor(id){
+  if(!(await gridGateOpen(id))) return;   // v7.38: pending grid edits for this model → save-or-cancel
   approvedFromGrid=true;
   hide('am-view'); activeGrid=null;
   show('selector-bar');
@@ -3426,6 +3668,7 @@ function toggleNotesExpand(taId,btn){
   else { ta.style.height=''; if(btn) btn.textContent='▾ expand'; }
 }
 async function openKanbanModal(id){
+  if(!(await gridGateOpen(id))) return;   // v7.38: pending grid edits for this model → save-or-cancel
   if(!(await gateKbModal())) return;   // opening over a dirty modal would wipe its edits
   const modal=document.getElementById('kb-modal');
   const body=document.getElementById('kb-modal-body');
@@ -3683,6 +3926,11 @@ async function setMode(mode){
   if(!(await gateKbModal())){ try{const _mm=document.getElementById('mobile-mode-select'); if(_mm) _mm.value=currentMode;}catch(e){} return; }
   kbModalForceClose();
   if(!(await gateFullEditor())){ try{const _mm=document.getElementById('mobile-mode-select'); if(_mm) _mm.value=currentMode;}catch(e){} return; }
+  // v7.38: leaving the grid with pending tile edits — confirm, then discard.
+  if(gridHasEdits()){
+    if(!confirm('You have unsaved grid changes. Leave and discard them?')){ try{const _mm=document.getElementById('mobile-mode-select'); if(_mm) _mm.value=currentMode;}catch(e){} return; }
+    gridEdits={};
+  }
   try{ const _mm=document.getElementById('mobile-mode-select'); if(_mm && _mm.value!==mode) _mm.value=mode; }catch(e){}
   // Switch active board: batch tab → batch board, everything else → main board.
   const wantBoard = (mode === 'batch') ? BATCH_BOARD_ID : MAIN_BOARD_ID;
@@ -4142,7 +4390,7 @@ function maybeShowDraftBanner(id){
 setInterval(()=>{ if(currentItem && isDirty) captureDraft(); }, 30000);
 window.addEventListener('beforeunload', (e)=>{
   if(currentItem && isDirty) captureDraft();
-  if(fullEditorDirty() || kbModalDirty()){ e.preventDefault(); e.returnValue=''; }
+  if(fullEditorDirty() || kbModalDirty() || gridHasEdits()){ e.preventDefault(); e.returnValue=''; }
 });
 
 // ── LOAD CANDIDATE ──
@@ -5799,6 +6047,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.38: (editable grid — #5) Grid tiles (All Models + all status scopes) now show and edit the Final rating and shoot tags inline, without opening the model. Under each name: the current rating (Final, falling back to Intake for display) as a 1–10 input, and the shoot-tag chips with a searchable "+ tag" picker (add/remove/create). Edits go into an in-memory buffer (gridEdits) — NOTHING writes to Monday until you click Save. A sticky "N unsaved changes" bar appears above the grid with Save changes / Discard. Save batch-writes each model using the same mutation shapes as the editor (Final rating via change_multiple_column_values; shoot tags via create_labels_if_missing), then remaps new label ids so the grid + sandbox reflect them without a reload. Guards: opening a model that has pending grid edits prompts to save first; switching tabs / leaving the grid / closing the page warns about unsaved grid edits; a board Refresh clears the (now-stale) buffer. loadKanban now also fetches the two rating columns. All client-side.
    v7.37.2: (casting sandbox scope) The sandbox now loads anyone who carries the selected shoot tag regardless of pipeline status, EXCEPT rejected(3)/retired(0)/delete(6)/evernote(11)/duplicate(12). Previously it only loaded approved-group statuses (2/4/105), so a tagged 3-INTERVIEW model wouldn't appear. Empty-state message updated to match.
    v7.37.1: (bugfix) Shoot tags added from the 3-INTERVIEW view were silently dropped on Save — the shoot-tag write in saveRecord was gated to currentMode==='5a' (5-APPROVED) only, so from the interview view (mode '3') it never fired. Widened the gate to fire for any non-'new' view on the main board (full editor 5a/2/4 AND interview 3). Existing-tag load was already correct (shared populateForm), so this only fixes the save.
    v7.37: (grid/tab tweaks) Five staging-requested changes. (#1) SHOOT TAGS are now available directly in the 3-INTERVIEW view, under General Notes — same shootTags state + Save path as the full editor, searchable add/remove. (#2) The CASTING SANDBOX shoot-tag selector is now a searchable picker (was a plain dropdown). (#3) The "Port shoot tag to Monday" control is retired from the 5-APPROVED grid (porting lives in the CASTING SANDBOX now). (#4) All model grids default to newest-first (by date added / created_at) instead of Name A→Z. (#6) "Port to casting row" now lists CASTING-type rows only (TYPE index 0), excluding CREW. NOTE: the editable-grid feature (inline rating + shoot-tag on tiles with a grid-level save) is intentionally NOT here — it's the separate next release.
