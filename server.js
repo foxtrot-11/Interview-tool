@@ -346,6 +346,52 @@ app.post('/rearrange-photos', dataLimiter, requireAuth, async (req, res) => {
   }
 });
 
+// v7.40: FAST headshot replace. The generic /rearrange-photos re-downloads and re-uploads
+// EVERY photo (headshot + all extras) just to reorder — 30+ serial monday round-trips on a
+// model with many extras, and it churns every extra's asset id (breaking med-thumb pairings).
+// A headshot replace only needs to: put the new headshot in the headshot column and demote
+// the OLD headshot into extras. Existing extras are left untouched — far fewer round-trips
+// AND their asset ids (and med-thumb pairings) survive.
+// Body: { itemId, boardId, newHeadAssetId, oldHeadAssetIds:[] }
+app.post('/replace-headshot-fast', dataLimiter, requireAuth, async (req, res) => {
+  try {
+    const { itemId, boardId, newHeadAssetId, oldHeadAssetIds = [] } = req.body || {};
+    if (!itemId || !boardId || !newHeadAssetId) return res.status(400).json({ error: 'missing itemId, boardId, or newHeadAssetId' });
+    if (!ALLOWED_BOARD_IDS.has(String(boardId))) return res.status(403).json({ error: 'board not permitted' });
+
+    const HEADSHOT_COL = 'files_mkncw5nm';
+    const EXTRAS_COL = 'file_mkp1n4bt';
+
+    // Download bytes we need to move BEFORE clearing (originals must still exist):
+    // the new headshot and each old headshot we'll demote into extras.
+    const newHeadBuf = await downloadAsset(newHeadAssetId);
+    const oldHeadBufs = [];
+    for (const aid of oldHeadAssetIds) oldHeadBufs.push(await downloadAsset(aid));
+
+    // Clear ONLY the headshot column (extras column left as-is — its files & ids survive).
+    await mondayGql(
+      `mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+      { i: String(itemId), b: String(boardId), c: JSON.stringify({ [HEADSHOT_COL]: { clear_all: true } }) }
+    );
+    await new Promise(r => setTimeout(r, 900)); // let the clear settle
+
+    const newHeadId = await uploadBufferToColumn(itemId, HEADSHOT_COL, newHeadBuf);
+    if (!newHeadId) throw new Error('headshot upload returned no asset id');
+
+    // Demote old headshot(s) by APPENDING to extras — uploading to a file column adds without
+    // disturbing the files already there, so existing extras keep their asset ids.
+    const demotedIds = [];
+    for (const b of oldHeadBufs) {
+      const id = await uploadBufferToColumn(itemId, EXTRAS_COL, b);
+      if (id) demotedIds.push(id);
+    }
+
+    res.json({ ok: true, headshotAssetId: newHeadId, demotedExtraAssetIds: demotedIds });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ---- shared helpers ----
 // v7.12: same-origin asset bytes for the headshot recropper. monday's S3 public_url
 // sends no CORS headers, so the browser cannot read pixels from it directly; this

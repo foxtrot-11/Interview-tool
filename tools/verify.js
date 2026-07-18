@@ -366,7 +366,7 @@ has('Promise.allSettled(ivMedThumbJobs)', 'interview extras thumbs run in parall
 has('Promise.allSettled(fvMedThumbJobs)', 'full-view extras thumbs run in parallel (Finding 3)');
 has('Promise.allSettled(nmMedThumbJobs)', 'new-model extras thumbs run in parallel (Finding 3)');
 { const n2=(src.match(/clearExtraMedThumbs\(/g)||[]).length;
-  (n2>=6 ? ok : bad)(`clearExtraMedThumbs wired into all 5 rearrange flows (${n2} refs incl. def)`, `only ${n2}`); }
+  (n2>=5 ? ok : bad)(`clearExtraMedThumbs still guards the flows that DO churn extras (${n2} calls; v7.40 dropped the 2 replace flows to the fast path)`, `only ${n2}`); }
 has("ctx==='fv' ? 'f-dup__of_facebook'", 'scrape falls back to saved Bluesky link when URL empty');
 { const btn=src.indexOf('id="scrape-btn-fv"'), inp=src.indexOf('id="scrape-url-fv"');
   (btn>0 && inp>0 && btn<inp ? ok : bad)('scrape button now left of URL field (fv)', 'button not before input'); }
@@ -438,8 +438,7 @@ has('v7.38.1:', 'v7.38.1 deploy marker present');
 lacks('<span class="am-caret">', 'stray tile caret removed');
 has('Date created', 'DATE CREATED label row present');
 has('.am-tile.picker-open{overflow:visible', 'tile escapes clip while picker open');
-has('function gridFitChips(', 'chip +N overflow fitter present');
-has('am-chip-more', '+N overflow chip present');
+has('function gridToggleTagList(', 'grid tag list popover present');
 has('tile.classList.add(\'picker-open\')', 'picker toggle sets picker-open');
 
 /* v7.39 asserts: rating step + sandbox polish + UX steps */
@@ -452,6 +451,21 @@ has('class="sb-step-num">1<', 'sandbox step 1 present');
 has('class="sb-step-num">4<', 'sandbox step 4 present');
 has('Send to casting row', 'port button relabeled friendly');
 lacks('⇪ Port this arrangement', 'old dense port label removed');
+
+/* v7.40 asserts: grid shoot-tag filter + tag-count + fast headshot + sandbox add-model */
+has('v7.40:', 'v7.40 deploy marker present');
+lacks("label:'Shoot Tags', kind:'dropdown', scope:'5a'", 'shoot-tag filter no longer scope-locked to 5a');
+has("label:'Shoot Tags', kind:'dropdown'}", 'shoot-tag filter present on all grids');
+has('am-tag-count', 'grid tag-count badge present');
+has('function gridToggleTagList(', 'grid tag list popover present');
+has('function replaceHeadshotFast(', 'fast headshot client helper present');
+has('function sbOpenAddPicker(', 'sandbox empty-slot add picker present');
+has('function sbAddPick(', 'sandbox add-model pick handler present');
+has('const SB_EXCLUDE_STATUS = new Set([3,0,6,11,12])', 'sandbox exclude set hoisted to module scope');
+/* server.js */
+{ const srv = fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
+  (srv.includes('/replace-headshot-fast') ? ok : bad)('fast headshot server endpoint present', 'missing /replace-headshot-fast');
+  (srv.includes('[HEADSHOT_COL]: { clear_all: true }') ? ok : bad)('fast endpoint clears only headshot column', 'missing headshot-only clear'); }
 
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
