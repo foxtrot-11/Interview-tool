@@ -484,5 +484,14 @@ has('.kb-chk:has(input:checked)', 'kanban multi restyled as box buttons');
 has('recrop-guide', 'recrop head+shoulders guide present');
 has('function toggleRecropGuide(', 'recrop guide toggle present');
 
+/* v7.42 asserts: sandbox bigger tiles + tile→editor round trip */
+has('v7.42:', 'v7.42 deploy marker present');
+has('width:128px;height:128px', 'sandbox thumb enlarged to 128px');
+has('minmax(320px,1fr)', 'sandbox columns widened');
+has('sb-edit-btn', 'sandbox tile edit button present');
+has('function sbOpenFullEditor(', 'sandbox→full-editor opener present');
+has("editorReturnTo==='sb'", 'back-to-grid returns to sandbox');
+has('let editorReturnTo', 'editorReturnTo state present');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

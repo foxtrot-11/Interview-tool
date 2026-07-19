@@ -141,15 +141,15 @@
   .tb-label{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:0.12em;color:var(--text-muted);text-transform:uppercase;white-space:nowrap}
   .tb-sep{width:1px;height:22px;background:var(--border);margin:0 2px;flex:none}
   /* ── CASTING SANDBOX (v7.17) ── */
-  .mode-btn.sb-btn{border-color:#8657d4;color:#b18ae8}
-  .mode-btn.sb-btn.active{background:#8657d4;color:#fff;border-color:#8657d4}
+  .mode-btn.sb-btn{border-color:#3AA2E0;color:#6cc0ec}
+  .mode-btn.sb-btn.active{background:#3AA2E0;color:#fff;border-color:#3AA2E0}
   .sb-hint{font-size:11px;color:var(--text-muted);line-height:1.5;max-width:900px}
   .sb-saves-list{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-width:0}
   .sb-save-tab{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:4px 12px;font-size:11px;color:var(--text);cursor:pointer;max-width:230px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:inherit}
-  .sb-save-tab:hover{border-color:#8657d4;color:#b18ae8}
+  .sb-save-tab:hover{border-color:#3AA2E0;color:#6cc0ec}
   .sb-saves-empty{font-size:11px;color:var(--text-muted)}
   .sb-save-chip{display:inline-flex;align-items:stretch;border:1px solid var(--border);border-radius:14px;overflow:hidden}
-  .sb-save-chip:hover{border-color:#8657d4}
+  .sb-save-chip:hover{border-color:#3AA2E0}
   .sb-save-chip .sb-save-tab{border:none;border-radius:0;max-width:210px}
   .sb-save-del{border:none;border-left:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;padding:0 9px;font-size:11px}
   .sb-save-del:hover{background:var(--danger);color:#fff}
@@ -158,7 +158,7 @@
   .sb-progress-bar{display:block;height:100%;width:0;background:var(--accent);transition:width .2s ease}
   .sb-progress-txt{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);white-space:nowrap}
   .sb-board{display:block}
-  .sb-cols{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:14px;align-items:start}
+  .sb-cols{display:grid;grid-template-columns:repeat(3,minmax(320px,1fr));gap:14px;align-items:start}
   .sb-colhead{font-family:var(--font-display);font-weight:800;font-size:14px;letter-spacing:0.06em;padding:8px 10px;border:1px solid var(--border);border-radius:8px 8px 0 0;background:var(--surface);display:flex;justify-content:space-between;align-items:center}
   .sb-althead{font-family:var(--font-mono);font-weight:700;font-size:9px;letter-spacing:.14em;color:var(--text-muted);padding:8px 10px 4px;display:flex;justify-content:space-between;align-items:center}
   .sb-altsection{margin-top:0}
@@ -166,17 +166,20 @@
   .sb-zone{border:1px dashed var(--border);border-top:none;padding:8px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;background:rgba(255,255,255,.015);min-height:60px}
   .sb-altzone{border-radius:0 0 8px 8px;background:rgba(134,87,212,.05)}
   .sb-zone.over{border-color:var(--accent);background:rgba(255,120,60,.06)}
-  .sb-slot{position:relative;width:92px;min-height:112px;border:1px dashed transparent;border-radius:8px;display:flex;align-items:flex-start;justify-content:center;padding-top:2px}
+  .sb-slot{position:relative;width:142px;min-height:180px;border:1px dashed transparent;border-radius:8px;display:flex;align-items:flex-start;justify-content:center;padding-top:2px}
   .sb-slot.empty{border-color:var(--border);background:rgba(255,255,255,.02)}
   .sb-slot.empty:hover,.sb-slot.over{border-color:var(--accent);background:rgba(255,120,60,.06)}
   .sb-slotnum{position:absolute;top:2px;left:4px;font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--text-muted);opacity:.7;pointer-events:none;z-index:1}
   .sb-slot.empty .sb-slotnum{position:static;margin:auto;opacity:.5;font-size:11px;letter-spacing:.08em}
   .sb-slot-add{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:10px;color:var(--accent,#3AA2E0);opacity:0;transition:opacity .12s;pointer-events:none}
   .sb-slot.empty:hover .sb-slot-add{opacity:.9}
-  .sb-tile{position:relative;width:86px;cursor:grab;user-select:none;border:2px solid transparent;border-radius:8px;padding:3px;text-align:center}
+  .sb-tile{position:relative;width:134px;cursor:grab;user-select:none;border:2px solid transparent;border-radius:8px;padding:3px;text-align:center}
   .sb-tile:active{cursor:grabbing}
   .sb-tile.sel{border-color:var(--accent);background:rgba(255,120,60,.10)}
   .sb-note-caret{position:absolute;top:3px;right:3px;width:28px;height:28px;line-height:26px;padding:0;border-radius:7px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;cursor:pointer;opacity:.95;transition:transform .1s}
+  /* v7.42: open-full-editor button, bottom-right of each sandbox tile */
+  .sb-edit-btn{position:absolute;top:103px;right:6px;width:28px;height:28px;line-height:26px;padding:0;border-radius:7px;border:1.5px solid var(--accent,#3AA2E0);background:var(--surface2);color:var(--accent,#3AA2E0);font-size:14px;cursor:pointer;opacity:.92;transition:transform .1s}
+  .sb-edit-btn:hover{transform:scale(1.12);background:var(--accent,#3AA2E0);color:#fff}
   /* v7.40: empty-slot add-model picker */
   .sb-addpick{position:fixed;z-index:200;background:var(--surface2);border:1px solid var(--accent,#3AA2E0);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);padding:10px;display:none}
   .sb-addpick-head{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px}
@@ -216,12 +219,13 @@
   .sb-note-caret.note-none{background:#f4f4f5;border-color:#d4d4d8;color:#3f3f46}       /* white — nothing logged */
   .sb-note-caret.note-partial{background:#f5c518;border-color:#d9a800;color:#3a2f00}    /* yellow — one field */
   .sb-note-caret.note-both{background:#2ea043;border-color:#238636;color:#fff}         /* green — pay + dates */
-  .sb-thumb{width:80px;height:80px;border-radius:6px;overflow:hidden;background:var(--surface);margin:0 auto}
+  .sb-thumb{width:128px;height:128px;border-radius:6px;overflow:hidden;background:var(--surface);margin:0 auto}
   .sb-thumb img{width:100%;height:100%;object-fit:cover;pointer-events:none}
-  .sb-name{font-size:10px;line-height:1.25;margin-top:3px;word-break:break-word;max-height:26px;overflow:hidden}
+  .sb-name{font-size:12px;line-height:1.25;margin-top:4px;word-break:break-word;max-height:32px;overflow:hidden}
   .port-name-input{background:var(--surface);border:1px solid var(--border);border-radius:5px;color:inherit;font:inherit;font-size:12px;padding:2px 6px;width:130px}
   .port-name-input:focus{border-color:var(--accent);outline:none}
-  @media (max-width:760px){ .sb-cols{grid-template-columns:1fr} }
+  @media (max-width:1100px){ .sb-cols{grid-template-columns:repeat(3,320px);overflow-x:auto} }
+  @media (max-width:760px){ .sb-cols{grid-template-columns:1fr;overflow-x:visible} }
   #am-filterbtns{display:contents}
   .am-fwrap{position:relative}
   .am-fbtn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:7px 10px;font-family:var(--font-mono);font-size:11px;cursor:pointer;white-space:nowrap}
@@ -3333,7 +3337,7 @@ async function renderSandbox(){
     const hasPay=!!(nt&&nt.pay&&String(nt.pay).trim()), hasDates=!!(nt&&nt.dates&&String(nt.dates).trim());
     const noteState = (hasPay&&hasDates)?'both':((hasPay||hasDates)?'partial':'none'); // v7.39: white / yellow / green
     const noteTitle = noteState==='both'?'Pay + dates logged — click to edit':(noteState==='partial'?'Missing pay or dates — click to complete':'Add pay / dates');
-    return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret note-${noteState}" title="${noteTitle}" onclick="sbOpenNote(event,'${id}')">▾</button></div>`; };
+    return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret note-${noteState}" title="${noteTitle}" onclick="sbOpenNote(event,'${id}')">▾</button><button type="button" class="sb-edit-btn" title="Open full editor" onclick="sbOpenFullEditor(event,'${id}')">✎</button></div>`; };
   // A zone renders as fixed numbered slots (main ≥8, alt ≥4). Slot position = subitem number at Port.
   const slots=(z,alt)=>{ const ids=sbState.zones[z]||[]; const n=Math.max(alt?SB_ALT_MIN:SB_MIN_SLOTS, ids.length); let h='';
     for(let i=0;i<n;i++){ const id=ids[i]; const lbl=alt?'ALT':(SB_TYPE[z].slice(0,1)+(i+1));
@@ -3814,6 +3818,28 @@ async function gateFullEditor(){
 }
 
 // ── 5-APPROVED grid: enter full editor from a tile, Back returns to the grid untouched ──
+// v7.42: open the FULL editor from a Casting Sandbox tile, remembering to return to the sandbox.
+// Always the full editor (not the interview view) regardless of the model's status, since the
+// sandbox is cross-status and the user wants full info. sbState is module-level and untouched by
+// the editor, so the arrangement is intact on return.
+let editorReturnTo=null;   // null → normal grid; 'sb' → Casting Sandbox
+let sbReturnScroll=0;
+async function sbOpenFullEditor(e, id){
+  if(e){ e.stopPropagation(); }
+  sbReturnScroll = window.scrollY||0;
+  editorReturnTo='sb';
+  hide('sb-view');
+  show('selector-bar');
+  const bb=document.getElementById('back-to-grid-btn'); if(bb) bb.style.display='';
+  approvedFromGrid=true;
+  buildSidebarNav('full');
+  // force the FULL editor path: loadCandidate renders the interview view only when currentMode==='3',
+  // so temporarily treat this as the approved/full editor.
+  const prevMode=currentMode; currentMode='5a';
+  loadCandidatesForMode('5a');
+  await loadCandidate(id);
+  currentMode=prevMode;   // restore so the sandbox tab stays logically current for return
+}
 async function openApprovedEditor(id){
   if(!(await gridGateOpen(id))) return;   // v7.38: pending grid edits for this model → save-or-cancel
   approvedFromGrid=true;
@@ -3832,6 +3858,15 @@ async function backToApprovedGrid(){
   hide('selector-bar'); hide('empty-state');
   buildSidebarNav('blank');
   document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
+  // v7.42: if we came from the Casting Sandbox, return there with the arrangement intact.
+  if(editorReturnTo==='sb'){
+    editorReturnTo=null;
+    activeGrid='sb';
+    show('sb-view');
+    renderSandbox();   // sbState is unchanged; sbSyncMembership reconciles any status/tag edits
+    window.scrollTo(0, sbReturnScroll||0);
+    return;
+  }
   activeGrid='am';
   show('am-view');
   renderAllModels();   // gridScope is unchanged, so this returns to whichever grid we came from
@@ -6387,7 +6422,8 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
-   v7.41: (theme + quick-UI batch) Eight changes. (1) App accent recolored from purple to logo blue (#3AA2E0) everywhere — the AI-app purple and kanban chrome; Monday's own data-label colors (status pills etc., which mirror Monday's #9d50dd "color 4") are intentionally left unchanged so the app stays in sync with Monday. (2) "Scrape photos" button is now yellow so it stands out. (3) "Copy link" now sits directly beside "Back to grid" (wrapped in one flex group) instead of floating mid-toolbar. (4) Grid tag popovers now close on any outside click (capture-phase handler that defeats inner stopPropagation) and on Escape; the read-only tag list gained a "+ Add tag" footer that opens the add/create picker in place. (5) Metric/imperial: clearer warning that distinguishes an out-of-plausible-range value (e.g. "250 cm is outside 120–230 cm") from an unparseable one, value still saved; the six measurement fields are now grouped into three paired imperial|metric rows so each pair shares a line; a WHITE outline marks whichever side was the source of truth (live as you type, inferred on load via exact round-trip). (6) Kanban modal multi-selects restyled from raw checkboxes to the app's box-button look (native checkbox hidden, state via :has — value collection unchanged). (7) Recrop headshot gained a passport-style head+shoulders guide overlay (toggleable) to standardize crops. (8) Confirmed all grids default to newest-first. Client-only.
+   v7.42: (Casting Sandbox: bigger tiles + tile→full-editor round trip) Two changes, client-only. (1) Sandbox tiles are now gallery-sized — thumbnails 80px→128px, tiles/slots and name text scaled up to match the normal grids; the three columns keep their layout and scroll horizontally on narrower windows rather than cramping. (2) Each sandbox tile has a small ✎ button (bottom-right of the thumbnail) that opens the SAME full editor used in 5-APPROVED — always the full editor regardless of the model's status, so you get complete info and a working Save. Hitting "← Back to grid" returns you straight to the Casting Sandbox with the exact same arrangement (shoot tag, zones, pay/dates notes), scrolled back to where you were. The arrangement lives in memory (sbState) and is never reset by opening/closing the editor, so you can open a tile, edit + Save, come back, rearrange, open another, and only hit "Save state" at the very end. NOTE: two independent save concepts remain — the editor's Save writes that model's data to Monday; the sandbox "Save state" persists the arrangement — they don't clobber each other. NOTE: if you remove a model's shoot tag or set an excluded status (rejected/retired/etc.) inside the editor, that model correctly drops off the sandbox on return (membership is reconciled), which is expected, not a bug.
+   v7.41: (theme + quick-UI batch) Eight changes. (1) App accent recolored from purple to logo blue (#3AA2E0) everywhere — the AI-app purple, kanban chrome, and the CASTING SANDBOX tab + sandbox save-tab hovers; Monday's own data-label colors (status pills etc., which mirror Monday's #9d50dd "color 4") are intentionally left unchanged so the app stays in sync with Monday. (2) "Scrape photos" button is now yellow so it stands out. (3) "Copy link" now sits directly beside "Back to grid" (wrapped in one flex group) instead of floating mid-toolbar. (4) Grid tag popovers now close on any outside click (capture-phase handler that defeats inner stopPropagation) and on Escape; the read-only tag list gained a "+ Add tag" footer that opens the add/create picker in place. (5) Metric/imperial: clearer warning that distinguishes an out-of-plausible-range value (e.g. "250 cm is outside 120–230 cm") from an unparseable one, value still saved; the six measurement fields are now grouped into three paired imperial|metric rows so each pair shares a line; a WHITE outline marks whichever side was the source of truth (live as you type, inferred on load via exact round-trip). (6) Kanban modal multi-selects restyled from raw checkboxes to the app's box-button look (native checkbox hidden, state via :has — value collection unchanged). (7) Recrop headshot gained a passport-style head+shoulders guide overlay (toggleable) to standardize crops. (8) Confirmed all grids default to newest-first. Client-only.
    v7.40: (grid shoot-tag filter + tag-count tiles + fast headshot + sandbox add-model) Four changes. (A) The "Shoot Tags" filter dropdown is now available on EVERY grid (was only 5-APPROVED) — filter any grid to selected shoot tags. (B) Grid tiles no longer list tiny tag chips; the TAG row shows a count ("3 tags" / "No tags") that opens a read-only list popover on click, while the + button still opens the add/edit picker. (C) Headshot replace is much faster: new server endpoint /replace-headshot-fast rewrites ONLY the headshot column and appends the old headshot to extras, leaving existing extras (and their med-thumb pairings) untouched — instead of /rearrange-photos re-downloading and re-uploading every photo (30+ serial round-trips on models with many extras). Both interview and full-view replace paths use it; their clearExtraMedThumbs calls are removed since extras are preserved. (D) Casting Sandbox: clicking an empty slot (with nothing selected) opens a searchable list of ALL eligible models (same exclude set: not rejected/retired/delete/evernote/dup, minus anyone already placed); picking one drops it into the slot AND writes the current shoot tag onto that one model on Monday immediately — a per-model save distinct from "Save state"/"Send to casting row", so you never leave the sandbox to tag someone. TWO-FILE release (server.js + index.html).
    v7.39: (grid rating step + sandbox polish + sandbox UX overhaul) (1) The grid Rating input's spinner/arrows now step by whole integers (step=1) while still accepting typed decimals like 7.5. (2) The Casting Sandbox pay/dates caret on each tile is bigger and color-coded: grey = nothing logged, yellow = one of pay/dates filled, green = both — so incomplete cards are obvious at a glance. (3) Casting Sandbox toolbar redesigned into four numbered steps (Pick a shoot tag → Arrange the cast → Save/share → Send to a casting row) with plain-language descriptions and bigger, friendlier buttons, since the old dense filter-style toolbar confused less technical coworkers. Takes more vertical space by design (this view isn't mobile-first). No logic changed — same functions wired to the restyled buttons.
    v7.38.1: (editable-grid tile fix) Fixes the v7.38 tile UI per testing. The tag picker was rendering but being clipped invisible by the tile's overflow:hidden — tiles now flip to overflow:visible while their picker is open (thumbnail keeps its own clip), and the per-tile picker is anchored tile-wide to the tag row instead of the 280px toolbar width, so tags list and create work. Removed the stray decorative caret. Tile now has three uniform label rows — RATING, TAG, DATE CREATED — matching styles. Tags render on a single line that never grows the tile: chips until they run out of room, then a "+N" chip that opens the picker (which shows the full list with ✓ marks). A metric sort value still shows as an extra line when sorting by height/weight/etc., omitted when sorting by date (would duplicate DATE CREATED).
