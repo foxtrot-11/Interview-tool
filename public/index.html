@@ -16,7 +16,7 @@
   :root {
     --bg:#0d0d0f;--surface:#141416;--surface2:#1c1c1f;
     --border:#2a2a2e;--border-active:#5a5a6e;
-    --accent:#c8b4ff;--accent2:#ff7eb3;--accent3:#7ef4c8;
+    --accent:#3AA2E0;--accent2:#ff7eb3;--accent3:#7ef4c8;
     --text:#e8e8f0;--text-muted:#8b8ba0;--text-dim:#74748a;
     --success:#4ade80;--warning:#facc15;--danger:#f87171;
     --radius:6px;--font-display:'Myriad Pro','Source Sans 3',sans-serif;--font-mono:'DM Mono',monospace;
@@ -33,8 +33,8 @@
   .scrape-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
   .scrape-input{flex:1;min-width:240px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px}
   .scrape-input:focus{border-color:var(--accent);outline:none}
-  .fv-scrape-btn{background:var(--surface2);border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:8px 16px;font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
-  .fv-scrape-btn:hover{background:var(--accent);color:#fff}
+  .fv-scrape-btn{background:var(--surface2);border:1px solid #f5c518;color:#f5c518;border-radius:6px;padding:8px 16px;font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+  .fv-scrape-btn:hover{background:#f5c518;color:#3a2f00}
   .fv-scrape-btn:disabled{opacity:.5;cursor:default}
   .scrape-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;max-height:60vh;overflow:auto;margin-top:6px}
   .scrape-cell{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);display:flex;flex-direction:column}
@@ -107,7 +107,7 @@
   .dup-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px}
   /* ── KANBAN ── */
   .mode-btn.active[data-mode="all"]{background:#e8e8f0;color:#111}
-  .mode-btn.active[data-mode="kanban"]{background:#9d50dd;color:#fff}
+  .mode-btn.active[data-mode="kanban"]{background:#3AA2E0;color:#fff}
   .kanban-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
   .kb-col{flex:0 0 300px;width:300px;min-width:0;overflow:hidden;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;max-height:calc(100vh - 230px)}
   .kb-col-head{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:0.04em;color:#111;padding:10px 12px;border-radius:7px 7px 0 0}
@@ -171,14 +171,14 @@
   .sb-slot.empty:hover,.sb-slot.over{border-color:var(--accent);background:rgba(255,120,60,.06)}
   .sb-slotnum{position:absolute;top:2px;left:4px;font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--text-muted);opacity:.7;pointer-events:none;z-index:1}
   .sb-slot.empty .sb-slotnum{position:static;margin:auto;opacity:.5;font-size:11px;letter-spacing:.08em}
-  .sb-slot-add{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:10px;color:var(--accent,#a78bfa);opacity:0;transition:opacity .12s;pointer-events:none}
+  .sb-slot-add{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:10px;color:var(--accent,#3AA2E0);opacity:0;transition:opacity .12s;pointer-events:none}
   .sb-slot.empty:hover .sb-slot-add{opacity:.9}
   .sb-tile{position:relative;width:86px;cursor:grab;user-select:none;border:2px solid transparent;border-radius:8px;padding:3px;text-align:center}
   .sb-tile:active{cursor:grabbing}
   .sb-tile.sel{border-color:var(--accent);background:rgba(255,120,60,.10)}
   .sb-note-caret{position:absolute;top:3px;right:3px;width:28px;height:28px;line-height:26px;padding:0;border-radius:7px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;cursor:pointer;opacity:.95;transition:transform .1s}
   /* v7.40: empty-slot add-model picker */
-  .sb-addpick{position:fixed;z-index:200;background:var(--surface2);border:1px solid var(--accent,#a78bfa);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);padding:10px;display:none}
+  .sb-addpick{position:fixed;z-index:200;background:var(--surface2);border:1px solid var(--accent,#3AA2E0);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);padding:10px;display:none}
   .sb-addpick-head{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px}
   .sb-addpick-sub{font-size:11px;font-weight:400;color:var(--text-muted);margin:2px 0 6px;line-height:1.4}
   #sb-addpick-search{width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:7px 9px;margin-bottom:6px}
@@ -189,13 +189,13 @@
   .sb-addpick-role{font-size:10px;color:var(--text-dim);font-family:var(--font-mono);white-space:nowrap}
   .sb-addpick-empty{font-size:12px;color:var(--text-dim);padding:10px 9px}
   .sb-addpick-cancel{margin-top:8px;width:100%;background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--text-muted);font-size:12px;padding:7px;cursor:pointer}
-  .sb-addpick-cancel:hover{border-color:var(--accent,#a78bfa);color:var(--text)}
+  .sb-addpick-cancel:hover{border-color:var(--accent,#3AA2E0);color:var(--text)}
   /* v7.39: stepped sandbox toolbar */
   .sb-toolbar{padding-bottom:6px}
   .sb-intro{font-size:14px;color:var(--text-muted);margin:4px 2px 14px;line-height:1.5;max-width:900px}
   .sb-step{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--border)}
   .sb-step:first-of-type{border-top:none}
-  .sb-step-num{flex:none;width:30px;height:30px;border-radius:50%;background:var(--accent,#a78bfa);color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .sb-step-num{flex:none;width:30px;height:30px;border-radius:50%;background:var(--accent,#3AA2E0);color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
   .sb-step-body{flex:1;min-width:0}
   .sb-step-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:2px}
   .sb-optional{font-size:12px;font-weight:500;color:var(--text-dim)}
@@ -205,11 +205,11 @@
   .sb-btn:hover{transform:translateY(-1px)}
   .sb-btn-pick{min-width:210px;text-align:left;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .sb-btn-soft{background:var(--surface2);color:var(--text)}
-  .sb-btn-soft:hover{border-color:var(--accent,#a78bfa)}
-  .sb-btn-primary{background:var(--accent,#a78bfa);border-color:var(--accent,#a78bfa);color:#fff;font-size:15px;padding:11px 22px}
+  .sb-btn-soft:hover{border-color:var(--accent,#3AA2E0)}
+  .sb-btn-primary{background:var(--accent,#3AA2E0);border-color:var(--accent,#3AA2E0);color:#fff;font-size:15px;padding:11px 22px}
   .sb-btn-primary:hover{filter:brightness(1.08)}
   .sb-mini-btn{font-size:15px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text-muted);cursor:pointer}
-  .sb-mini-btn:hover{border-color:var(--accent,#a78bfa);color:var(--text)}
+  .sb-mini-btn:hover{border-color:var(--accent,#3AA2E0);color:var(--text)}
   .sb-saves-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)}
   .sb-saves-label{font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em}
   .sb-note-caret:hover{transform:scale(1.12)}
@@ -245,34 +245,36 @@
   .am-name{padding:7px 9px 2px;font-size:13px;font-weight:600;color:var(--text);line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:34px}
   .am-sub{padding:0 9px 8px;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);min-height:15px}
   /* v7.38 / v7.38.1 editable grid */
-  .am-tile.am-dirty{border-color:var(--accent,#a78bfa);box-shadow:inset 3px 0 0 var(--accent,#a78bfa)}
+  .am-tile.am-dirty{border-color:var(--accent,#3AA2E0);box-shadow:inset 3px 0 0 var(--accent,#3AA2E0)}
   .am-tile.picker-open{overflow:visible;z-index:40}          /* escape clip so the tag picker is visible */
   .am-thumb{border-radius:7px 7px 0 0}                        /* keep rounded top corners when tile overflow is visible */
   .am-field-row{display:flex;align-items:center;gap:8px;padding:2px 9px}
   .am-field-row:first-of-type{padding-top:4px}
   .am-flabel{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;flex:none;width:70px}
   .am-rate-input{width:52px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:3px 6px}
-  .am-rate-input:focus{outline:none;border-color:var(--accent,#a78bfa)}
+  .am-rate-input:focus{outline:none;border-color:var(--accent,#3AA2E0)}
   .am-tags-row{position:relative;padding-bottom:2px}
   .am-tag-count{font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:2px 9px;color:var(--text);cursor:pointer;flex:none}
-  .am-tag-count:hover{border-color:var(--accent,#a78bfa)}
+  .am-tag-count:hover{border-color:var(--accent,#3AA2E0)}
   .am-tag-count.empty{color:var(--text-dim);cursor:default}
   .am-tag-btn{font-size:13px;line-height:1;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text-muted);padding:2px 8px;cursor:pointer;flex:none}
-  .am-tag-btn:hover{border-color:var(--accent,#a78bfa);color:var(--text)}
+  .am-tag-btn:hover{border-color:var(--accent,#3AA2E0);color:var(--text)}
   .am-taglist-pop{position:absolute;top:calc(100% + 2px);left:9px;right:9px;width:auto;min-width:0;z-index:80;display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px;max-height:180px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)}
   .am-taglist-pop.open{display:block}
   .am-taglist-head{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);padding:2px 6px 4px}
   .am-taglist-item{font-size:12px;color:var(--text);padding:4px 6px;border-radius:4px}
   .am-taglist-item.dim{color:var(--text-dim)}
+  .am-taglist-add{font-size:12px;color:var(--accent,#3AA2E0);padding:6px;border-radius:4px;cursor:pointer;border-top:1px solid var(--border);margin-top:4px;text-align:center}
+  .am-taglist-add:hover{background:var(--surface)}
   .am-date-row{padding-bottom:8px}
   .am-date-val{font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
   /* per-tile tag picker: anchored to the tag row, tile-wide (overrides the 280px toolbar picker) */
   .am-tags-row .shoot-picker{position:absolute;top:calc(100% + 2px);left:9px;right:9px;width:auto;min-width:0;z-index:80}
   .amtag-search{width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;padding:4px 7px;margin-bottom:4px}
-  .grid-save-bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--accent,#a78bfa);border-radius:8px;padding:9px 14px;margin-bottom:12px}
-  .grid-save-bar .gsb-dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#a78bfa);flex:none}
+  .grid-save-bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--accent,#3AA2E0);border-radius:8px;padding:9px 14px;margin-bottom:12px}
+  .grid-save-bar .gsb-dot{width:8px;height:8px;border-radius:50%;background:var(--accent,#3AA2E0);flex:none}
   .grid-save-bar .gsb-text{font-size:13px;color:var(--text);flex:1}
-  .grid-save-bar .gsb-save{background:var(--accent,#a78bfa);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .grid-save-bar .gsb-save{background:var(--accent,#3AA2E0);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer}
   .grid-save-bar .gsb-save:disabled{opacity:.6;cursor:default}
   .grid-save-bar .gsb-discard{background:transparent;color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer}
   .am-empty{padding:48px;text-align:center;color:var(--text-muted);font-family:var(--font-mono);font-size:13px}
@@ -303,6 +305,10 @@
   .recrop-stage{position:relative;align-self:center;user-select:none;touch-action:none;overflow:hidden}
   .recrop-stage img{display:block;max-width:min(84vw,820px);max-height:62vh;pointer-events:none}
   .recrop-box{position:absolute;border:2px dashed var(--accent);box-shadow:0 0 0 9999px rgba(0,0,0,.55);cursor:move;touch-action:none}
+  /* v7.41 (41.7): head+shoulders crop guide */
+  .recrop-guide{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .recrop-guide ellipse,.recrop-guide line,.recrop-guide path{stroke:rgba(255,255,255,.65);stroke-width:1;fill:none;vector-effect:non-scaling-stroke}
+  .recrop-guide.off{display:none}
   .recrop-handle{position:absolute;right:-8px;bottom:-8px;width:16px;height:16px;background:var(--accent);border-radius:3px;cursor:nwse-resize;touch-action:none}
   .recrop-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   /* ── Shoot tag boxes + searchable picker (v7.12) ── */
@@ -362,8 +368,11 @@
   .kb-sec:first-of-type{margin-top:2px}
   .kb-sec-title{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:0.08em;color:var(--accent);text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
   .kb-checks{display:flex;flex-wrap:wrap;gap:6px}
-  .kb-chk{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:6px 10px;font-size:11px;color:var(--text);cursor:pointer;text-transform:none;letter-spacing:normal}
-  .kb-chk input{margin:0}
+  /* v7.41 (41.6): match the compat-btn box-button look used elsewhere instead of raw checkboxes */
+  .kb-chk{display:inline-flex;align-items:center;background:var(--bg);border:2px solid var(--border);border-radius:6px;padding:5px 11px;font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text-muted);cursor:pointer;text-transform:none;letter-spacing:normal;transition:all .12s;user-select:none}
+  .kb-chk:hover{border-color:var(--accent,#3AA2E0)}
+  .kb-chk input{position:absolute;opacity:0;width:0;height:0;margin:0;pointer-events:none}
+  .kb-chk:has(input:checked){background:var(--accent,#3AA2E0);border-color:var(--accent,#3AA2E0);color:#fff}
   .kb-savebar{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--border);margin-top:24px;padding:14px 0;display:flex;align-items:center;gap:12px}
   .kb-modal-close{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:16px;cursor:pointer}
   .kb-modal-close:hover{border-color:var(--danger);color:var(--danger)}
@@ -555,6 +564,11 @@
 
   /* FIELD GRID */
   .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  /* v7.41 (41.5): paired imperial|metric measurement rows */
+  .meas-pairs{display:flex;flex-direction:column;gap:14px}
+  .meas-pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:8px;border:1px dashed var(--border);border-radius:8px}
+  .meas-legend{font-size:11px;color:var(--text-dim);margin-bottom:8px}
+  .meas-src{border:2px solid #fff !important}
   .field-grid.single{grid-template-columns:1fr}
   .field-grid.triple{grid-template-columns:1fr 1fr 1fr}
   .field-full{grid-column:1/-1}
@@ -881,8 +895,10 @@
         </div>
         <div class="status-dd-menu" id="status-dd-menu"></div>
       </div>
-      <button class="dup-refresh-btn" id="back-to-grid-btn" style="display:none" onclick="backToApprovedGrid()">← Back to grid</button>
-      <button class="dup-refresh-btn" id="copy-model-link-btn" style="display:none" onclick="copyModelLink()" title="Copy a link that opens this model's page">🔗 Copy link</button>
+      <span style="display:flex;gap:8px;align-items:center">
+        <button class="dup-refresh-btn" id="back-to-grid-btn" style="display:none" onclick="backToApprovedGrid()">← Back to grid</button>
+        <button class="dup-refresh-btn" id="copy-model-link-btn" style="display:none" onclick="copyModelLink()" title="Copy a link that opens this model's page">🔗 Copy link</button>
+      </span>
       <button class="save-btn" id="save-btn" onclick="saveAll()" disabled style="margin-left:auto">Save Changes</button>
       <div id="save-progress-bar" style="display:none;position:absolute;bottom:0;left:0;height:3px;background:var(--accent);border-radius:2px;width:0%;transition:width 0.3s ease"></div>
     </div>
@@ -1059,12 +1075,23 @@
       <div class="section" id="fs-3">
         <div class="section-header"><div class="section-title">Physical</div><div class="section-count">4/7</div></div>
         <div class="field-grid triple">
-          <div class="field"><div class="field-label">Height</div><input type="text" id="f-text_mknc1sps" placeholder='5&apos;11"' oninput="markDirty()"></div>
-          <div class="field"><div class="field-label">Height (metric)</div><input type="text" id="f-metric_h" placeholder="185 cm" oninput="markDirty()"></div>
-          <div class="field"><div class="field-label">Weight</div><input type="text" id="f-text_mm1yx2wg" placeholder="175 lbs" oninput="markDirty()"></div>
-          <div class="field"><div class="field-label">Weight (metric)</div><input type="text" id="f-metric_w" placeholder="70 kg" oninput="markDirty()"></div>
-          <div class="field"><div class="field-label">Cock Size</div><input type="text" id="f-text_mm1y2znz" placeholder='7"' oninput="markDirty()"></div>
-          <div class="field"><div class="field-label">Cock Size (metric)</div><input type="text" id="f-metric_c" placeholder="17 cm" oninput="markDirty()"></div>
+          <div class="field meas-pair-cell" style="grid-column:1/-1">
+            <div class="meas-legend">White outline = the value as originally entered; its twin is auto-converted.</div>
+            <div class="meas-pairs">
+              <div class="meas-pair">
+                <div class="field"><div class="field-label">Height</div><input type="text" id="f-text_mknc1sps" placeholder='5&apos;11"' oninput="markDirty();measMarkSrc('h','us')"></div>
+                <div class="field"><div class="field-label">Height (metric)</div><input type="text" id="f-metric_h" placeholder="185 cm" oninput="markDirty();measMarkSrc('h','met')"></div>
+              </div>
+              <div class="meas-pair">
+                <div class="field"><div class="field-label">Weight</div><input type="text" id="f-text_mm1yx2wg" placeholder="175 lbs" oninput="markDirty();measMarkSrc('w','us')"></div>
+                <div class="field"><div class="field-label">Weight (metric)</div><input type="text" id="f-metric_w" placeholder="70 kg" oninput="markDirty();measMarkSrc('w','met')"></div>
+              </div>
+              <div class="meas-pair">
+                <div class="field"><div class="field-label">Cock Size</div><input type="text" id="f-text_mm1y2znz" placeholder='7"' oninput="markDirty();measMarkSrc('c','us')"></div>
+                <div class="field"><div class="field-label">Cock Size (metric)</div><input type="text" id="f-metric_c" placeholder="17 cm" oninput="markDirty();measMarkSrc('c','met')"></div>
+              </div>
+            </div>
+          </div>
           <div class="field"><div class="field-label">Hair Color</div><input type="text" id="f-text_mkncjzx8" placeholder="Brown" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Eye Color</div><input type="text" id="f-text_mkncsqaq" placeholder="Blue" oninput="markDirty()"></div>
           <div class="field"><div class="field-label">Cut vs Uncut</div><div class="custom-select-wrap"><div class="custom-select-display" id="display-dropdown_mkx04tbr" onclick="event.stopPropagation();toggleCustom('dropdown_mkx04tbr',true)"><span class="custom-placeholder">Select...</span></div><span class="select-chevron">▾</span><div class="custom-dropdown" id="dropdown-dropdown_mkx04tbr"></div></div></div>
@@ -1602,11 +1629,21 @@
         <div class="recrop-hint">Drag the box to reposition · drag the corner handle to resize · the square becomes the new headshot. The original photo is kept in Extra pictures.</div>
         <div class="recrop-stage" id="recrop-stage">
           <img id="recrop-img" draggable="false">
-          <div class="recrop-box" id="recrop-box" style="display:none"><div class="recrop-handle" id="recrop-handle"></div></div>
+          <div class="recrop-box" id="recrop-box" style="display:none">
+            <div class="recrop-handle" id="recrop-handle"></div>
+            <svg class="recrop-guide" id="recrop-guide" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <!-- v7.41 (41.7): passport-style head+shoulders guide. Head oval, eye line, shoulders. -->
+              <ellipse cx="50" cy="38" rx="18" ry="24"></ellipse>
+              <line x1="26" y1="40" x2="74" y2="40" stroke-dasharray="3,3"></line>
+              <path d="M8,100 C20,78 80,78 92,100" fill="none"></path>
+              <line x1="50" y1="4" x2="50" y2="16" stroke-dasharray="2,3" opacity="0.5"></line>
+            </svg>
+          </div>
         </div>
         <div class="recrop-actions">
           <button class="kb-save" id="recrop-save" onclick="saveRecrop()">Save crop</button>
           <button class="kb-hs-cancel" onclick="closeRecrop()">Cancel</button>
+          <button class="kb-hs-cancel" id="recrop-guide-toggle" onclick="toggleRecropGuide()">Guide: ON</button>
           <span class="am-count" id="recrop-status"></span>
         </div>
       </div>
@@ -1909,10 +1946,13 @@ function fmtCockUS(inches){ return `${Math.round(inches*4)/4}"`; }
 function fmtLbs(lb){ return `${Math.round(lb)} lbs`; }
 
 const MEAS_DEFS={
-  h:{us:'text_mknc1sps', label:'Height',    parseUS:parseHeightIn, parseMet:parseMetricHeightCm, usToMet:v=>fmtCm(v*2.54),       metToUS:v=>fmtHeightUS(v/2.54)},
-  w:{us:'text_mm1yx2wg', label:'Weight',    parseUS:parseWeightLb, parseMet:parseMetricWeightKg, usToMet:v=>fmtKg(v*0.45359237), metToUS:v=>fmtLbs(v*2.20462)},
-  c:{us:'text_mm1y2znz', label:'Cock Size', parseUS:parseCockIn,   parseMet:parseMetricCockCm,   usToMet:v=>fmtCm(v*2.54),       metToUS:v=>fmtCockUS(v/2.54)}
+  h:{us:'text_mknc1sps', label:'Height',    parseUS:parseHeightIn, parseMet:parseMetricHeightCm, usToMet:v=>fmtCm(v*2.54),       metToUS:v=>fmtHeightUS(v/2.54), metRange:[120,230], metUnit:'cm'},
+  w:{us:'text_mm1yx2wg', label:'Weight',    parseUS:parseWeightLb, parseMet:parseMetricWeightKg, usToMet:v=>fmtKg(v*0.45359237), metToUS:v=>fmtLbs(v*2.20462), metRange:[27,182], metUnit:'kg'},
+  c:{us:'text_mm1y2znz', label:'Cock Size', parseUS:parseCockIn,   parseMet:parseMetricCockCm,   usToMet:v=>fmtCm(v*2.54),       metToUS:v=>fmtCockUS(v/2.54), metRange:[5,33], metUnit:'cm'}
 };
+// Pull the first bare number out of a metric string, to distinguish "unparseable" from
+// "parsed a number but outside the plausible range" in the warning message.
+function meas_rawNum(s){ const m=String(s||'').match(/(\d+(?:[.,]\d+)?)/); return m?parseFloat(m[1].replace(',','.')):null; }
 // One measurement pair at save time. US wins when both sides were edited; a blank
 // edit clears both; an unparseable edit saves as typed but leaves the twin alone (with a warning).
 function pairMeasurement(key, usRaw, metRaw, usChanged, metChanged){
@@ -1926,12 +1966,50 @@ function pairMeasurement(key, usRaw, metRaw, usChanged, metChanged){
     out.met=metRaw;
     const t=(metRaw||'').trim();
     if(t===''){ out.us=''; }
-    else{ const n=d.parseMet(t); if(n!=null) out.us=d.metToUS(n); else out.warn=`couldn't read ${d.label} (metric) — US not auto-filled`; }
+    else{ const n=d.parseMet(t);
+      if(n!=null) out.us=d.metToUS(n);
+      else {
+        const raw=meas_rawNum(t), r=d.metRange;
+        out.warn = (raw!=null && r && (raw<r[0]||raw>r[1]))
+          ? `${d.label} ${raw} ${d.metUnit} is outside the plausible range (${r[0]}–${r[1]} ${d.metUnit}) — US not auto-filled (value still saved)`
+          : `couldn't read ${d.label} (metric) — US not auto-filled`;
+      }
+    }
   }
   return out;
 }
 // ── Form glue: baselines + pairing for the full/interview editor ──
 let measBaseline={};
+// v7.41 (41.5c): remember which side of each pair is the source of truth (user-entered), so we
+// can draw a white outline on it. 'us' | 'met' | null per key.
+let measSrc={h:null,w:null,c:null};
+function measFieldEl(key, side){ return document.getElementById(side==='us' ? ('f-'+MEAS_DEFS[key].us) : ('f-metric_'+key)); }
+function measApplySrcOutline(){
+  ['h','w','c'].forEach(k=>{
+    const usEl=measFieldEl(k,'us'), metEl=measFieldEl(k,'met');
+    if(usEl) usEl.classList.toggle('meas-src', measSrc[k]==='us');
+    if(metEl) metEl.classList.toggle('meas-src', measSrc[k]==='met');
+  });
+}
+function measMarkSrc(key, side){ measSrc[key]=side; measApplySrcOutline(); }
+// On load, infer the source: only one side filled → that's it. Both filled → whichever side
+// round-trips exactly to the other is the source (derived values are formatter-exact).
+function measInferSrc(){
+  ['h','w','c'].forEach(k=>{
+    const d=MEAS_DEFS[k];
+    const us=((measFieldEl(k,'us')||{}).value||'').trim();
+    const met=((measFieldEl(k,'met')||{}).value||'').trim();
+    if(us && !met){ measSrc[k]='us'; }
+    else if(met && !us){ measSrc[k]='met'; }
+    else if(us && met){
+      let src=null;
+      const un=d.parseUS(us); if(un!=null && d.usToMet(un)===met) src='us';
+      if(!src){ const mn=d.parseMet(met); if(mn!=null && d.metToUS(mn)===us) src='met'; }
+      measSrc[k]=src; // null if ambiguous → no outline
+    } else { measSrc[k]=null; }
+  });
+  measApplySrcOutline();
+}
 function captureMeasBaseline(){
   measBaseline={};
   ['h','w','c'].forEach(k=>{
@@ -2193,9 +2271,11 @@ function gridRefreshChips(id){
 function gridFillTagList(id){
   const m=gridModel(id); const pop=document.getElementById('amtaglist-pop-'+id); if(!m||!pop) return;
   const labels=gridShootLabels(m);
-  pop.innerHTML = labels.length
+  const list = labels.length
     ? `<div class="am-taglist-head">Shoot tags</div>`+labels.map(l=>`<div class="am-taglist-item">${escapeHtml(l)}</div>`).join('')
     : `<div class="am-taglist-item dim">No shoot tags</div>`;
+  // v7.41 (41.4): "+ Add tag" footer opens the searchable add/create picker without leaving.
+  pop.innerHTML = list + `<div class="am-taglist-add" onclick="event.stopPropagation();gridToggleTagPicker('${id}')">+ Add tag</div>`;
 }
 function gridToggleTagList(id){
   const pop=document.getElementById('amtaglist-pop-'+id); if(!pop) return;
@@ -2843,6 +2923,12 @@ function kbOpenRecrop(){
   if(!hs){ showToast('No headshot to recrop','error'); return; }
   openRecrop(kbModalItemId, hs.assetId);
 }
+function toggleRecropGuide(){
+  const g=document.getElementById('recrop-guide'), btn=document.getElementById('recrop-guide-toggle');
+  if(!g) return;
+  const off=g.classList.toggle('off');
+  if(btn) btn.textContent='Guide: '+(off?'OFF':'ON');
+}
 async function openRecrop(itemIdArg, headIdArg){
   // v7.17: callable from the kanban/all-models modal too — pass itemId + headshot assetId
   // explicitly; with no args it derives them from the full editor's state as before.
@@ -3007,7 +3093,23 @@ function qnavSpy(){
   });
 }
 document.getElementById('form-area')?.addEventListener('scroll', qnavSpy, {passive:true});
-document.addEventListener('click', e=>{ if(!e.target.closest('.shoot-picker-wrap')){ closeShootPicker(); closeIvShootPicker(); } if(!e.target.closest('.port-row-wrap')) closeRowPicker(); if(!e.target.closest('.am-tags-row')) gridCloseAllTagPickers(); });
+// v7.41 (41.4): capture-phase outside-click close. Runs BEFORE any stopPropagation on inner
+// widgets, so pickers/popovers reliably close on a click anywhere outside them — regardless of
+// how many inner elements swallow bubbling clicks.
+document.addEventListener('click', e=>{
+  const t=e.target;
+  // shoot pickers (editor + interview)
+  if(!t.closest('.shoot-picker-wrap') && !t.closest('.shoot-picker')){ closeShootPicker(); closeIvShootPicker(); }
+  // sandbox row/tag pickers
+  if(!t.closest('.port-row-wrap') && !t.closest('.shoot-picker')) closeRowPicker();
+  // grid tile tag picker + read-only tag-list popover: close unless the click is on the tags
+  // row that owns an open one (the row's own handlers manage open/toggle).
+  if(!t.closest('.am-tags-row')) gridCloseAllTagPickers();
+}, true);
+// v7.41 (41.4): Escape closes every transient picker/popover.
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ closeShootPicker(); closeIvShootPicker(); closeRowPicker(); gridCloseAllTagPickers(); }
+});
 
 // ── PORT TO CASTING STACK (v7.13) ──
 // Pushes every 5-APPROVED-scope model carrying a chosen shoot tag into a chosen
@@ -4843,7 +4945,7 @@ function populateForm(item){
   ].forEach(id=>setTxt(id,txt(id))));
 
   // Metric measurement twins (v7.10) — real column ids vary per board; blank on boards without them
-  guard('metric',()=>{ const mc=metricCols(BOARD_ID); ['h','w','c'].forEach(k=>setTxt('metric_'+k, mc?txt(mc[k]):'')); captureMeasBaseline(); });
+  guard('metric',()=>{ const mc=metricCols(BOARD_ID); ['h','w','c'].forEach(k=>setTxt('metric_'+k, mc?txt(mc[k]):'')); captureMeasBaseline(); measInferSrc(); });
 
   // Shoot tags (5-APPROVED only) — labels come as comma-separated text
   guard('shoot',()=>{
@@ -6285,6 +6387,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.41: (theme + quick-UI batch) Eight changes. (1) App accent recolored from purple to logo blue (#3AA2E0) everywhere — the AI-app purple and kanban chrome; Monday's own data-label colors (status pills etc., which mirror Monday's #9d50dd "color 4") are intentionally left unchanged so the app stays in sync with Monday. (2) "Scrape photos" button is now yellow so it stands out. (3) "Copy link" now sits directly beside "Back to grid" (wrapped in one flex group) instead of floating mid-toolbar. (4) Grid tag popovers now close on any outside click (capture-phase handler that defeats inner stopPropagation) and on Escape; the read-only tag list gained a "+ Add tag" footer that opens the add/create picker in place. (5) Metric/imperial: clearer warning that distinguishes an out-of-plausible-range value (e.g. "250 cm is outside 120–230 cm") from an unparseable one, value still saved; the six measurement fields are now grouped into three paired imperial|metric rows so each pair shares a line; a WHITE outline marks whichever side was the source of truth (live as you type, inferred on load via exact round-trip). (6) Kanban modal multi-selects restyled from raw checkboxes to the app's box-button look (native checkbox hidden, state via :has — value collection unchanged). (7) Recrop headshot gained a passport-style head+shoulders guide overlay (toggleable) to standardize crops. (8) Confirmed all grids default to newest-first. Client-only.
    v7.40: (grid shoot-tag filter + tag-count tiles + fast headshot + sandbox add-model) Four changes. (A) The "Shoot Tags" filter dropdown is now available on EVERY grid (was only 5-APPROVED) — filter any grid to selected shoot tags. (B) Grid tiles no longer list tiny tag chips; the TAG row shows a count ("3 tags" / "No tags") that opens a read-only list popover on click, while the + button still opens the add/edit picker. (C) Headshot replace is much faster: new server endpoint /replace-headshot-fast rewrites ONLY the headshot column and appends the old headshot to extras, leaving existing extras (and their med-thumb pairings) untouched — instead of /rearrange-photos re-downloading and re-uploading every photo (30+ serial round-trips on models with many extras). Both interview and full-view replace paths use it; their clearExtraMedThumbs calls are removed since extras are preserved. (D) Casting Sandbox: clicking an empty slot (with nothing selected) opens a searchable list of ALL eligible models (same exclude set: not rejected/retired/delete/evernote/dup, minus anyone already placed); picking one drops it into the slot AND writes the current shoot tag onto that one model on Monday immediately — a per-model save distinct from "Save state"/"Send to casting row", so you never leave the sandbox to tag someone. TWO-FILE release (server.js + index.html).
    v7.39: (grid rating step + sandbox polish + sandbox UX overhaul) (1) The grid Rating input's spinner/arrows now step by whole integers (step=1) while still accepting typed decimals like 7.5. (2) The Casting Sandbox pay/dates caret on each tile is bigger and color-coded: grey = nothing logged, yellow = one of pay/dates filled, green = both — so incomplete cards are obvious at a glance. (3) Casting Sandbox toolbar redesigned into four numbered steps (Pick a shoot tag → Arrange the cast → Save/share → Send to a casting row) with plain-language descriptions and bigger, friendlier buttons, since the old dense filter-style toolbar confused less technical coworkers. Takes more vertical space by design (this view isn't mobile-first). No logic changed — same functions wired to the restyled buttons.
    v7.38.1: (editable-grid tile fix) Fixes the v7.38 tile UI per testing. The tag picker was rendering but being clipped invisible by the tile's overflow:hidden — tiles now flip to overflow:visible while their picker is open (thumbnail keeps its own clip), and the per-tile picker is anchored tile-wide to the tag row instead of the 280px toolbar width, so tags list and create work. Removed the stray decorative caret. Tile now has three uniform label rows — RATING, TAG, DATE CREATED — matching styles. Tags render on a single line that never grows the tile: chips until they run out of room, then a "+N" chip that opens the picker (which shows the full list with ✓ marks). A metric sort value still shows as an extra line when sorting by height/weight/etc., omitted when sorting by date (would duplicate DATE CREATED).

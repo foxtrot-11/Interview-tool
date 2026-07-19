@@ -467,5 +467,22 @@ has('const SB_EXCLUDE_STATUS = new Set([3,0,6,11,12])', 'sandbox exclude set hoi
   (srv.includes('/replace-headshot-fast') ? ok : bad)('fast headshot server endpoint present', 'missing /replace-headshot-fast');
   (srv.includes('[HEADSHOT_COL]: { clear_all: true }') ? ok : bad)('fast endpoint clears only headshot column', 'missing headshot-only clear'); }
 
+/* v7.41 asserts: theme + quick-UI batch */
+has('v7.41:', 'v7.41 deploy marker present');
+has('--accent:#3AA2E0', 'accent recolored to logo blue');
+lacks('#a78bfa', 'no purple accent fallbacks remain');
+lacks('#c8b4ff', 'old purple accent var gone');
+has('border:1px solid #f5c518;color:#f5c518', 'scrape button is yellow');
+has("border:2px solid #fff !important", 'measurement source-of-truth white outline');
+has('function measInferSrc(', 'source-of-truth inference present');
+has('function measMarkSrc(', 'live source marking present');
+has('is outside the plausible range', 'clearer out-of-range metric warning');
+has('class="meas-pair"', 'paired imperial|metric rows present');
+has("addEventListener('click', e=>{", 'capture-phase close handler present');
+has('am-taglist-add', 'tag list + Add tag footer present');
+has('.kb-chk:has(input:checked)', 'kanban multi restyled as box buttons');
+has('recrop-guide', 'recrop head+shoulders guide present');
+has('function toggleRecropGuide(', 'recrop guide toggle present');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
