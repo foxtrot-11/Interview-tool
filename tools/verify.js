@@ -493,5 +493,15 @@ has('function sbOpenFullEditor(', 'sandbox→full-editor opener present');
 has("editorReturnTo==='sb'", 'back-to-grid returns to sandbox');
 has('let editorReturnTo', 'editorReturnTo state present');
 
+/* v7.43 asserts: kanban drag-to-change-status */
+has('v7.43:', 'v7.43 deploy marker present');
+has('function kbDragStart(', 'kanban card dragstart handler');
+has('function kbDrop(', 'kanban column drop handler');
+has('function kbDragOver(', 'kanban dragover handler');
+has('draggable="true" ondragstart="kbDragStart', 'kanban cards are draggable');
+has('ondrop="kbDrop(event', 'kanban columns are drop targets');
+has('KANBAN_COLS[i].ids[0]', 'drop writes column primary status id');
+has('kb-drop-over', 'drop-target highlight style present');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

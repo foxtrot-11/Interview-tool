@@ -114,6 +114,10 @@
   .kb-count{opacity:0.65;margin-left:4px}
   .kb-col-body{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
   .kb-card{flex:0 0 auto;background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  /* v7.43: drag-to-change-status */
+  .kb-card[draggable="true"] .kb-card-top{cursor:grab}
+  .kb-card.kb-dragging{opacity:.5;outline:2px solid var(--accent,#3AA2E0)}
+  .kb-col-body.kb-drop-over{background:rgba(58,162,224,.12);outline:2px dashed var(--accent,#3AA2E0);outline-offset:-4px}
   .kb-card-top{display:flex;align-items:center;gap:12px;padding:12px;cursor:pointer}
   .kb-thumb{width:96px;height:96px;min-width:96px;flex:0 0 96px;border-radius:6px;background:var(--surface2);overflow:hidden}
   .kb-thumb img{width:96px;height:96px;object-fit:cover;display:block}
@@ -2706,7 +2710,7 @@ function kanbanCardHtml(m){
   const cached = imgAsset ? kbHeadCache[imgAsset] : null;
   const initial = escapeHtml((m.name||'?').trim().charAt(0).toUpperCase()||'?');
   const thumb = cached ? `<img loading="lazy" src="${escapeHtml(cached)}" alt="">` : `<span class="kb-mono">${initial}</span>`;
-  return `<div class="kb-card" data-id="${m.id}">
+  return `<div class="kb-card" data-id="${m.id}" draggable="true" ondragstart="kbDragStart(event,'${m.id}')" ondragend="kbDragEnd(event)">
     <div class="kb-card-top" onclick="openKanbanModal('${m.id}')">
       <div class="kb-thumb" id="kbthumb-${m.id}">${thumb}</div>
       <div class="kb-name">${escapeHtml(m.name||'(no name)')}</div>
@@ -2739,12 +2743,64 @@ function renderKanban(){
     <div class="kb-col">
       <div class="kb-col-head" style="background:${KANBAN_COLOR[c.mode]}">${escapeHtml(c.label)}<span class="kb-count">${buckets[i].length}</span></div>
       ${loadBtn}
-      <div class="kb-col-body" id="kbcol-${i}">${buckets[i].map(kanbanCardHtml).join('')}</div>
+      <div class="kb-col-body" id="kbcol-${i}" data-col="${i}" ondragover="kbDragOver(event,${i})" ondragleave="kbDragLeave(event,${i})" ondrop="kbDrop(event,${i})">${buckets[i].map(kanbanCardHtml).join('')}</div>
     </div>`;
   }).join('');
   document.getElementById('kanban-summary').textContent = `${buckets.reduce((n,b)=>n+b.length,0)} models`;
   // Auto-load headshots for small columns (and any column the user asked to load); skip big ones.
   buckets.forEach((b,i)=>{ if(b.length<=KB_AUTO_THRESHOLD || kbColLoaded[i]){ fetchKanbanHeadshotsForModels(b); fetchKanbanNotesForModels(b); } });
+}
+
+// ── v7.43: Kanban drag-to-change-status ──
+// Dragging a card to another column writes that column's PRIMARY status id (KANBAN_COLS[i].ids[0])
+// to Monday via the same change_multiple_column_values {label:{index}} path the editor uses.
+// Optimistic: the card moves immediately; on write failure we revert and toast.
+let kbDragId=null;
+function kbDragStart(e,id){
+  kbDragId=id;
+  try{ e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed='move'; }catch(_){}
+  const card=e.currentTarget; if(card) card.classList.add('kb-dragging');
+}
+function kbDragEnd(e){
+  const card=e.currentTarget; if(card) card.classList.remove('kb-dragging');
+  document.querySelectorAll('.kb-col-body.kb-drop-over').forEach(el=>el.classList.remove('kb-drop-over'));
+  kbDragId=null;
+}
+function kbDragOver(e,i){
+  if(kbDragId==null) return;
+  e.preventDefault();                 // allow drop
+  try{ e.dataTransfer.dropEffect='move'; }catch(_){}
+  const body=document.getElementById('kbcol-'+i); if(body) body.classList.add('kb-drop-over');
+}
+function kbDragLeave(e,i){
+  // only clear when actually leaving the column body (not moving onto a child card)
+  const body=document.getElementById('kbcol-'+i);
+  if(body && !body.contains(e.relatedTarget)) body.classList.remove('kb-drop-over');
+}
+async function kbDrop(e,i){
+  e.preventDefault();
+  const body=document.getElementById('kbcol-'+i); if(body) body.classList.remove('kb-drop-over');
+  const id = kbDragId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
+  kbDragId=null;
+  if(!id) return;
+  const m=kanbanItems.find(x=>String(x.id)===String(id)); if(!m) return;
+  const targetIdx = KANBAN_COLS[i].ids[0];      // the column's primary status id
+  const idxToCol = kbIdxToCol();
+  if(idxToCol[m.statusIdx]===i) return;         // same column → nothing to do
+  const prevIdx = m.statusIdx;
+  // optimistic move
+  m.statusIdx = targetIdx; m.updated_at=new Date().toISOString();
+  renderKanban();
+  try{
+    await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
+      {i:String(id), b:String(MAIN_BOARD_ID), c:JSON.stringify({label:{index:targetIdx}})});
+    // m.statusIdx is the single source used by both kanban bucketing and All Models status
+    // scoping, so the optimistic update above already keeps every view in sync.
+    showToast((m.name||'Model')+' → '+KANBAN_COLS[i].label, 'success');
+  }catch(err){
+    m.statusIdx=prevIdx; renderKanban();         // revert
+    showToast('Could not move '+(m.name||'model')+': '+(err&&err.message?err.message:'write failed'), 'error');
+  }
 }
 
 async function loadKanbanColumnPhotos(i){
@@ -6422,6 +6478,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.43: (kanban interactivity) Two changes, client-only, WRITES model status to Monday. (1) Drag any kanban card from one column to another to change that model's MODEL STATUS — the card moves immediately (optimistic) and the new status is written to Monday via the same change_multiple_column_values {label:{index}} call the editor already uses; on a write failure the card snaps back and an error toast shows. Dropping a card back on its own column does nothing. Each column writes its PRIMARY status id (the 5-APPROVED column, which also visually holds retired/delete/outside-exclusive, writes APPROVED; ALL-STAR writes all-star; EXCLUSIVE writes exclusive; etc.). (2) The kanban card modal already has an editable MODEL STATUS control that writes on Save — confirmed working; between it and drag, you can now move models through the pipeline directly in kanban. NOTE: like all main-board writes, drag-to-move only succeeds on PRODUCTION — on staging Monday rejects writes to the staging board's item IDs, so a drag there will revert with an error toast (test drag on prod with a throwaway move).
    v7.42: (Casting Sandbox: bigger tiles + tile→full-editor round trip) Two changes, client-only. (1) Sandbox tiles are now gallery-sized — thumbnails 80px→128px, tiles/slots and name text scaled up to match the normal grids; the three columns keep their layout and scroll horizontally on narrower windows rather than cramping. (2) Each sandbox tile has a small ✎ button (bottom-right of the thumbnail) that opens the SAME full editor used in 5-APPROVED — always the full editor regardless of the model's status, so you get complete info and a working Save. Hitting "← Back to grid" returns you straight to the Casting Sandbox with the exact same arrangement (shoot tag, zones, pay/dates notes), scrolled back to where you were. The arrangement lives in memory (sbState) and is never reset by opening/closing the editor, so you can open a tile, edit + Save, come back, rearrange, open another, and only hit "Save state" at the very end. NOTE: two independent save concepts remain — the editor's Save writes that model's data to Monday; the sandbox "Save state" persists the arrangement — they don't clobber each other. NOTE: if you remove a model's shoot tag or set an excluded status (rejected/retired/etc.) inside the editor, that model correctly drops off the sandbox on return (membership is reconciled), which is expected, not a bug.
    v7.41: (theme + quick-UI batch) Eight changes. (1) App accent recolored from purple to logo blue (#3AA2E0) everywhere — the AI-app purple, kanban chrome, and the CASTING SANDBOX tab + sandbox save-tab hovers; Monday's own data-label colors (status pills etc., which mirror Monday's #9d50dd "color 4") are intentionally left unchanged so the app stays in sync with Monday. (2) "Scrape photos" button is now yellow so it stands out. (3) "Copy link" now sits directly beside "Back to grid" (wrapped in one flex group) instead of floating mid-toolbar. (4) Grid tag popovers now close on any outside click (capture-phase handler that defeats inner stopPropagation) and on Escape; the read-only tag list gained a "+ Add tag" footer that opens the add/create picker in place. (5) Metric/imperial: clearer warning that distinguishes an out-of-plausible-range value (e.g. "250 cm is outside 120–230 cm") from an unparseable one, value still saved; the six measurement fields are now grouped into three paired imperial|metric rows so each pair shares a line; a WHITE outline marks whichever side was the source of truth (live as you type, inferred on load via exact round-trip). (6) Kanban modal multi-selects restyled from raw checkboxes to the app's box-button look (native checkbox hidden, state via :has — value collection unchanged). (7) Recrop headshot gained a passport-style head+shoulders guide overlay (toggleable) to standardize crops. (8) Confirmed all grids default to newest-first. Client-only.
    v7.40: (grid shoot-tag filter + tag-count tiles + fast headshot + sandbox add-model) Four changes. (A) The "Shoot Tags" filter dropdown is now available on EVERY grid (was only 5-APPROVED) — filter any grid to selected shoot tags. (B) Grid tiles no longer list tiny tag chips; the TAG row shows a count ("3 tags" / "No tags") that opens a read-only list popover on click, while the + button still opens the add/edit picker. (C) Headshot replace is much faster: new server endpoint /replace-headshot-fast rewrites ONLY the headshot column and appends the old headshot to extras, leaving existing extras (and their med-thumb pairings) untouched — instead of /rearrange-photos re-downloading and re-uploading every photo (30+ serial round-trips on models with many extras). Both interview and full-view replace paths use it; their clearExtraMedThumbs calls are removed since extras are preserved. (D) Casting Sandbox: clicking an empty slot (with nothing selected) opens a searchable list of ALL eligible models (same exclude set: not rejected/retired/delete/evernote/dup, minus anyone already placed); picking one drops it into the slot AND writes the current shoot tag onto that one model on Monday immediately — a per-model save distinct from "Save state"/"Send to casting row", so you never leave the sandbox to tag someone. TWO-FILE release (server.js + index.html).
