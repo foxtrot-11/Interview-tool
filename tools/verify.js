@@ -353,7 +353,7 @@ has('return j?.data?.add_file_to_column?.id', 'uploadFileToMonday returns new as
 has('await setHeadMedThumb(newId, file)', 'new-model headshot generates med-thumb');
 has('addExtraMedThumb(newId, file, exId)', 'new-model extras generate paired med-thumbs');
 has('await setHeadMedThumb(job.itemId, file, bId)', 'headshot-replace regenerates med-thumb (v7.44: in runPhotoJob, board-threaded)');
-has('await clearHeadMedThumb(itemId)', 'recrop clears head med-thumb (fallback to full)');
+has('await clearHeadMedThumb(itemId, bId)', 'recrop clears head med-thumb (fallback to full; v7.45 board-threaded)');
 has('await clearHeadMedThumb(currentItem.id)', 'promote-existing clears head med-thumb');
 has('`medthumb-${fullAssetId}.jpg`', 'extra med-thumb named by source asset id (pairing)');
 
@@ -506,12 +506,12 @@ has('kb-drop-over', 'drop-target highlight style present');
 has('v7.44:', 'v7.44 deploy marker present');
 // queue + serialization
 has('let bgJobs = [];', 'bgJobs queue present');
-has('const bgRunning = new Set()', 'per-item serialization guard present');
+has('const bgRunning = new Set()', 'photo-job run guard present');
 has('function enqueuePhotoJob(', 'photo job enqueue present');
 has('function pumpBgJobs(', 'job pump present');
 has('async function runPhotoJob(', 'runPhotoJob worker present');
 has('function hasActivePhotoJob(', 'active-job check present');
-has('boardId: String(boardId)', 'job snapshots active board at enqueue');
+has('boardId: String(extra.boardId)', 'job snapshots active board at enqueue');
 // board threading (a mid-job board switch must not retarget the write)
 has('function medHeadCol(bId)', 'medHeadCol accepts optional boardId');
 has('function medExtraCol(bId)', 'medExtraCol accepts optional boardId');
@@ -538,6 +538,33 @@ has('photo-inflight-note', 'in-progress note styled');
 has('function refreshInflightNotes(', 'in-progress note toggler present');
 has('iv-photo-inflight', 'iv in-progress note present');
 has('fv-photo-inflight', 'fv in-progress note present');
+
+/* v7.45 asserts: recrop → background queue + cancelable jobs + global serialization */
+has('v7.45:', 'v7.45 deploy marker present');
+// recrop routed through the queue
+has('function enqueueRecropJob(', 'recrop enqueue helper present');
+has('async function runRecropPhase(', 'recrop background worker present');
+has('async function runSavePhase(', 'save background worker present');
+has('enqueueRecropJob({ itemId, modelName:name, boardId:BOARD_ID, croppedFile:file, headId })', 'saveRecrop enqueues instead of uploading inline');
+has("job.kind==='recrop'", 'runPhotoJob branches on job kind');
+lacks("st.textContent='Setting as headshot on Monday", 'recrop no longer runs the rearrange inline in saveRecrop');
+// global one-at-a-time serialization
+has('function bgAnyRunning(', 'global run check present');
+has('if(bgAnyRunning()) return;', 'pump enforces global concurrency = 1');
+// cancel (honest phase gating)
+has('function cancelBgJob(', 'job cancel present');
+has('function bgJobCancelable(', 'cancelable-phase check present');
+has("job._phase==='finalizing'", 'cancel refused during the atomic finalize phase');
+has('job._canceled = true', 'cancel flags the job and aborts the transfer');
+has("xhr.onabort = () => reject(new Error('canceled'))", 'upload xhr abort wired');
+has('onXhr(xhr)', 'uploadFileToMonday exposes the xhr for abort');
+has('bgjob-cancel', 'widget cancel button styled');
+has("status==='canceled'", 'canceled job status handled in widget');
+// board threading for the recrop write helpers
+has('async function rearrangePhotos(itemId, headshotAssetIds, extraAssetIds, bId)', 'rearrangePhotos board-threaded');
+has('async function clearHeadMedThumb(itemId, bId)', 'clearHeadMedThumb board-threaded');
+has('async function clearExtraMedThumbs(itemId, bId)', 'clearExtraMedThumbs board-threaded');
+has('await rearrangePhotos(itemId,[newId],[oldHead,...extrasBefore].filter(x=>x!=null), bId)', 'recrop rearrange uses snapshotted board');
 
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

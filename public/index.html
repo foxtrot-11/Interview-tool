@@ -777,6 +777,12 @@
   .bgjob-retry{margin-top:6px;font-size:10px;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;
     background:var(--surface);border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:4px 10px}
   .bgjob-retry:hover{background:var(--danger);color:#3a0000}
+  /* v7.45: recrop → background queue, cancelable jobs */
+  .bgjob-cancel{margin-top:6px;font-size:10px;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;
+    background:var(--surface);border:1px solid var(--border-active);color:var(--text-muted);border-radius:6px;padding:4px 10px}
+  .bgjob-cancel:hover{background:var(--surface2);color:var(--text)}
+  .bgjob.canceled{border-color:var(--border-active);opacity:.7}
+  .bgjob.canceled .bgjob-fill{background:var(--text-dim)}
   .bgjobs-clear{font-size:10px;cursor:pointer;color:var(--text-dim);background:none;border:none;text-decoration:underline}
   .bgjobs-clear:hover{color:var(--text-muted)}
   .bgjob.flash{animation:bgflash .9s ease}
@@ -3083,9 +3089,10 @@ function rcClamp(){ const st=rcState; st.box.s=Math.max(40,Math.min(st.box.s,Mat
 function closeRecrop(){ const m=document.getElementById('recrop-modal'); m.classList.remove('open'); if(rcState&&rcState.url) URL.revokeObjectURL(rcState.url); rcState=null; }
 async function saveRecrop(){
   if(!rcState) return;
-  const st=document.getElementById('recrop-status'); const btn=document.getElementById('recrop-save');
+  const btn=document.getElementById('recrop-save');
   btn.disabled=true;
   try{
+    // Produce the cropped headshot File from the canvas (this part is instant + local).
     const img=document.getElementById('recrop-img');
     const sx=img.naturalWidth/rcState.dw, sy=img.naturalHeight/rcState.dh;
     const cx=Math.round(rcState.box.x*sx), cy=Math.round(rcState.box.y*sy);
@@ -3096,39 +3103,20 @@ async function saveRecrop(){
     const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
     if(!blob) throw new Error('crop failed');
     const file=new File([blob],'headshot-crop.jpg',{type:'image/jpeg'});
-    const itemId=rcState.itemId;
-    // Read CURRENT photo ids fresh (don't trust possibly-stale local state)
-    st.textContent='Reading current photos…';
-    const parseIds=(cvArr,colId)=>{ const cv=(cvArr||[]).find(x=>x.id===colId); if(!cv||!cv.value) return []; try{ return (JSON.parse(cv.value).files||[]).map(f=>f.assetId); }catch{ return []; } };
-    const before=await gql(`{items(ids:[${itemId}]){column_values(ids:["file_mkp1n4bt","files_mkncw5nm"]){id value}}}`);
-    const extrasBefore=parseIds(before.items[0].column_values,'file_mkp1n4bt');
-    const headBefore=parseIds(before.items[0].column_values,'files_mkncw5nm');
-    const oldHead=(headBefore[0]!=null)?headBefore[0]:rcState.headId;
-    st.textContent='Uploading crop…';
-    await uploadFileToMonday(itemId,'file_mkp1n4bt',file,p=>{ st.textContent='Uploading crop… '+Math.round(p*100)+'%'; });
-    st.textContent='Finding uploaded crop…';
-    const after=await gql(`{items(ids:[${itemId}]){column_values(ids:["file_mkp1n4bt"]){id value}}}`);
-    const extrasAfter=parseIds(after.items[0].column_values,'file_mkp1n4bt');
-    const newId=extrasAfter.find(a=>!extrasBefore.some(b=>String(b)===String(a)));
-    if(!newId) throw new Error('uploaded crop not found on Monday');
-    st.textContent='Setting as headshot on Monday… (a few seconds)';
-    await rearrangePhotos(itemId,[newId],[oldHead,...extrasBefore].filter(x=>x!=null));
-    await clearHeadMedThumb(itemId);   // v7.35: recrop changed the headshot — drop stale thumb, fall back to full
-    await clearExtraMedThumbs(itemId);   // v7.36 (Finding 1): rearrange reassigned extra ids — clear dead pairings
-    st.textContent='Refreshing…';
-    const kbOpen=document.getElementById('kb-modal').classList.contains('open') && String(kbModalItemId)===String(itemId);
-    if(kbOpen){
-      await kbLoadModalPhotos(itemId);   // re-renders the modal photo grid from Monday
-      const hs2=(kbModalPhotos||[]).find(p=>p.isHeadshot);
-      refreshHeadEverywhere(itemId, hs2);
-      const th=document.querySelector('#kb-modal .kb-modal-thumb'); if(th&&hs2) th.innerHTML=`<img src="${escapeHtml(hs2.url)}" alt="">`;
-    } else {
-      await loadCandidatePhotos(itemId);
-      refreshHeadEverywhere(itemId);
-    }
-    closeRecrop();
-    showToast('Headshot recropped ✓ (original kept in Extra pictures)','success');
-  }catch(e){ st.textContent='Error: '+(e.message||String(e)); btn.disabled=false; }
+    const itemId=rcState.itemId, headId=rcState.headId;
+    // v7.45: hand the crop to the background queue instead of uploading inline. The modal closes
+    // right away so you can move to the next model; the actual upload+rearrange runs in the
+    // job widget (one at a time, cancelable while queued/uploading). boardId snapshotted here.
+    const m=(typeof kanbanItems!=='undefined'&&kanbanItems)?kanbanItems.find(x=>String(x.id)===String(itemId)):null;
+    const name = m ? m.name : ((currentItem && String(currentItem.id)===String(itemId)) ? currentItem.name : 'Model');
+    enqueueRecropJob({ itemId, modelName:name, boardId:BOARD_ID, croppedFile:file, headId });
+    closeRecrop();                                   // back to the editor immediately
+    refreshInflightNotes();
+    showToast(`${name}: recrop queued`, 'success');
+  }catch(e){
+    const st=document.getElementById('recrop-status'); if(st) st.textContent='Error: '+(e.message||String(e));
+    btn.disabled=false;
+  }
 }
 // After a recrop/photo change, update the shared store + any grid/kanban tiles for this item.
 // hsOpt (v7.17): pass the headshot explicitly when the full editor's candidatePhotos isn't the source of truth.
@@ -5838,7 +5826,7 @@ async function compressImage(fileIn){
   }
 }
 
-async function uploadFileToMonday(itemId, columnId, file, onProgress){
+async function uploadFileToMonday(itemId, columnId, file, onProgress, onXhr){
   // Shrink oversized images first so we don't hit Render's request size limit
   const sendFile = await compressImage(file);
 
@@ -5849,7 +5837,9 @@ async function uploadFileToMonday(itemId, columnId, file, onProgress){
 
   const j = await new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    if(onXhr) try{ onXhr(xhr); }catch(e){}   // v7.45: hand the xhr to the caller so a background job can .abort() it
     xhr.upload.onprogress = e => { if(e.lengthComputable && onProgress) onProgress(e.loaded/e.total); };
+    xhr.onabort = () => reject(new Error('canceled'));   // v7.45: user-canceled upload
     xhr.onload = () => {
       try {
         const jj = JSON.parse(xhr.responseText);
@@ -5919,11 +5909,11 @@ async function setHeadMedThumb(itemId, sourceFile, bId){
 // Clear the model's headshot med-thumb (used when the headshot changes via a flow we don't
 // regenerate for — recrop / promote-existing / kanban headshot). Grid falls back to the full
 // headshot until a later save or backfill regenerates it. Best-effort: never throws.
-async function clearHeadMedThumb(itemId){
-  const col = medHeadCol(); if(!col) return;
+async function clearHeadMedThumb(itemId, bId){
+  const col = medHeadCol(bId); if(!col) return;
   try{
     await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
-      {i:String(itemId), b:BOARD_ID, c:JSON.stringify({[col]:{clear_all:true}})});
+      {i:String(itemId), b:(bId||BOARD_ID), c:JSON.stringify({[col]:{clear_all:true}})});
   }catch(e){ console.warn('clearHeadMedThumb skipped:', e.message); }
 }
 
@@ -5932,11 +5922,11 @@ async function clearHeadMedThumb(itemId){
 // so every medthumb-<oldId>.jpg pairing is now dead and would otherwise sit orphaned forever.
 // Clearing them keeps the column clean; the strip falls back to full-res until a backfill
 // re-run regenerates paired thumbs. Best-effort: never throws.
-async function clearExtraMedThumbs(itemId){
-  const col = medExtraCol(); if(!col) return;
+async function clearExtraMedThumbs(itemId, bId){
+  const col = medExtraCol(bId); if(!col) return;
   try{
     await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
-      {i:String(itemId), b:BOARD_ID, c:JSON.stringify({[col]:{clear_all:true}})});
+      {i:String(itemId), b:(bId||BOARD_ID), c:JSON.stringify({[col]:{clear_all:true}})});
   }catch(e){ console.warn('clearExtraMedThumbs skipped:', e.message); }
 }
 
@@ -5966,11 +5956,11 @@ async function moveAssetToColumn(itemId, targetColumnId, assetId){
 
 // Atomic rearrange: tell the server the desired final arrangement of EXISTING assets.
 // Server downloads all bytes first, clears, then re-uploads — cannot orphan.
-async function rearrangePhotos(itemId, headshotAssetIds, extraAssetIds){
+async function rearrangePhotos(itemId, headshotAssetIds, extraAssetIds, bId){
   const r = await fetch('/rearrange-photos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-App-Auth': APP_PW },
-    body: JSON.stringify({ itemId, boardId: BOARD_ID, headshotAssetIds, extraAssetIds })
+    body: JSON.stringify({ itemId, boardId: (bId||BOARD_ID), headshotAssetIds, extraAssetIds })
   });
   const j = await r.json();
   if(!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
@@ -6173,129 +6163,212 @@ async function saveNewModel(targetMode){
 //   • On success: refresh that model's head/medHead in the shared store, drop the stale
 //     kbHeadCache entries, and repaint its grid/kanban tiles — no full reload.
 //   • On failure: red row + Retry (re-runs with the same snapshotted files + board).
-let bgJobs = [];           // {id,itemId,modelName,boardId,kind,headshotFile,extraFiles,status,pct,phase,error}
+let bgJobs = [];           // {id,itemId,modelName,detail,boardId,kind,...,status,pct,phase,error,_phase,_xhr,_canceled}
 let bgJobSeq = 0;          // monotonic id source
-const bgRunning = new Set(); // itemIds with a job currently running (serialization guard)
+const bgRunning = new Set(); // itemIds with a job currently running (kept for hasActivePhotoJob)
+// v7.45: serialization is now GLOBAL (one photo job at a time across all models) — batching
+// recrops shouldn't hammer the free-tier server with concurrent rearranges, and it keeps the
+// short un-cancelable "finalizing" window to a single job.
+function bgAnyRunning(){ return bgJobs.some(j=>j.status==='running'); }
 
 function hasActivePhotoJob(itemId){
   const s = String(itemId);
   return bgJobs.some(j => String(j.itemId)===s && (j.status==='queued' || j.status==='running'));
 }
 
-// Package + enqueue a photo job. files are snapshotted here; caller clears its own arrays.
+// SAVE job (headshot/extra upload from the editor Save button). files snapshotted here.
 function enqueuePhotoJob({itemId, modelName, boardId, headshotFile, extraFiles}){
   const hs = headshotFile || null;
   const ex = (extraFiles || []).slice();
   if(!hs && ex.length===0) return null;         // nothing to upload
-  const job = {
+  return pushJob({
+    itemId, modelName, boardId, kind:'save', detail:'Photo save',
+    headshotFile: hs, extraFiles: ex
+  });
+}
+
+// RECROP job (v7.45) — the cropped headshot File is snapshotted here; current photo ids are
+// read fresh when the job runs (global serialization guarantees earlier jobs finished first).
+function enqueueRecropJob({itemId, modelName, boardId, croppedFile, headId}){
+  if(!croppedFile) return null;
+  return pushJob({
+    itemId, modelName, boardId, kind:'recrop', detail:'Recrop',
+    croppedFile, headId: headId!=null ? String(headId) : null
+  });
+}
+
+function pushJob(extra){
+  const job = Object.assign({
     id: ++bgJobSeq,
-    itemId: String(itemId),
-    modelName: modelName || 'Model',
-    boardId: String(boardId),                    // SNAPSHOT — never re-read from the global
-    headshotFile: hs,
-    extraFiles: ex,
-    status: 'queued',                            // queued → running → done | error
+    itemId: String(extra.itemId),
+    modelName: extra.modelName || 'Model',
+    boardId: String(extra.boardId),              // SNAPSHOT — never re-read from the global
+    status: 'queued',                            // queued → running → done | error | canceled
     pct: 0,
     phase: 'Queued…',
-    error: null
-  };
+    error: null,
+    _phase: 'queued',                            // queued | uploading | finalizing (cancel gate)
+    _xhr: null,
+    _canceled: false
+  }, extra);
   bgJobs.push(job);
   renderBgJobs();
   pumpBgJobs();
   return job;
 }
 
-// Start the next queued job for any item that has no job currently running.
+// Start the NEXT queued job, but only if nothing is currently running (global concurrency = 1).
 function pumpBgJobs(){
-  for(const job of bgJobs){
-    if(job.status!=='queued') continue;
-    if(bgRunning.has(job.itemId)) continue;      // that model already has a job in flight
-    bgRunning.add(job.itemId);
-    job.status = 'running';
-    job.phase = 'Starting…';
+  if(bgAnyRunning()) return;
+  const job = bgJobs.find(j=>j.status==='queued');
+  if(!job) return;
+  bgRunning.add(job.itemId);
+  job.status = 'running';
+  job._phase = 'starting';
+  job.phase = 'Starting…';
+  renderBgJobs();
+  runPhotoJob(job);   // fire-and-forget; it re-pumps on finish
+}
+
+// Cancel a job. Clean while QUEUED (never starts) or while UPLOADING (abort the transfer).
+// During FINALIZING (server-side rearrange/replace in flight) cancel is refused — the server
+// operation is atomic on its side and dropping the client can't safely interrupt it.
+function cancelBgJob(id){
+  const job = bgJobs.find(j=>j.id===id); if(!job) return;
+  if(job.status==='queued'){
+    bgJobs = bgJobs.filter(j=>j.id!==id);        // never ran — just drop it
     renderBgJobs();
-    // Fire and forget; runPhotoJob owns its own error handling and re-pumps on finish.
-    runPhotoJob(job);
+    return;
+  }
+  if(job.status==='running'){
+    if(job._phase==='finalizing'){
+      showToast('Finishing this one — it can\u2019t be canceled now','error');
+      return;
+    }
+    job._canceled = true;
+    if(job._xhr){ try{ job._xhr.abort(); }catch(e){} }  // rejects the upload promise with "canceled"
+    job.phase = 'Canceling…';
+    updateBgJobRow(job);
   }
 }
 
-// The actual upload work — refactored verbatim from the old saveAndUploadIv/Fv photo bodies,
-// but operating on the job snapshot (job.headshotFile / job.extraFiles / job.boardId) instead
-// of the editor globals, and reporting progress into the widget row instead of a DOM bar.
+// The background worker. Branches on job.kind; both kinds share the completion refresh and the
+// cancel/finalize phase gating.
 async function runPhotoJob(job){
   const bId = job.boardId;
   const setPhase = (pct, phase) => { job.pct = Math.max(0, Math.min(100, Math.round(pct))); if(phase) job.phase = phase; updateBgJobRow(job); };
-  const haveHeadshot = !!job.headshotFile;
-  const nExtras = job.extraFiles.length;
   let headChanged = false;
-  let hadError = false;
+  let outcome = 'done';   // 'done' | 'error' | 'canceled'
 
   try{
-    // ---- HEADSHOT REPLACEMENT (first) ----
-    if(haveHeadshot){
-      const file = job.headshotFile;
-      setPhase(0, 'Uploading headshot…');
-      // Snapshot existing photos BEFORE the new upload (used to identify the new asset + demote old head)
-      const cur = await gql(`{items(ids:[${job.itemId}]){column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
-      const cvals = cur.items[0].column_values;
-      const parseEntries = (cid)=>{ const c=cvals.find(x=>x.id===cid); if(!c||!c.value) return []; try{return (JSON.parse(c.value).files||[]);}catch{return [];} };
-      const oldHead = parseEntries('files_mkncw5nm');
-
-      // Upload the new file to the headshot column (real bytes → owned asset; this APPENDS)
-      await uploadFileToMonday(job.itemId, 'files_mkncw5nm', file, pct=>setPhase(pct*50, 'Uploading headshot…'));
-
-      // Find the newly-uploaded asset id (the entry not present before)
-      const after = await gql(`{items(ids:[${job.itemId}]){column_values(ids:["files_mkncw5nm"]){id value}}}`);
-      let headNow = [];
-      try{ headNow = JSON.parse(after.items[0].column_values[0].value).files||[]; }catch{}
-      const oldHeadIds = new Set(oldHead.map(e=>e.assetId));
-      const newEntry = headNow.find(e=>!oldHeadIds.has(e.assetId)) || headNow[headNow.length-1];
-
-      setPhase(50, 'Finalizing headshot…');
-      // v7.40 FAST replace — new upload becomes the headshot, old headshot(s) demoted to extras,
-      // existing extras UNTOUCHED (asset ids + med-thumb pairings survive). boardId threaded (v7.44).
-      await replaceHeadshotFast(job.itemId, newEntry.assetId, oldHead.map(e=>e.assetId), bId);
-      await setHeadMedThumb(job.itemId, file, bId);   // regenerate small headshot from the new file
-      headChanged = true;
+    if(job.kind==='recrop'){
+      headChanged = await runRecropPhase(job, bId, setPhase);
+    } else {
+      headChanged = await runSavePhase(job, bId, setPhase);
     }
-
-    // ---- EXTRA PHOTOS ----
-    const medThumbJobs = []; // don't block each upload on its thumb; settle at the end
-    for(let i=0;i<nExtras;i++){
-      const file = job.extraFiles[i];
-      const base = haveHeadshot ? 50 : 0, span = haveHeadshot ? 50 : 100;
-      setPhase(base + (i/Math.max(1,nExtras))*span, `Uploading extra ${i+1}/${nExtras}…`);
-      const exId = await uploadFileToMonday(job.itemId, 'file_mkp1n4bt', file, pct=>{
-        setPhase(base + ((i+pct)/nExtras)*span, `Uploading extra ${i+1}/${nExtras}…`);
-      });
-      medThumbJobs.push(addExtraMedThumb(job.itemId, file, exId, bId)); // paired small version, board threaded (v7.44)
-    }
-    if(medThumbJobs.length){ setPhase(98, 'Finishing thumbnails…'); await Promise.allSettled(medThumbJobs); }
-
     setPhase(100, 'Done ✓');
     job.status = 'done';
   }catch(e){
-    hadError = true;
-    job.status = 'error';
-    job.error = e.message || String(e);
-    job.phase = '✗ ' + job.error;
-    showToast(`${job.modelName}: photo upload failed — ${job.error}`, 'error');
+    const msg = e && (e.message || String(e));
+    if(job._canceled || msg==='canceled'){
+      outcome = 'canceled';
+      job.status = 'canceled';
+      job.phase = 'Canceled';
+    } else {
+      outcome = 'error';
+      job.status = 'error';
+      job.error = msg;
+      job.phase = '✗ ' + msg;
+      showToast(`${job.modelName}: ${job.detail.toLowerCase()} failed — ${msg}`, 'error');
+    }
   }
 
+  job._xhr = null;
   updateBgJobRow(job);
   bgRunning.delete(job.itemId);
 
-  if(!hadError){
-    // Update the shared store + repaint tiles for this item (best-effort; never throws).
+  if(outcome==='done'){
     try{ if(headChanged) await refreshItemHeadFromMonday(job.itemId, bId); }catch(e){ console.warn('head refresh skipped:', e.message); }
-    // If the editor is still parked on this same model, refresh its photo strip too.
     try{ if(currentItem && String(currentItem.id)===job.itemId) loadCandidatePhotos(job.itemId); }catch(e){}
-    showToast(`${job.modelName}: photos saved ✓`, 'success');
+    showToast(`${job.modelName}: ${job.detail.toLowerCase()} done ✓`, 'success');
     flashBgJobRow(job);
   }
 
-  pumpBgJobs();          // let the next queued job (if any) for any item start
+  pumpBgJobs();          // start the next queued job
   refreshInflightNotes();
+}
+
+// SAVE kind: headshot replace (fast path) + extras. Returns true if the headshot changed.
+async function runSavePhase(job, bId, setPhase){
+  const haveHeadshot = !!job.headshotFile;
+  const nExtras = (job.extraFiles||[]).length;
+  let headChanged = false;
+
+  if(haveHeadshot){
+    const file = job.headshotFile;
+    job._phase='uploading'; setPhase(0, 'Uploading headshot…');
+    const cur = await gql(`{items(ids:[${job.itemId}]){column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
+    const cvals = cur.items[0].column_values;
+    const parseEntries = (cid)=>{ const c=cvals.find(x=>x.id===cid); if(!c||!c.value) return []; try{return (JSON.parse(c.value).files||[]);}catch{return [];} };
+    const oldHead = parseEntries('files_mkncw5nm');
+    await uploadFileToMonday(job.itemId, 'files_mkncw5nm', file, pct=>setPhase(pct*50, 'Uploading headshot…'), xhr=>{job._xhr=xhr;});
+    if(job._canceled) throw new Error('canceled');
+    const after = await gql(`{items(ids:[${job.itemId}]){column_values(ids:["files_mkncw5nm"]){id value}}}`);
+    let headNow = [];
+    try{ headNow = JSON.parse(after.items[0].column_values[0].value).files||[]; }catch{}
+    const oldHeadIds = new Set(oldHead.map(e=>e.assetId));
+    const newEntry = headNow.find(e=>!oldHeadIds.has(e.assetId)) || headNow[headNow.length-1];
+    job._phase='finalizing'; job._xhr=null; setPhase(50, 'Finalizing headshot…');
+    await replaceHeadshotFast(job.itemId, newEntry.assetId, oldHead.map(e=>e.assetId), bId);
+    await setHeadMedThumb(job.itemId, file, bId);
+    headChanged = true;
+  }
+
+  const medThumbJobs = [];
+  for(let i=0;i<nExtras;i++){
+    const file = job.extraFiles[i];
+    const base = haveHeadshot ? 50 : 0, span = haveHeadshot ? 50 : 100;
+    job._phase='uploading'; setPhase(base + (i/Math.max(1,nExtras))*span, `Uploading extra ${i+1}/${nExtras}…`);
+    const exId = await uploadFileToMonday(job.itemId, 'file_mkp1n4bt', file, pct=>{
+      setPhase(base + ((i+pct)/nExtras)*span, `Uploading extra ${i+1}/${nExtras}…`);
+    }, xhr=>{job._xhr=xhr;});
+    if(job._canceled) throw new Error('canceled');
+    medThumbJobs.push(addExtraMedThumb(job.itemId, file, exId, bId));
+  }
+  job._xhr=null;
+  if(medThumbJobs.length){ job._phase='finalizing'; setPhase(98, 'Finishing thumbnails…'); await Promise.allSettled(medThumbJobs); }
+  return headChanged;
+}
+
+// RECROP kind (v7.45): upload the cropped headshot into extras, then atomically rearrange it to
+// be the headshot (old head demoted to extras, existing extras preserved). Always changes head.
+async function runRecropPhase(job, bId, setPhase){
+  const itemId = job.itemId;
+  job._phase='uploading'; setPhase(5, 'Reading current photos…');
+  const parseIds=(cvArr,colId)=>{ const cv=(cvArr||[]).find(x=>x.id===colId); if(!cv||!cv.value) return []; try{ return (JSON.parse(cv.value).files||[]).map(f=>f.assetId); }catch{ return []; } };
+  const before=await gql(`{items(ids:[${itemId}]){column_values(ids:["file_mkp1n4bt","files_mkncw5nm"]){id value}}}`);
+  const extrasBefore=parseIds(before.items[0].column_values,'file_mkp1n4bt');
+  const headBefore=parseIds(before.items[0].column_values,'files_mkncw5nm');
+  const oldHead=(headBefore[0]!=null)?headBefore[0]:job.headId;
+  if(job._canceled) throw new Error('canceled');
+
+  setPhase(10, 'Uploading crop…');
+  let newId = await uploadFileToMonday(itemId,'file_mkp1n4bt',job.croppedFile, p=>setPhase(10+p*60,'Uploading crop…'), xhr=>{job._xhr=xhr;});
+  if(job._canceled) throw new Error('canceled');
+  if(!newId){
+    // Fallback: diff the extras column to find the just-uploaded asset id.
+    const after=await gql(`{items(ids:[${itemId}]){column_values(ids:["file_mkp1n4bt"]){id value}}}`);
+    const extrasAfter=parseIds(after.items[0].column_values,'file_mkp1n4bt');
+    newId=extrasAfter.find(a=>!extrasBefore.some(b=>String(b)===String(a)));
+  }
+  if(!newId) throw new Error('uploaded crop not found on Monday');
+
+  // Past the point of clean cancel — the atomic server rearrange is about to run.
+  job._phase='finalizing'; job._xhr=null; setPhase(75, 'Setting as headshot… (a few seconds)');
+  await rearrangePhotos(itemId,[newId],[oldHead,...extrasBefore].filter(x=>x!=null), bId);
+  await clearHeadMedThumb(itemId, bId);   // head changed — drop stale thumb, fall back to full
+  await clearExtraMedThumbs(itemId, bId); // rearrange reassigned extra ids — clear dead pairings
+  return true;   // headshot always changes on a recrop
 }
 
 // After a background headshot change, pull the NEW head + med-head asset (id+url) fresh from
@@ -6315,7 +6388,6 @@ async function refreshItemHeadFromMonday(itemId, bId){
 
   const m = (typeof kanbanItems!=='undefined' && kanbanItems) ? kanbanItems.find(x=>String(x.id)===String(itemId)) : null;
   if(m){
-    // Drop stale cache entries for the OUTGOING assets before overwriting.
     if(m.head)    delete kbHeadCache[String(m.head)];
     if(m.medHead) delete kbHeadCache[String(m.medHead)];
     m.head    = headAsset ? String(headAsset.id) : null;
@@ -6324,7 +6396,6 @@ async function refreshItemHeadFromMonday(itemId, bId){
   if(headAsset && headAsset.public_url) kbHeadCache[String(headAsset.id)] = headAsset.public_url;
   if(medAsset  && medAsset.public_url)  kbHeadCache[String(medAsset.id)]  = medAsset.public_url;
 
-  // Repaint the grid + kanban tiles for this item (med-thumb preferred, else full head).
   const dispUrl = (medAsset && medAsset.public_url) || (headAsset && headAsset.public_url) || '';
   if(dispUrl){
     ['amthumb-','kbthumb-'].forEach(pre=>{ const el=document.getElementById(pre+itemId); if(el) el.innerHTML=`<img loading="lazy" src="${escapeHtml(dispUrl)}" alt="">`; });
@@ -6339,32 +6410,43 @@ function renderBgJobs(){
   if(bgJobs.length===0){ wrap.classList.remove('visible'); list.innerHTML=''; return; }
   wrap.classList.add('visible');
   list.innerHTML = bgJobs.map(j=>bgJobRowHtml(j)).join('');
-  const anyDone = bgJobs.some(j=>j.status==='done'||j.status==='error');
+  const anyDone = bgJobs.some(j=>j.status==='done'||j.status==='error'||j.status==='canceled');
   const clr = document.getElementById('bgjobs-clear');
   if(clr) clr.style.display = anyDone ? '' : 'none';
 }
+// Cancel is offered while queued, or while running but NOT yet finalizing.
+function bgJobCancelable(j){ return j.status==='queued' || (j.status==='running' && j._phase!=='finalizing'); }
+function bgJobActions(j){
+  if(j.status==='error') return `<button class="bgjob-retry" onclick="retryBgJob(${j.id})">Retry</button>`;
+  if(bgJobCancelable(j)) return `<button class="bgjob-cancel" onclick="cancelBgJob(${j.id})">Cancel</button>`;
+  return '';
+}
 function bgJobRowHtml(j){
   const spin = j.status==='running' ? '<span class="bgjob-spin"></span>' : '';
-  const pctTxt = j.status==='error' ? '' : (j.status==='done' ? '100%' : j.pct+'%');
-  const retry = j.status==='error' ? `<button class="bgjob-retry" onclick="retryBgJob(${j.id})">Retry</button>` : '';
-  const phaseCls = j.status==='error' ? 'bgjob-phase err' : 'bgjob-phase';
+  const pctTxt = (j.status==='error'||j.status==='canceled') ? '' : (j.status==='done' ? '100%' : j.pct+'%');
+  const phaseCls = (j.status==='error') ? 'bgjob-phase err' : 'bgjob-phase';
+  const label = `${j.detail} · ${escapeHtml(j.modelName)}`;
+  const w = (j.status==='done'?100:(j.status==='error'||j.status==='canceled'?100:j.pct));
   return `<div class="bgjob ${j.status}" id="bgjob-${j.id}">
-    <div class="bgjob-top"><span class="bgjob-name">${spin}${escapeHtml(j.modelName)}</span><span class="bgjob-pct">${pctTxt}</span></div>
-    <div class="bgjob-track"><div class="bgjob-fill" style="width:${j.status==='done'?100:(j.status==='error'?100:j.pct)}%"></div></div>
+    <div class="bgjob-top"><span class="bgjob-name">${spin}${label}</span><span class="bgjob-pct">${pctTxt}</span></div>
+    <div class="bgjob-track"><div class="bgjob-fill" style="width:${w}%"></div></div>
     <div class="${phaseCls}">${escapeHtml(j.phase||'')}</div>
-    ${retry}
+    ${bgJobActions(j)}
   </div>`;
 }
 function updateBgJobRow(job){
   const row = document.getElementById('bgjob-'+job.id);
   if(!row){ renderBgJobs(); return; }
   row.className = 'bgjob '+job.status;
-  const fill = row.querySelector('.bgjob-fill'); if(fill) fill.style.width = (job.status==='done'?100:(job.status==='error'?100:job.pct))+'%';
-  const pctEl = row.querySelector('.bgjob-pct'); if(pctEl) pctEl.textContent = job.status==='error'?'':(job.status==='done'?'100%':job.pct+'%');
+  const w = (job.status==='done'?100:(job.status==='error'||job.status==='canceled'?100:job.pct));
+  const fill = row.querySelector('.bgjob-fill'); if(fill) fill.style.width = w+'%';
+  const pctEl = row.querySelector('.bgjob-pct'); if(pctEl) pctEl.textContent = (job.status==='error'||job.status==='canceled')?'':(job.status==='done'?'100%':job.pct+'%');
   const phEl = row.querySelector('.bgjob-phase'); if(phEl){ phEl.textContent = job.phase||''; phEl.className = job.status==='error'?'bgjob-phase err':'bgjob-phase'; }
-  const nameEl = row.querySelector('.bgjob-name'); if(nameEl){ const spin = job.status==='running'?'<span class="bgjob-spin"></span>':''; nameEl.innerHTML = spin+escapeHtml(job.modelName); }
-  if(job.status==='error' && !row.querySelector('.bgjob-retry')){ row.insertAdjacentHTML('beforeend', `<button class="bgjob-retry" onclick="retryBgJob(${job.id})">Retry</button>`); }
-  const clr = document.getElementById('bgjobs-clear'); if(clr) clr.style.display = bgJobs.some(j=>j.status==='done'||j.status==='error')?'':'none';
+  const nameEl = row.querySelector('.bgjob-name'); if(nameEl){ const spin = job.status==='running'?'<span class="bgjob-spin"></span>':''; nameEl.innerHTML = spin+`${job.detail} · ${escapeHtml(job.modelName)}`; }
+  // Rebuild the action button (Cancel/Retry/none) to match the current phase/status.
+  const oldBtn = row.querySelector('.bgjob-retry,.bgjob-cancel'); if(oldBtn) oldBtn.remove();
+  const actions = bgJobActions(job); if(actions) row.insertAdjacentHTML('beforeend', actions);
+  const clr = document.getElementById('bgjobs-clear'); if(clr) clr.style.display = bgJobs.some(j=>j.status==='done'||j.status==='error'||j.status==='canceled')?'':'none';
 }
 function flashBgJobRow(job){
   const row = document.getElementById('bgjob-'+job.id); if(!row) return;
@@ -6372,7 +6454,7 @@ function flashBgJobRow(job){
 }
 function retryBgJob(id){
   const job = bgJobs.find(j=>j.id===id); if(!job || job.status!=='error') return;
-  job.status='queued'; job.pct=0; job.phase='Queued…'; job.error=null;
+  job.status='queued'; job.pct=0; job.phase='Queued…'; job.error=null; job._phase='queued'; job._canceled=false; job._xhr=null;
   renderBgJobs();
   pumpBgJobs();
 }
@@ -6617,6 +6699,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.45: (recrop joins the background queue + cancelable jobs) Client-only, builds on v7.44. Recrop headshot was still fully blocking (its own separate flow, untouched by v7.44) — hitting "Save crop" froze the editor and the modal's Cancel didn't actually stop the upload (it just hid the modal while the work finished anyway). Now: (1) "Save crop" packages the crop into a background RECROP job and closes the modal immediately, so you can go model-to-model recropping without waiting. (2) The floating job widget shows each task's detail ("Recrop · <name>" / "Photo save · <name>") with a per-row Cancel button. (3) Cancel semantics are honest: a QUEUED job is dropped cleanly (never runs); a job UPLOADING its crop is aborted mid-transfer; but once a job hits the FINALIZING phase (the server-side atomic rearrange that clears+re-uploads all photos, a few seconds) Cancel is refused with a note — dropping the client there can't safely interrupt the server and could orphan photos. (4) The recrop modal's own Cancel now genuinely stops everything because nothing is enqueued until you hit Save crop. (5) Serialization is now GLOBAL — one photo job at a time across all models (recrop + save share one lane) — which is gentler on the free-tier server during a batch and keeps the un-cancelable finalize window to a single job. (6) Board id is snapshotted per job and threaded through the recrop write helpers too (rearrangePhotos + the med-thumb clears), so a mid-batch board switch can't retarget a write. On success the model's tile repaints with the new face; failures show red + Retry (same as v7.44). NOTE: real uploads only succeed on PRODUCTION; on staging every job fails into the red/Retry path, which is how queue/cancel/serialization/widget are verified there.
    v7.44: (background non-blocking photo uploads) Client-only; the one behavior change is that saving a headshot/extra photo no longer freezes the editor. Hitting Save still writes all FIELD data synchronously (as before), but the PHOTO upload is now packaged into a background job and run in a queue while you keep working — navigate, edit other models, whatever. Progress shows in a floating widget bottom-right (one row per job: name + %, live spinner, green flash + "Done ✓" on success, red row + Retry on failure). Per-item serialization: only one photo job runs per model at a time; a second photo change to the same model queues behind the first (so two uploads can't race the same columns). Opening the photo area for a model whose upload is still running shows an "upload in progress" note. On success the model's grid/kanban tile repaints with the new face (head + med-thumb refreshed in the shared store, stale URLs dropped) without a full reload. Board safety: each job snapshots the active board id at enqueue and threads it through every write helper (replaceHeadshotFast + the med-thumb writes), so switching to the Evernote/batch board mid-upload cannot retarget the write. A close/refresh while a job is in flight warns you first. The old blocking upload overlay is retired (its markup is left inert). NOTE: real uploads only succeed on PRODUCTION — on staging Monday rejects writes to the staging board's item IDs, so a save there exercises the red/Retry path (queue, widget, serialization, and revert-on-fail are all testable on staging).
    v7.43: (kanban interactivity) Two changes, client-only, WRITES model status to Monday. (1) Drag any kanban card from one column to another to change that model's MODEL STATUS — the card moves immediately (optimistic) and the new status is written to Monday via the same change_multiple_column_values {label:{index}} call the editor already uses; on a write failure the card snaps back and an error toast shows. Dropping a card back on its own column does nothing. Each column writes its PRIMARY status id (the 5-APPROVED column, which also visually holds retired/delete/outside-exclusive, writes APPROVED; ALL-STAR writes all-star; EXCLUSIVE writes exclusive; etc.). (2) The kanban card modal already has an editable MODEL STATUS control that writes on Save — confirmed working; between it and drag, you can now move models through the pipeline directly in kanban. NOTE: like all main-board writes, drag-to-move only succeeds on PRODUCTION — on staging Monday rejects writes to the staging board's item IDs, so a drag there will revert with an error toast (test drag on prod with a throwaway move).
    v7.42: (Casting Sandbox: bigger tiles + tile→full-editor round trip) Two changes, client-only. (1) Sandbox tiles are now gallery-sized — thumbnails 80px→128px, tiles/slots and name text scaled up to match the normal grids; the three columns keep their layout and scroll horizontally on narrower windows rather than cramping. (2) Each sandbox tile has a small ✎ button (bottom-right of the thumbnail) that opens the SAME full editor used in 5-APPROVED — always the full editor regardless of the model's status, so you get complete info and a working Save. Hitting "← Back to grid" returns you straight to the Casting Sandbox with the exact same arrangement (shoot tag, zones, pay/dates notes), scrolled back to where you were. The arrangement lives in memory (sbState) and is never reset by opening/closing the editor, so you can open a tile, edit + Save, come back, rearrange, open another, and only hit "Save state" at the very end. NOTE: two independent save concepts remain — the editor's Save writes that model's data to Monday; the sandbox "Save state" persists the arrangement — they don't clobber each other. NOTE: if you remove a model's shoot tag or set an excluded status (rejected/retired/etc.) inside the editor, that model correctly drops off the sandbox on return (membership is reconciled), which is expected, not a bug.
