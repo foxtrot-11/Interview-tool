@@ -752,6 +752,39 @@
   .upload-step.active{color:var(--accent)}
   .upload-step.error{color:var(--danger)}
   .upload-step-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+  /* v7.44: floating background photo-upload jobs widget (bottom-right, non-blocking) */
+  #bgjobs{position:fixed;right:18px;bottom:18px;z-index:9000;width:300px;max-height:60vh;overflow-y:auto;
+    display:none;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--border);
+    border-radius:12px;padding:12px;box-shadow:0 8px 28px rgba(0,0,0,.5);font-family:var(--font-mono)}
+  #bgjobs.visible{display:flex}
+  .bgjobs-hd{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);
+    display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+  .bgjob{border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--surface2);transition:border-color .2s}
+  .bgjob.done{border-color:var(--success)}
+  .bgjob.error{border-color:var(--danger)}
+  .bgjob-top{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--text)}
+  .bgjob-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bgjob-pct{font-size:11px;color:var(--text-muted);flex-shrink:0}
+  .bgjob-track{background:var(--border);border-radius:99px;height:5px;overflow:hidden;margin-top:6px}
+  .bgjob-fill{background:var(--accent);height:100%;border-radius:99px;transition:width .3s ease;width:0%}
+  .bgjob.done .bgjob-fill{background:var(--success)}
+  .bgjob.error .bgjob-fill{background:var(--danger)}
+  .bgjob-phase{font-size:10px;color:var(--text-dim);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bgjob-phase.err{color:var(--danger)}
+  .bgjob-spin{display:inline-block;width:10px;height:10px;border:2px solid var(--border);border-top-color:var(--accent);
+    border-radius:50%;animation:bgspin .7s linear infinite;flex-shrink:0}
+  @keyframes bgspin{to{transform:rotate(360deg)}}
+  .bgjob-retry{margin-top:6px;font-size:10px;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;
+    background:var(--surface);border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:4px 10px}
+  .bgjob-retry:hover{background:var(--danger);color:#3a0000}
+  .bgjobs-clear{font-size:10px;cursor:pointer;color:var(--text-dim);background:none;border:none;text-decoration:underline}
+  .bgjobs-clear:hover{color:var(--text-muted)}
+  .bgjob.flash{animation:bgflash .9s ease}
+  @keyframes bgflash{0%{background:rgba(74,222,128,.28)}100%{background:var(--surface2)}}
+  /* editor "photo save in progress" note */
+  .photo-inflight-note{font-size:11px;color:var(--warning);border:1px solid var(--warning);border-radius:6px;
+    padding:6px 10px;margin-top:8px;display:none}
+  .photo-inflight-note.visible{display:block}
 
   /* ── MOBILE: simple native status dropdown above the search bar (no hamburger) ── */
   .hamburger{display:none}
@@ -796,6 +829,8 @@
 </div>
 <div id="loading-screen" style="display:none"><div class="spinner"></div><div class="loading-text">Connecting to monday.com</div></div>
 <div id="toast"><span id="toast-msg"></span><span id="toast-close" onclick="hideToast()" style="display:none;cursor:pointer;margin-left:10px;font-weight:700;opacity:0.7">×</span></div>
+<!-- v7.44: floating background photo-upload jobs widget -->
+<div id="bgjobs"><div class="bgjobs-hd"><span id="bgjobs-title">Photo uploads</span><button class="bgjobs-clear" id="bgjobs-clear" onclick="clearFinishedBgJobs()">clear done</button></div><div id="bgjobs-list"></div></div>
 
 <!-- LIGHTBOX GALLERY -->
 <div id="lightbox" onclick="if(event.target===this)closeLightbox()">
@@ -971,6 +1006,7 @@
         <div class="upload-bar-track"><div class="upload-bar-fill" id="fv-upload-bar"></div></div>
         <div class="upload-step-list" id="fv-upload-steps"></div>
       </div>
+      <div class="photo-inflight-note" id="fv-photo-inflight">A photo save for this model is still uploading in the background — new photo changes will queue behind it.</div>
     </div>
     <div id="empty-state">
       <div class="empty-icon">◈</div>
@@ -1294,6 +1330,7 @@
             <div class="upload-bar-track"><div class="upload-bar-fill" id="iv-upload-bar"></div></div>
             <div class="upload-step-list" id="iv-upload-steps"></div>
           </div>
+          <div class="photo-inflight-note" id="iv-photo-inflight">A photo save for this model is still uploading in the background — new photo changes will queue behind it.</div>
         </div>
 
         </div><!-- /iv-quick-section -->
@@ -1694,8 +1731,11 @@ const MED_THUMB_EXTRA_COL = {
   '18419204393': 'file_mm54jfwh',   // staging
   '18416230588': 'file_mm54qnmn',   // batch import
 };
-function medHeadCol(){ return MED_THUMB_HEAD_COL[BOARD_ID] || null; }
-function medExtraCol(){ return MED_THUMB_EXTRA_COL[BOARD_ID] || null; }
+// v7.44: optional boardId arg so a background photo job can resolve the med-thumb columns
+// for the board it was ENQUEUED against, even if the user has since switched boards. All
+// existing callers pass nothing and get the live BOARD_ID exactly as before.
+function medHeadCol(bId){ return MED_THUMB_HEAD_COL[bId||BOARD_ID] || null; }
+function medExtraCol(bId){ return MED_THUMB_EXTRA_COL[bId||BOARD_ID] || null; }
 // v7.34: which asset id a grid tile should display for a model — the small med-thumb if it
 // was backfilled/generated, otherwise the full headshot (sharp, same as before). Either id
 // resolves to a URL through the normal fetchAssetUrls/kbHeadCache path.
@@ -4810,7 +4850,8 @@ function maybeShowDraftBanner(id){
 setInterval(()=>{ if(currentItem && isDirty) captureDraft(); }, 30000);
 window.addEventListener('beforeunload', (e)=>{
   if(currentItem && isDirty) captureDraft();
-  if(fullEditorDirty() || kbModalDirty() || gridHasEdits()){ e.preventDefault(); e.returnValue=''; }
+  const photoJobsActive = (typeof bgJobs!=='undefined') && bgJobs.some(j=>j.status==='queued'||j.status==='running'); // v7.44
+  if(fullEditorDirty() || kbModalDirty() || gridHasEdits() || photoJobsActive){ e.preventDefault(); e.returnValue=''; }
 });
 
 // ── LOAD CANDIDATE ──
@@ -5542,6 +5583,7 @@ async function loadCandidatePhotos(itemId){
   } catch(e) {
     console.log('Photo load error:', e.message);
   }
+  if(typeof refreshInflightNotes==='function') refreshInflightNotes(); // v7.44: show "upload in progress" if this model has a live job
 }
 
 function renderPhotoGrid(){
@@ -5851,8 +5893,8 @@ async function makeMedThumb(fileIn){
 // Set the model's HEADSHOT med-thumb from a source file: clear the (single-file) column and
 // upload one fresh small version. The grid reads files[0] of this column, so the filename is
 // irrelevant here (no id pairing needed for the headshot). Best-effort: never throws.
-async function setHeadMedThumb(itemId, sourceFile){
-  const col = medHeadCol(); if(!col || !sourceFile) return;
+async function setHeadMedThumb(itemId, sourceFile, bId){
+  const col = medHeadCol(bId); if(!col || !sourceFile) return;
   try{
     const thumb = await makeMedThumb(sourceFile); if(!thumb) return;
     // v7.36 (Finding 2): only clear if the column actually has something, and wait for the
@@ -5867,7 +5909,7 @@ async function setHeadMedThumb(itemId, sourceFile){
     }catch(e){}
     if(hasExisting){
       await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
-        {i:String(itemId), b:BOARD_ID, c:JSON.stringify({[col]:{clear_all:true}})});
+        {i:String(itemId), b:(bId||BOARD_ID), c:JSON.stringify({[col]:{clear_all:true}})});
       await new Promise(r=>setTimeout(r, 800)); // let the clear settle (monday is eventually-consistent)
     }
     await uploadFileToMonday(itemId, col, thumb);
@@ -5900,8 +5942,8 @@ async function clearExtraMedThumbs(itemId){
 
 // Add an EXTRA med-thumb paired to a just-uploaded full extra. Named medthumb-<fullAssetId>.jpg
 // so the editor strip can pair small<->full by embedded id. Best-effort: never throws.
-async function addExtraMedThumb(itemId, sourceFile, fullAssetId){
-  const col = medExtraCol(); if(!col || !sourceFile || !fullAssetId) return;
+async function addExtraMedThumb(itemId, sourceFile, fullAssetId, bId){
+  const col = medExtraCol(bId); if(!col || !sourceFile || !fullAssetId) return;
   try{
     const thumb = await makeMedThumb(sourceFile); if(!thumb) return;
     const named = new File([thumb], `medthumb-${fullAssetId}.jpg`, { type:'image/jpeg' });
@@ -5937,11 +5979,11 @@ async function rearrangePhotos(itemId, headshotAssetIds, extraAssetIds){
 
 // v7.40: fast headshot replace — only the headshot column is rewritten; the old headshot is
 // appended to extras; existing extras (and their med-thumb pairings) are left untouched.
-async function replaceHeadshotFast(itemId, newHeadAssetId, oldHeadAssetIds){
+async function replaceHeadshotFast(itemId, newHeadAssetId, oldHeadAssetIds, bId){
   const r = await fetch('/replace-headshot-fast', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-App-Auth': APP_PW },
-    body: JSON.stringify({ itemId, boardId: BOARD_ID, newHeadAssetId, oldHeadAssetIds })
+    body: JSON.stringify({ itemId, boardId: (bId||BOARD_ID), newHeadAssetId, oldHeadAssetIds })
   });
   const j = await r.json();
   if(!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
@@ -6118,170 +6160,267 @@ async function saveNewModel(targetMode){
 }
 
 // ── SAVE + UPLOAD for interview mode ──
-async function saveAndUploadIv(){
-  if(!currentItem) return;
-  // First save all field data
-  await saveRecord();
+// ── v7.44: BACKGROUND PHOTO UPLOAD QUEUE ────────────────────────────────────────────────
+// Hitting Save used to freeze the editor behind a blocking progress overlay for the entire
+// photo upload. Now the field save (saveRecord) still runs inline/synchronously, but the
+// PHOTO work is packaged into a job, enqueued, and run in the background while the user keeps
+// working. Progress shows in a floating widget (bottom-right). Design points:
+//   • Each job SNAPSHOTS boardId at enqueue and threads it through every write helper, so a
+//     board switch mid-upload cannot retarget the write (the helpers otherwise read the live
+//     global BOARD_ID).
+//   • Per-item serialization: only one active photo job per itemId; a second change to the
+//     same model queues behind the first (prevents two uploads racing the same columns).
+//   • On success: refresh that model's head/medHead in the shared store, drop the stale
+//     kbHeadCache entries, and repaint its grid/kanban tiles — no full reload.
+//   • On failure: red row + Retry (re-runs with the same snapshotted files + board).
+let bgJobs = [];           // {id,itemId,modelName,boardId,kind,headshotFile,extraFiles,status,pct,phase,error}
+let bgJobSeq = 0;          // monotonic id source
+const bgRunning = new Set(); // itemIds with a job currently running (serialization guard)
 
-  const haveHeadshot = ivHeadshotFile.length > 0;
-  const haveExtras = ivExtraFiles.length > 0;
-  if(!haveHeadshot && !haveExtras) return;
+function hasActivePhotoJob(itemId){
+  const s = String(itemId);
+  return bgJobs.some(j => String(j.itemId)===s && (j.status==='queued' || j.status==='running'));
+}
 
-  const prog = document.getElementById('iv-upload-progress');
-  const steps = document.getElementById('iv-upload-steps');
-  const bar = document.getElementById('iv-upload-bar');
-  steps.innerHTML=''; prog.classList.add('visible');
-  document.getElementById('iv-upload-label').textContent='Uploading photos...';
-  document.getElementById('iv-upload-pct').textContent='0%';
+// Package + enqueue a photo job. files are snapshotted here; caller clears its own arrays.
+function enqueuePhotoJob({itemId, modelName, boardId, headshotFile, extraFiles}){
+  const hs = headshotFile || null;
+  const ex = (extraFiles || []).slice();
+  if(!hs && ex.length===0) return null;         // nothing to upload
+  const job = {
+    id: ++bgJobSeq,
+    itemId: String(itemId),
+    modelName: modelName || 'Model',
+    boardId: String(boardId),                    // SNAPSHOT — never re-read from the global
+    headshotFile: hs,
+    extraFiles: ex,
+    status: 'queued',                            // queued → running → done | error
+    pct: 0,
+    phase: 'Queued…',
+    error: null
+  };
+  bgJobs.push(job);
+  renderBgJobs();
+  pumpBgJobs();
+  return job;
+}
 
-  // ---- HEADSHOT REPLACEMENT (do first) ----
-  if(haveHeadshot){
-    const file = ivHeadshotFile[0];
-    const si = addUploadStep(steps, `Uploading headshot ${file.name}...`, 'active');
-    try{
-      // Snapshot existing photos BEFORE the new upload
-      const cur = await gql(`{items(ids:[${currentItem.id}]){column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
+// Start the next queued job for any item that has no job currently running.
+function pumpBgJobs(){
+  for(const job of bgJobs){
+    if(job.status!=='queued') continue;
+    if(bgRunning.has(job.itemId)) continue;      // that model already has a job in flight
+    bgRunning.add(job.itemId);
+    job.status = 'running';
+    job.phase = 'Starting…';
+    renderBgJobs();
+    // Fire and forget; runPhotoJob owns its own error handling and re-pumps on finish.
+    runPhotoJob(job);
+  }
+}
+
+// The actual upload work — refactored verbatim from the old saveAndUploadIv/Fv photo bodies,
+// but operating on the job snapshot (job.headshotFile / job.extraFiles / job.boardId) instead
+// of the editor globals, and reporting progress into the widget row instead of a DOM bar.
+async function runPhotoJob(job){
+  const bId = job.boardId;
+  const setPhase = (pct, phase) => { job.pct = Math.max(0, Math.min(100, Math.round(pct))); if(phase) job.phase = phase; updateBgJobRow(job); };
+  const haveHeadshot = !!job.headshotFile;
+  const nExtras = job.extraFiles.length;
+  let headChanged = false;
+  let hadError = false;
+
+  try{
+    // ---- HEADSHOT REPLACEMENT (first) ----
+    if(haveHeadshot){
+      const file = job.headshotFile;
+      setPhase(0, 'Uploading headshot…');
+      // Snapshot existing photos BEFORE the new upload (used to identify the new asset + demote old head)
+      const cur = await gql(`{items(ids:[${job.itemId}]){column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
       const cvals = cur.items[0].column_values;
       const parseEntries = (cid)=>{ const c=cvals.find(x=>x.id===cid); if(!c||!c.value) return []; try{return (JSON.parse(c.value).files||[]);}catch{return [];} };
       const oldHead = parseEntries('files_mkncw5nm');
-      const oldExtras = parseEntries('file_mkp1n4bt');
 
       // Upload the new file to the headshot column (real bytes → owned asset; this APPENDS)
-      await uploadFileToMonday(currentItem.id, 'files_mkncw5nm', file, pct=>{
-        bar.style.width = Math.round(pct*50)+'%';
-        document.getElementById('iv-upload-pct').textContent = Math.round(pct*50)+'%';
-      });
+      await uploadFileToMonday(job.itemId, 'files_mkncw5nm', file, pct=>setPhase(pct*50, 'Uploading headshot…'));
 
       // Find the newly-uploaded asset id (the entry not present before)
-      const after = await gql(`{items(ids:[${currentItem.id}]){column_values(ids:["files_mkncw5nm"]){id value}}}`);
+      const after = await gql(`{items(ids:[${job.itemId}]){column_values(ids:["files_mkncw5nm"]){id value}}}`);
       let headNow = [];
       try{ headNow = JSON.parse(after.items[0].column_values[0].value).files||[]; }catch{}
       const oldHeadIds = new Set(oldHead.map(e=>e.assetId));
       const newEntry = headNow.find(e=>!oldHeadIds.has(e.assetId)) || headNow[headNow.length-1];
 
-      // v7.40: FAST replace — new upload becomes the headshot, old headshot(s) demoted to
-      // extras, existing extras UNTOUCHED (their asset ids + med-thumb pairings survive).
-      await replaceHeadshotFast(currentItem.id, newEntry.assetId, oldHead.map(e=>e.assetId));
-
-      await setHeadMedThumb(currentItem.id, file);   // regenerate small headshot from the new file
-      // NOTE: no clearExtraMedThumbs — extras (and their pairings) are preserved by the fast path.
-
-      setUploadStep(steps, si, 'done', '✓ Headshot replaced: '+file.name);
-    }catch(e){
-      setUploadStep(steps, si, 'error', '✗ Headshot: '+e.message);
+      setPhase(50, 'Finalizing headshot…');
+      // v7.40 FAST replace — new upload becomes the headshot, old headshot(s) demoted to extras,
+      // existing extras UNTOUCHED (asset ids + med-thumb pairings survive). boardId threaded (v7.44).
+      await replaceHeadshotFast(job.itemId, newEntry.assetId, oldHead.map(e=>e.assetId), bId);
+      await setHeadMedThumb(job.itemId, file, bId);   // regenerate small headshot from the new file
+      headChanged = true;
     }
-  }
 
-  // ---- EXTRA PHOTOS ----
-  const ivMedThumbJobs = []; // v7.36 (Finding 3): don't block each upload on its thumb; settle at the end
-  for(let i=0; i<ivExtraFiles.length; i++){
-    const file = ivExtraFiles[i];
-    const si = addUploadStep(steps, `Uploading ${file.name}...`, 'active');
-    try{
-      const exId = await uploadFileToMonday(currentItem.id, 'file_mkp1n4bt', file, pct=>{
-        const base = haveHeadshot ? 50 : 0;
-        const span = haveHeadshot ? 50 : 100;
-        const total = Math.round(base + ((i+pct)/ivExtraFiles.length)*span);
-        bar.style.width = total+'%';
-        document.getElementById('iv-upload-pct').textContent = total+'%';
+    // ---- EXTRA PHOTOS ----
+    const medThumbJobs = []; // don't block each upload on its thumb; settle at the end
+    for(let i=0;i<nExtras;i++){
+      const file = job.extraFiles[i];
+      const base = haveHeadshot ? 50 : 0, span = haveHeadshot ? 50 : 100;
+      setPhase(base + (i/Math.max(1,nExtras))*span, `Uploading extra ${i+1}/${nExtras}…`);
+      const exId = await uploadFileToMonday(job.itemId, 'file_mkp1n4bt', file, pct=>{
+        setPhase(base + ((i+pct)/nExtras)*span, `Uploading extra ${i+1}/${nExtras}…`);
       });
-      ivMedThumbJobs.push(addExtraMedThumb(currentItem.id, file, exId));   // v7.35: paired small version (v7.36: parallel)
-      setUploadStep(steps, si, 'done', '✓ '+file.name);
-    }catch(e){
-      setUploadStep(steps, si, 'error', '✗ '+file.name+': '+e.message);
+      medThumbJobs.push(addExtraMedThumb(job.itemId, file, exId, bId)); // paired small version, board threaded (v7.44)
     }
+    if(medThumbJobs.length){ setPhase(98, 'Finishing thumbnails…'); await Promise.allSettled(medThumbJobs); }
+
+    setPhase(100, 'Done ✓');
+    job.status = 'done';
+  }catch(e){
+    hadError = true;
+    job.status = 'error';
+    job.error = e.message || String(e);
+    job.phase = '✗ ' + job.error;
+    showToast(`${job.modelName}: photo upload failed — ${job.error}`, 'error');
   }
-  if(ivMedThumbJobs.length) await Promise.allSettled(ivMedThumbJobs); // finish thumbs before the grid reloads
-  bar.style.width='100%';
-  document.getElementById('iv-upload-pct').textContent='100%';
-  document.getElementById('iv-upload-label').textContent='Done!';
-  ivExtraFiles=[];
-  ivHeadshotFile=[];
-  // Refresh photo grid so new uploads appear next to the name
-  if(currentItem) loadCandidatePhotos(currentItem.id);
-  renderPreviews('iv-extras-previews',[],`iv-extra`);
-  renderPreviews('iv-headshot-previews',[],`iv-headshot`);
-  setTimeout(()=>{ prog.classList.remove('visible'); steps.innerHTML=''; bar.style.width='0%'; },2500);
+
+  updateBgJobRow(job);
+  bgRunning.delete(job.itemId);
+
+  if(!hadError){
+    // Update the shared store + repaint tiles for this item (best-effort; never throws).
+    try{ if(headChanged) await refreshItemHeadFromMonday(job.itemId, bId); }catch(e){ console.warn('head refresh skipped:', e.message); }
+    // If the editor is still parked on this same model, refresh its photo strip too.
+    try{ if(currentItem && String(currentItem.id)===job.itemId) loadCandidatePhotos(job.itemId); }catch(e){}
+    showToast(`${job.modelName}: photos saved ✓`, 'success');
+    flashBgJobRow(job);
+  }
+
+  pumpBgJobs();          // let the next queued job (if any) for any item start
+  refreshInflightNotes();
 }
 
-// Full-view (applicant → approved/rejected) save + photo upload. Mirrors saveAndUploadIv.
+// After a background headshot change, pull the NEW head + med-head asset (id+url) fresh from
+// Monday and update the store so grid/kanban tiles show the new face without a full reload.
+async function refreshItemHeadFromMonday(itemId, bId){
+  const mHead = medHeadCol(bId);
+  const medClause = mHead ? `,"${mHead}"` : '';
+  const data = await gql(`{items(ids:[${itemId}]){assets{id public_url name} column_values(ids:["files_mkncw5nm"${medClause}]){id value}}}`);
+  const item = data?.items?.[0]; if(!item) return;
+  const assetById = {}; (item.assets||[]).forEach(a=>assetById[String(a.id)]=a);
+  const filesOf = cid => { const c=(item.column_values||[]).find(x=>x.id===cid); if(!c||!c.value) return []; try{return JSON.parse(c.value).files||[];}catch{return [];} };
+
+  const headEntry = filesOf('files_mkncw5nm')[0] || null;
+  const medEntry  = mHead ? (filesOf(mHead)[0] || null) : null;
+  const headAsset = headEntry ? assetById[String(headEntry.assetId)] : null;
+  const medAsset  = medEntry  ? assetById[String(medEntry.assetId)]  : null;
+
+  const m = (typeof kanbanItems!=='undefined' && kanbanItems) ? kanbanItems.find(x=>String(x.id)===String(itemId)) : null;
+  if(m){
+    // Drop stale cache entries for the OUTGOING assets before overwriting.
+    if(m.head)    delete kbHeadCache[String(m.head)];
+    if(m.medHead) delete kbHeadCache[String(m.medHead)];
+    m.head    = headAsset ? String(headAsset.id) : null;
+    m.medHead = medAsset  ? String(medAsset.id)  : null;
+  }
+  if(headAsset && headAsset.public_url) kbHeadCache[String(headAsset.id)] = headAsset.public_url;
+  if(medAsset  && medAsset.public_url)  kbHeadCache[String(medAsset.id)]  = medAsset.public_url;
+
+  // Repaint the grid + kanban tiles for this item (med-thumb preferred, else full head).
+  const dispUrl = (medAsset && medAsset.public_url) || (headAsset && headAsset.public_url) || '';
+  if(dispUrl){
+    ['amthumb-','kbthumb-'].forEach(pre=>{ const el=document.getElementById(pre+itemId); if(el) el.innerHTML=`<img loading="lazy" src="${escapeHtml(dispUrl)}" alt="">`; });
+  }
+}
+
+// ── widget rendering ──
+function renderBgJobs(){
+  const wrap = document.getElementById('bgjobs');
+  const list = document.getElementById('bgjobs-list');
+  if(!wrap || !list) return;
+  if(bgJobs.length===0){ wrap.classList.remove('visible'); list.innerHTML=''; return; }
+  wrap.classList.add('visible');
+  list.innerHTML = bgJobs.map(j=>bgJobRowHtml(j)).join('');
+  const anyDone = bgJobs.some(j=>j.status==='done'||j.status==='error');
+  const clr = document.getElementById('bgjobs-clear');
+  if(clr) clr.style.display = anyDone ? '' : 'none';
+}
+function bgJobRowHtml(j){
+  const spin = j.status==='running' ? '<span class="bgjob-spin"></span>' : '';
+  const pctTxt = j.status==='error' ? '' : (j.status==='done' ? '100%' : j.pct+'%');
+  const retry = j.status==='error' ? `<button class="bgjob-retry" onclick="retryBgJob(${j.id})">Retry</button>` : '';
+  const phaseCls = j.status==='error' ? 'bgjob-phase err' : 'bgjob-phase';
+  return `<div class="bgjob ${j.status}" id="bgjob-${j.id}">
+    <div class="bgjob-top"><span class="bgjob-name">${spin}${escapeHtml(j.modelName)}</span><span class="bgjob-pct">${pctTxt}</span></div>
+    <div class="bgjob-track"><div class="bgjob-fill" style="width:${j.status==='done'?100:(j.status==='error'?100:j.pct)}%"></div></div>
+    <div class="${phaseCls}">${escapeHtml(j.phase||'')}</div>
+    ${retry}
+  </div>`;
+}
+function updateBgJobRow(job){
+  const row = document.getElementById('bgjob-'+job.id);
+  if(!row){ renderBgJobs(); return; }
+  row.className = 'bgjob '+job.status;
+  const fill = row.querySelector('.bgjob-fill'); if(fill) fill.style.width = (job.status==='done'?100:(job.status==='error'?100:job.pct))+'%';
+  const pctEl = row.querySelector('.bgjob-pct'); if(pctEl) pctEl.textContent = job.status==='error'?'':(job.status==='done'?'100%':job.pct+'%');
+  const phEl = row.querySelector('.bgjob-phase'); if(phEl){ phEl.textContent = job.phase||''; phEl.className = job.status==='error'?'bgjob-phase err':'bgjob-phase'; }
+  const nameEl = row.querySelector('.bgjob-name'); if(nameEl){ const spin = job.status==='running'?'<span class="bgjob-spin"></span>':''; nameEl.innerHTML = spin+escapeHtml(job.modelName); }
+  if(job.status==='error' && !row.querySelector('.bgjob-retry')){ row.insertAdjacentHTML('beforeend', `<button class="bgjob-retry" onclick="retryBgJob(${job.id})">Retry</button>`); }
+  const clr = document.getElementById('bgjobs-clear'); if(clr) clr.style.display = bgJobs.some(j=>j.status==='done'||j.status==='error')?'':'none';
+}
+function flashBgJobRow(job){
+  const row = document.getElementById('bgjob-'+job.id); if(!row) return;
+  row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+}
+function retryBgJob(id){
+  const job = bgJobs.find(j=>j.id===id); if(!job || job.status!=='error') return;
+  job.status='queued'; job.pct=0; job.phase='Queued…'; job.error=null;
+  renderBgJobs();
+  pumpBgJobs();
+}
+function clearFinishedBgJobs(){
+  bgJobs = bgJobs.filter(j=>j.status==='queued'||j.status==='running');
+  renderBgJobs();
+}
+// Toggle the "photo save in progress" note inside whichever editor is open.
+function refreshInflightNotes(){
+  ['iv-photo-inflight','fv-photo-inflight'].forEach(id=>{
+    const el = document.getElementById(id); if(!el) return;
+    const show = currentItem && hasActivePhotoJob(currentItem.id);
+    el.classList.toggle('visible', !!show);
+  });
+}
+
+async function saveAndUploadIv(){
+  if(!currentItem) return;
+  await saveRecord();                                  // field save stays synchronous/inline
+  const itemId = currentItem.id, name = currentItem.name;
+  const boardId = BOARD_ID;                            // snapshot the board at enqueue time
+  const headshotFile = ivHeadshotFile.length ? ivHeadshotFile[0] : null;
+  const extraFiles = ivExtraFiles.slice();
+  // Clear the editor's pending-photo state immediately so the UI is free to navigate.
+  ivExtraFiles=[]; ivHeadshotFile=[];
+  renderPreviews('iv-extras-previews',[],`iv-extra`);
+  renderPreviews('iv-headshot-previews',[],`iv-headshot`);
+  if(headshotFile || extraFiles.length){
+    enqueuePhotoJob({itemId, modelName:name, boardId, headshotFile, extraFiles});
+    refreshInflightNotes();
+  }
+}
+
+// Full-view save + photo upload. Same split as saveAndUploadIv.
 async function saveAndUploadFv(){
   if(!currentItem) return;
   await saveRecord();
-
-  const haveHeadshot = fvHeadshotFile.length > 0;
-  const haveExtras = fvExtraFiles.length > 0;
-  if(!haveHeadshot && !haveExtras) return;
-
-  const prog = document.getElementById('fv-upload-progress');
-  const steps = document.getElementById('fv-upload-steps');
-  const bar = document.getElementById('fv-upload-bar');
-  steps.innerHTML=''; prog.classList.add('visible');
-  document.getElementById('fv-upload-label').textContent='Uploading photos...';
-  document.getElementById('fv-upload-pct').textContent='0%';
-
-  // ---- HEADSHOT REPLACEMENT (first) ----
-  if(haveHeadshot){
-    const file = fvHeadshotFile[0];
-    const si = addUploadStep(steps, `Uploading headshot ${file.name}...`, 'active');
-    try{
-      const cur = await gql(`{items(ids:[${currentItem.id}]){column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
-      const cvals = cur.items[0].column_values;
-      const parseEntries = (cid)=>{ const c=cvals.find(x=>x.id===cid); if(!c||!c.value) return []; try{return (JSON.parse(c.value).files||[]);}catch{return [];} };
-      const oldHead = parseEntries('files_mkncw5nm');
-      const oldExtras = parseEntries('file_mkp1n4bt');
-
-      await uploadFileToMonday(currentItem.id, 'files_mkncw5nm', file, pct=>{
-        bar.style.width = Math.round(pct*50)+'%';
-        document.getElementById('fv-upload-pct').textContent = Math.round(pct*50)+'%';
-      });
-
-      const after = await gql(`{items(ids:[${currentItem.id}]){column_values(ids:["files_mkncw5nm"]){id value}}}`);
-      let headNow = [];
-      try{ headNow = JSON.parse(after.items[0].column_values[0].value).files||[]; }catch{}
-      const oldHeadIds = new Set(oldHead.map(e=>e.assetId));
-      const newEntry = headNow.find(e=>!oldHeadIds.has(e.assetId)) || headNow[headNow.length-1];
-
-      // v7.40: FAST replace — see saveAndUploadIv. Extras untouched; pairings preserved.
-      await replaceHeadshotFast(currentItem.id, newEntry.assetId, oldHead.map(e=>e.assetId));
-
-      await setHeadMedThumb(currentItem.id, file);   // regenerate small headshot from the new file
-
-      setUploadStep(steps, si, 'done', '✓ Headshot replaced: '+file.name);
-    }catch(e){
-      setUploadStep(steps, si, 'error', '✗ Headshot: '+e.message);
-    }
-  }
-
-  // ---- EXTRA PHOTOS ----
-  const fvMedThumbJobs = []; // v7.36 (Finding 3): don't block each upload on its thumb; settle at the end
-  for(let i=0; i<fvExtraFiles.length; i++){
-    const file = fvExtraFiles[i];
-    const si = addUploadStep(steps, `Uploading ${file.name}...`, 'active');
-    try{
-      const exId = await uploadFileToMonday(currentItem.id, 'file_mkp1n4bt', file, pct=>{
-        const base = haveHeadshot ? 50 : 0;
-        const span = haveHeadshot ? 50 : 100;
-        const total = Math.round(base + ((i+pct)/fvExtraFiles.length)*span);
-        bar.style.width = total+'%';
-        document.getElementById('fv-upload-pct').textContent = total+'%';
-      });
-      fvMedThumbJobs.push(addExtraMedThumb(currentItem.id, file, exId));   // v7.35: paired small version (v7.36: parallel)
-      setUploadStep(steps, si, 'done', '✓ '+file.name);
-    }catch(e){
-      setUploadStep(steps, si, 'error', '✗ '+file.name+': '+e.message);
-    }
-  }
-  if(fvMedThumbJobs.length) await Promise.allSettled(fvMedThumbJobs); // finish thumbs before the grid reloads
-  bar.style.width='100%';
-  document.getElementById('fv-upload-pct').textContent='100%';
-  document.getElementById('fv-upload-label').textContent='Done!';
-  fvExtraFiles=[];
-  fvHeadshotFile=[];
-  if(currentItem) loadCandidatePhotos(currentItem.id);
+  const itemId = currentItem.id, name = currentItem.name;
+  const boardId = BOARD_ID;
+  const headshotFile = fvHeadshotFile.length ? fvHeadshotFile[0] : null;
+  const extraFiles = fvExtraFiles.slice();
+  fvExtraFiles=[]; fvHeadshotFile=[];
   renderPreviews('fv-extras-previews',[],`fv-extra`);
   renderPreviews('fv-headshot-previews',[],`fv-headshot`);
-  setTimeout(()=>{ prog.classList.remove('visible'); steps.innerHTML=''; bar.style.width='0%'; },2500);
+  if(headshotFile || extraFiles.length){
+    enqueuePhotoJob({itemId, modelName:name, boardId, headshotFile, extraFiles});
+    refreshInflightNotes();
+  }
 }
 
 function buildColumnValues(){
@@ -6478,6 +6617,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.44: (background non-blocking photo uploads) Client-only; the one behavior change is that saving a headshot/extra photo no longer freezes the editor. Hitting Save still writes all FIELD data synchronously (as before), but the PHOTO upload is now packaged into a background job and run in a queue while you keep working — navigate, edit other models, whatever. Progress shows in a floating widget bottom-right (one row per job: name + %, live spinner, green flash + "Done ✓" on success, red row + Retry on failure). Per-item serialization: only one photo job runs per model at a time; a second photo change to the same model queues behind the first (so two uploads can't race the same columns). Opening the photo area for a model whose upload is still running shows an "upload in progress" note. On success the model's grid/kanban tile repaints with the new face (head + med-thumb refreshed in the shared store, stale URLs dropped) without a full reload. Board safety: each job snapshots the active board id at enqueue and threads it through every write helper (replaceHeadshotFast + the med-thumb writes), so switching to the Evernote/batch board mid-upload cannot retarget the write. A close/refresh while a job is in flight warns you first. The old blocking upload overlay is retired (its markup is left inert). NOTE: real uploads only succeed on PRODUCTION — on staging Monday rejects writes to the staging board's item IDs, so a save there exercises the red/Retry path (queue, widget, serialization, and revert-on-fail are all testable on staging).
    v7.43: (kanban interactivity) Two changes, client-only, WRITES model status to Monday. (1) Drag any kanban card from one column to another to change that model's MODEL STATUS — the card moves immediately (optimistic) and the new status is written to Monday via the same change_multiple_column_values {label:{index}} call the editor already uses; on a write failure the card snaps back and an error toast shows. Dropping a card back on its own column does nothing. Each column writes its PRIMARY status id (the 5-APPROVED column, which also visually holds retired/delete/outside-exclusive, writes APPROVED; ALL-STAR writes all-star; EXCLUSIVE writes exclusive; etc.). (2) The kanban card modal already has an editable MODEL STATUS control that writes on Save — confirmed working; between it and drag, you can now move models through the pipeline directly in kanban. NOTE: like all main-board writes, drag-to-move only succeeds on PRODUCTION — on staging Monday rejects writes to the staging board's item IDs, so a drag there will revert with an error toast (test drag on prod with a throwaway move).
    v7.42: (Casting Sandbox: bigger tiles + tile→full-editor round trip) Two changes, client-only. (1) Sandbox tiles are now gallery-sized — thumbnails 80px→128px, tiles/slots and name text scaled up to match the normal grids; the three columns keep their layout and scroll horizontally on narrower windows rather than cramping. (2) Each sandbox tile has a small ✎ button (bottom-right of the thumbnail) that opens the SAME full editor used in 5-APPROVED — always the full editor regardless of the model's status, so you get complete info and a working Save. Hitting "← Back to grid" returns you straight to the Casting Sandbox with the exact same arrangement (shoot tag, zones, pay/dates notes), scrolled back to where you were. The arrangement lives in memory (sbState) and is never reset by opening/closing the editor, so you can open a tile, edit + Save, come back, rearrange, open another, and only hit "Save state" at the very end. NOTE: two independent save concepts remain — the editor's Save writes that model's data to Monday; the sandbox "Save state" persists the arrangement — they don't clobber each other. NOTE: if you remove a model's shoot tag or set an excluded status (rejected/retired/etc.) inside the editor, that model correctly drops off the sandbox on return (membership is reconciled), which is expected, not a bug.
    v7.41: (theme + quick-UI batch) Eight changes. (1) App accent recolored from purple to logo blue (#3AA2E0) everywhere — the AI-app purple, kanban chrome, and the CASTING SANDBOX tab + sandbox save-tab hovers; Monday's own data-label colors (status pills etc., which mirror Monday's #9d50dd "color 4") are intentionally left unchanged so the app stays in sync with Monday. (2) "Scrape photos" button is now yellow so it stands out. (3) "Copy link" now sits directly beside "Back to grid" (wrapped in one flex group) instead of floating mid-toolbar. (4) Grid tag popovers now close on any outside click (capture-phase handler that defeats inner stopPropagation) and on Escape; the read-only tag list gained a "+ Add tag" footer that opens the add/create picker in place. (5) Metric/imperial: clearer warning that distinguishes an out-of-plausible-range value (e.g. "250 cm is outside 120–230 cm") from an unparseable one, value still saved; the six measurement fields are now grouped into three paired imperial|metric rows so each pair shares a line; a WHITE outline marks whichever side was the source of truth (live as you type, inferred on load via exact round-trip). (6) Kanban modal multi-selects restyled from raw checkboxes to the app's box-button look (native checkbox hidden, state via :has — value collection unchanged). (7) Recrop headshot gained a passport-style head+shoulders guide overlay (toggleable) to standardize crops. (8) Confirmed all grids default to newest-first. Client-only.

@@ -352,7 +352,7 @@ has('async function addExtraMedThumb(', 'addExtraMedThumb helper present');
 has('return j?.data?.add_file_to_column?.id', 'uploadFileToMonday returns new asset id');
 has('await setHeadMedThumb(newId, file)', 'new-model headshot generates med-thumb');
 has('addExtraMedThumb(newId, file, exId)', 'new-model extras generate paired med-thumbs');
-has('await setHeadMedThumb(currentItem.id, file)', 'headshot-replace regenerates med-thumb');
+has('await setHeadMedThumb(job.itemId, file, bId)', 'headshot-replace regenerates med-thumb (v7.44: in runPhotoJob, board-threaded)');
 has('await clearHeadMedThumb(itemId)', 'recrop clears head med-thumb (fallback to full)');
 has('await clearHeadMedThumb(currentItem.id)', 'promote-existing clears head med-thumb');
 has('`medthumb-${fullAssetId}.jpg`', 'extra med-thumb named by source asset id (pairing)');
@@ -362,8 +362,7 @@ has('v7.36:', 'v7.36 deploy marker present');
 has('async function clearExtraMedThumbs(', 'clearExtraMedThumbs helper present (Finding 1)');
 has('setTimeout(r, 800)', 'setHeadMedThumb settles after clear (Finding 2)');
 has('if(hasExisting)', 'setHeadMedThumb only clears when column non-empty (Finding 2)');
-has('Promise.allSettled(ivMedThumbJobs)', 'interview extras thumbs run in parallel (Finding 3)');
-has('Promise.allSettled(fvMedThumbJobs)', 'full-view extras thumbs run in parallel (Finding 3)');
+has('await Promise.allSettled(medThumbJobs)', 'extras thumbs run in parallel (v7.44: unified in runPhotoJob for iv+fv)');
 has('Promise.allSettled(nmMedThumbJobs)', 'new-model extras thumbs run in parallel (Finding 3)');
 { const n2=(src.match(/clearExtraMedThumbs\(/g)||[]).length;
   (n2>=5 ? ok : bad)(`clearExtraMedThumbs still guards the flows that DO churn extras (${n2} calls; v7.40 dropped the 2 replace flows to the fast path)`, `only ${n2}`); }
@@ -502,6 +501,43 @@ has('draggable="true" ondragstart="kbDragStart', 'kanban cards are draggable');
 has('ondrop="kbDrop(event', 'kanban columns are drop targets');
 has('KANBAN_COLS[i].ids[0]', 'drop writes column primary status id');
 has('kb-drop-over', 'drop-target highlight style present');
+
+/* v7.44 asserts: background non-blocking photo uploads */
+has('v7.44:', 'v7.44 deploy marker present');
+// queue + serialization
+has('let bgJobs = [];', 'bgJobs queue present');
+has('const bgRunning = new Set()', 'per-item serialization guard present');
+has('function enqueuePhotoJob(', 'photo job enqueue present');
+has('function pumpBgJobs(', 'job pump present');
+has('async function runPhotoJob(', 'runPhotoJob worker present');
+has('function hasActivePhotoJob(', 'active-job check present');
+has('boardId: String(boardId)', 'job snapshots active board at enqueue');
+// board threading (a mid-job board switch must not retarget the write)
+has('function medHeadCol(bId)', 'medHeadCol accepts optional boardId');
+has('function medExtraCol(bId)', 'medExtraCol accepts optional boardId');
+has('async function setHeadMedThumb(itemId, sourceFile, bId)', 'setHeadMedThumb board-threaded');
+has('async function addExtraMedThumb(itemId, sourceFile, fullAssetId, bId)', 'addExtraMedThumb board-threaded');
+has('async function replaceHeadshotFast(itemId, newHeadAssetId, oldHeadAssetIds, bId)', 'replaceHeadshotFast board-threaded');
+has('await replaceHeadshotFast(job.itemId, newEntry.assetId, oldHead.map(e=>e.assetId), bId)', 'runPhotoJob passes snapshotted board to fast replace');
+// save path is now non-blocking (enqueue, no overlay)
+has('enqueuePhotoJob({itemId, modelName:name, boardId, headshotFile, extraFiles})', 'save enqueues a background photo job');
+lacks("prog.classList.add('visible')", 'blocking upload overlay is no longer shown by the save path');
+// completion: refresh store (head AND medHead), drop stale cache, repaint tile
+has('async function refreshItemHeadFromMonday(', 'completion store refresh present');
+has('m.medHead = medAsset', 'completion updates medHead (not just head)');
+has('delete kbHeadCache[String(m.head)]', 'completion drops stale head cache entry');
+// widget
+has('id="bgjobs"', 'jobs widget container present');
+has('function renderBgJobs(', 'jobs widget renderer present');
+has('function retryBgJob(', 'failed-job retry present');
+has('function flashBgJobRow(', 'done-flash present');
+has('bgjob-retry', 'retry button styled');
+// beforeunload + in-progress note
+has('const photoJobsActive', 'beforeunload warns while jobs active');
+has('photo-inflight-note', 'in-progress note styled');
+has('function refreshInflightNotes(', 'in-progress note toggler present');
+has('iv-photo-inflight', 'iv in-progress note present');
+has('fv-photo-inflight', 'fv in-progress note present');
 
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
