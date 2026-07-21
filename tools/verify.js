@@ -584,5 +584,27 @@ has('if(!sbState.tag && !sbState.pendingLabel)', 'renderSandbox accepts a provis
 has('sb-newtag', 'the + New tag row is rendered/styled');
 has("String(sbState.pendingLabel).toLowerCase()===label.toLowerCase()", 'provisional tag is promoted to a real id after first add');
 
+/* v7.47 asserts: dead-code removal + grid tag "+" on every tile + recrop shoulder guide */
+has('v7.47:', 'v7.47 deploy marker present');
+// (A) dead change-headshot code removed
+lacks('function kbApplyHeadshot(', 'dead kbApplyHeadshot removed');
+lacks('function kbHsProgressStart(', 'dead kbHsProgressStart removed');
+lacks('kbHsTimer=setInterval', 'dead kbHsTimer loop removed');
+lacks('.kb-hs-prog-bar{', 'dead kb-hs-prog CSS removed');
+// (B) grid tag picker reachable in one click on every tile
+has("tagCount?'Edit tags':'Add a tag'", 'grid count button opens the picker on every tile');
+has('.am-tag-count.empty{color:var(--text-dim);cursor:pointer}', 'empty No-tags count is clickable');
+// (C) recrop shoulder guide raised onto the shoulder line
+has('M8,74 C26,62 74,62 92,74', 'shoulder guide curve raised');
+lacks('M6,90 C22,66 78,66 94,90', 'v7.47 (still-too-low) shoulder curve removed');
+lacks('M8,100 C20,78 80,78 92,100', 'old low shoulder curve removed');
+
+/* v7.48 asserts: grid "+" cutoff fix + recrop shoulder guide (recomputed) */
+has('v7.48:', 'v7.48 deploy marker present');
+has('.am-tags-row .am-flabel{width:44px}', 'tag-row label narrowed so the + fits');
+has('flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis', 'tag count shrinks before the + clips');
+has('.am-tags-row{position:relative;padding-bottom:2px;gap:6px}', 'tag row gap tightened');
+// (recrop shoulder path already asserted above at the updated value)
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

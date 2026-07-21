@@ -136,8 +136,6 @@
   .kb-hs-save:disabled{opacity:0.6;cursor:default}
   .kb-hs-cancel{background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;cursor:pointer}
   .kb-hint{font-size:11px;color:var(--text-muted)}
-  .kb-hs-prog{flex:1 1 100%;height:9px;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;overflow:hidden}
-  .kb-hs-prog-bar{height:100%;width:8%;background:var(--accent);transition:width .5s ease}
   /* ── ALL MODELS grid ── */
   .am-toolbar{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
   .am-toolbar-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
@@ -261,10 +259,11 @@
   .am-flabel{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;flex:none;width:70px}
   .am-rate-input{width:52px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:3px 6px}
   .am-rate-input:focus{outline:none;border-color:var(--accent,#3AA2E0)}
-  .am-tags-row{position:relative;padding-bottom:2px}
-  .am-tag-count{font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:2px 9px;color:var(--text);cursor:pointer;flex:none}
+  .am-tags-row{position:relative;padding-bottom:2px;gap:6px}
+  .am-tags-row .am-flabel{width:44px}   /* v7.48: "TAG" needs far less than 70px — free room so the + never clips */
+  .am-tag-count{font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--text);cursor:pointer;flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .am-tag-count:hover{border-color:var(--accent,#3AA2E0)}
-  .am-tag-count.empty{color:var(--text-dim);cursor:default}
+  .am-tag-count.empty{color:var(--text-dim);cursor:pointer}
   .am-tag-btn{font-size:13px;line-height:1;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text-muted);padding:2px 8px;cursor:pointer;flex:none}
   .am-tag-btn:hover{border-color:var(--accent,#3AA2E0);color:var(--text)}
   .am-taglist-pop{position:absolute;top:calc(100% + 2px);left:9px;right:9px;width:auto;min-width:0;z-index:80;display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px;max-height:180px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)}
@@ -1688,7 +1687,10 @@
               <!-- v7.41 (41.7): passport-style head+shoulders guide. Head oval, eye line, shoulders. -->
               <ellipse cx="50" cy="38" rx="18" ry="24"></ellipse>
               <line x1="26" y1="40" x2="74" y2="40" stroke-dasharray="3,3"></line>
-              <path d="M8,100 C20,78 80,78 92,100" fill="none"></path>
+              <!-- v7.48: shoulder line — a cubic Bezier only reaches ~1/3 toward its control pts at the
+                   midpoint, so control y must be well above the target. This apexes at ~y65 (shoulder
+                   ridge, just below the oval's y62 chin) with ends at y74 (deltoid tops). -->
+              <path d="M8,74 C26,62 74,62 92,74" fill="none"></path>
               <line x1="50" y1="4" x2="50" y2="16" stroke-dasharray="2,3" opacity="0.5"></line>
             </svg>
           </div>
@@ -2466,7 +2468,7 @@ function renderAllModels(){
       </div>
       <div class="am-field-row am-tags-row" onclick="event.stopPropagation()">
         <span class="am-flabel">Tag</span>
-        <button type="button" class="am-tag-count${tagCount?'':' empty'}" id="amcount-${m.id}" onclick="event.stopPropagation();gridToggleTagList('${m.id}')" title="Show tags">${countLabel}</button>
+        <button type="button" class="am-tag-count${tagCount?'':' empty'}" id="amcount-${m.id}" onclick="event.stopPropagation();gridToggleTagPicker('${m.id}')" title="${tagCount?'Edit tags':'Add a tag'}">${countLabel}</button>
         <button type="button" class="am-tag-btn" onclick="event.stopPropagation();gridToggleTagPicker('${m.id}')" title="Add / edit tags">+</button>
         <div class="shoot-picker am-taglist-pop" id="amtaglist-pop-${m.id}" onclick="event.stopPropagation()"></div>
         <div class="shoot-picker" id="amtag-picker-${m.id}" onclick="event.stopPropagation()">
@@ -2943,41 +2945,8 @@ function kbPickHeadshot(assetId){
   if(p.isHeadshot){ kbCancelRechoose(); kbPhotoMsg('That photo is already the headshot.'); return; }
   kbPendingHeadshot=assetId; kbRechooseMode=false; kbRenderPhotos();
 }
-// Animated progress bar shown while Monday processes the image (the /rearrange-photos call gives no real progress events).
-let kbHsTimer=null;
-function kbHsProgressStart(){
-  const el=document.getElementById('kb-photo-actions'); if(!el) return;
-  el.innerHTML = `<div class="kb-hs-prog"><div class="kb-hs-prog-bar" id="kb-hs-prog-bar"></div></div><span class="kb-hint" id="kb-hs-stage">Starting…</span>`;
-  const stages=['Sending the new photo order to Monday…','Monday is processing the image…','Finalizing headshot…','Almost done…'];
-  let i=0, pct=8;
-  const bar=document.getElementById('kb-hs-prog-bar'), stage=document.getElementById('kb-hs-stage');
-  if(bar) bar.style.width=pct+'%'; if(stage) stage.textContent=stages[0];
-  if(kbHsTimer) clearInterval(kbHsTimer);
-  kbHsTimer=setInterval(()=>{
-    pct = Math.min(pct + Math.max(1,(92-pct)*0.12), 92); // ease toward 92%, hold until done
-    if(bar) bar.style.width=pct+'%';
-    const target=Math.floor(pct/23); if(target>i && i<stages.length-1){ i=target; if(stage) stage.textContent=stages[i]; }
-  }, 600);
-}
-function kbHsProgressDone(ok){
-  if(kbHsTimer){ clearInterval(kbHsTimer); kbHsTimer=null; }
-  const bar=document.getElementById('kb-hs-prog-bar'); if(bar){ bar.style.width='100%'; bar.style.background=ok?'var(--accent)':'var(--danger)'; }
-}
-// Apply the chosen headshot (atomic rearrange on Monday). Throws on failure.
-async function kbApplyHeadshot(id){
-  const assetId=kbPendingHeadshot; if(!assetId) return;
-  kbHsProgressStart();
-  try{
-    const rest=kbModalPhotos.filter(p=>String(p.assetId)!==String(assetId)).map(p=>p.assetId);
-    await rearrangePhotos(id,[assetId],rest);
-    await clearHeadMedThumb(id);   // v7.35: promoted an existing photo — drop stale thumb, fall back to full
-    await clearExtraMedThumbs(id);   // v7.36 (Finding 1): rearrange reassigned extra ids — clear dead pairings
-    kbPendingHeadshot=null; kbRechooseMode=false;
-    kbHsProgressDone(true);
-    await kbLoadModalPhotos(id);   // reload from Monday to confirm the change stuck
-    kbRefreshCardThumb(id);
-  }catch(e){ kbHsProgressDone(false); throw e; }
-}
+// v7.47: kbApplyHeadshot + its animated fake-progress bar (kbHsProgressStart/Done, kbHsTimer)
+// were removed here — "Change headshot" now runs as a background job (v7.46, enqueueChangeHeadJob).
 // "Save headshot" button — now saves the headshot AND any other pending field edits in one go.
 async function kbSaveHeadshot(){ return saveKanbanCard(kbModalItemId); }
 function kbOpenPhoto(n){ candidatePhotos=kbModalPhotos; window.lbViewOnly=true; openLightbox(n); }
@@ -6796,6 +6765,8 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.48: (two fixes from v7.47 feedback) Client-only. (A) GRID "+" CUTOFF: on narrow tiles (the grid floor is 150px columns) the tag row's fixed 70px label + count + "+" overflowed the tile and overflow:hidden clipped the "+". Tag-row-specific fix (rating/date rows untouched): the "TAG" label is 44px there, the row gap is tighter, and the count button can now shrink (min-width:0 + ellipsis) so the "+" — which stays flex:none — is always fully visible. (B) RECROP SHOULDER GUIDE (again): v7.47 raised it but not enough — a cubic Bezier only reaches ~1/3 of the way to its control points at the midpoint, so control-y 66 still apexed at ~y72 (chest). Recomputed: path M8,74 C26,62 74,62 92,74 apexes at ~y65 (on the shoulder ridge, just below the oval's y62 chin) with ends at y74 (deltoid tops), instead of drooping to the bottom corners.
+   v7.47: (cleanup + two small fixes) Client-only. (A) DEAD CODE removed: kbApplyHeadshot and its fake animated progress bar (kbHsProgressStart/kbHsProgressDone/kbHsTimer) + the .kb-hs-prog CSS — all superseded by the v7.46 background change-headshot job; nothing called them anymore. (B) GRID TAG "+": on every grid tile (All Models, 5-APPROVED, and the other scopes) both the tag-count button AND the "+" now open the add/edit picker in one click — previously an empty "No tags" tile made you take an extra click. The count button always opens the picker regardless of whether the model already has tags (the picker shows current tags with ✓ and lets you add/remove/create), so behavior is uniform across every tile and there's no stale-handler edge case. (C) RECROP SHOULDER GUIDE: the head+shoulders overlay's shoulder curve was peaking around y78 and diving to the bottom corners, so it sat on the chest; raised it (apex ~y66, ends ~y90) so it traces the actual shoulder line.
    v7.46: (three independent changes) Client-only. (A) CHANGE HEADSHOT now goes through the background job queue, same as recrop (v7.45): the kanban modal's "★ Change headshot" no longer blocks — it enqueues a "Change headshot · <name>" job (cancelable while queued; once the atomic rearrange starts it's finalizing and can't be canceled), field edits still save synchronously, and the tile repaints on completion. The old inline kbApplyHeadshot + fake progress bar are retired from the save path (kept defined, unused). (B) KANBAN DROP ZONES: columns now stretch to equal height (align-items:stretch) and each column body fills its column (flex:1, min-height:140px), so the whole column — including empty ones — is a big drop target instead of a narrow strip; you can nudge a card into the neighboring column without precise aiming. (C) NEW SHOOT TAG FROM THE SANDBOX: the shoot-tag picker has a "+ New tag…" row (and typing a non-matching name + Enter offers "+ Create <name>"). Because Monday can't create an empty dropdown label via the API, a new tag starts PROVISIONAL: it's selected immediately and the (empty) board opens so you can add people; the label is actually created in Monday the moment you drop the FIRST person in (the existing create_labels_if_missing write), after which it's promoted to a real tag id. Do it all without leaving the sandbox. NOTE: tags are only written on the PRODUCTION board (staging placement is visual-only), same as the existing sandbox add-person behavior.
    v7.45: (recrop joins the background queue + cancelable jobs) Client-only, builds on v7.44. Recrop headshot was still fully blocking (its own separate flow, untouched by v7.44) — hitting "Save crop" froze the editor and the modal's Cancel didn't actually stop the upload (it just hid the modal while the work finished anyway). Now: (1) "Save crop" packages the crop into a background RECROP job and closes the modal immediately, so you can go model-to-model recropping without waiting. (2) The floating job widget shows each task's detail ("Recrop · <name>" / "Photo save · <name>") with a per-row Cancel button. (3) Cancel semantics are honest: a QUEUED job is dropped cleanly (never runs); a job UPLOADING its crop is aborted mid-transfer; but once a job hits the FINALIZING phase (the server-side atomic rearrange that clears+re-uploads all photos, a few seconds) Cancel is refused with a note — dropping the client there can't safely interrupt the server and could orphan photos. (4) The recrop modal's own Cancel now genuinely stops everything because nothing is enqueued until you hit Save crop. (5) Serialization is now GLOBAL — one photo job at a time across all models (recrop + save share one lane) — which is gentler on the free-tier server during a batch and keeps the un-cancelable finalize window to a single job. (6) Board id is snapshotted per job and threaded through the recrop write helpers too (rearrangePhotos + the med-thumb clears), so a mid-batch board switch can't retarget a write. On success the model's tile repaints with the new face; failures show red + Retry (same as v7.44). NOTE: real uploads only succeed on PRODUCTION; on staging every job fails into the red/Retry path, which is how queue/cancel/serialization/widget are verified there.
    v7.44: (background non-blocking photo uploads) Client-only; the one behavior change is that saving a headshot/extra photo no longer freezes the editor. Hitting Save still writes all FIELD data synchronously (as before), but the PHOTO upload is now packaged into a background job and run in a queue while you keep working — navigate, edit other models, whatever. Progress shows in a floating widget bottom-right (one row per job: name + %, live spinner, green flash + "Done ✓" on success, red row + Retry on failure). Per-item serialization: only one photo job runs per model at a time; a second photo change to the same model queues behind the first (so two uploads can't race the same columns). Opening the photo area for a model whose upload is still running shows an "upload in progress" note. On success the model's grid/kanban tile repaints with the new face (head + med-thumb refreshed in the shared store, stale URLs dropped) without a full reload. Board safety: each job snapshots the active board id at enqueue and threads it through every write helper (replaceHeadshotFast + the med-thumb writes), so switching to the Evernote/batch board mid-upload cannot retarget the write. A close/refresh while a job is in flight warns you first. The old blocking upload overlay is retired (its markup is left inert). NOTE: real uploads only succeed on PRODUCTION — on staging Monday rejects writes to the staging board's item IDs, so a save there exercises the red/Retry path (queue, widget, serialization, and revert-on-fail are all testable on staging).
