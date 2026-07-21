@@ -443,7 +443,7 @@ has('tile.classList.add(\'picker-open\')', 'picker toggle sets picker-open');
 /* v7.39 asserts: rating step + sandbox polish + UX steps */
 has('v7.39:', 'v7.39 deploy marker present');
 has('step="1"', 'grid rating steps by whole integers');
-has("noteState = (hasPay&&hasDates)?'both'", 'sandbox note caret is 3-state');
+has("filled>0?'partial'", 'sandbox note caret is 3-state (v7.49: 4-field)');
 has('.sb-note-caret.note-partial', 'yellow partial note state CSS present');
 has('.sb-note-caret.note-both', 'green complete note state CSS present');
 has('class="sb-step-num">1<', 'sandbox step 1 present');
@@ -592,10 +592,10 @@ lacks('function kbHsProgressStart(', 'dead kbHsProgressStart removed');
 lacks('kbHsTimer=setInterval', 'dead kbHsTimer loop removed');
 lacks('.kb-hs-prog-bar{', 'dead kb-hs-prog CSS removed');
 // (B) grid tag picker reachable in one click on every tile
-has("tagCount?'Edit tags':'Add a tag'", 'grid count button opens the picker on every tile');
+has('function gridTagCountClick(', 'grid count uses live read-only/picker branch');
 has('.am-tag-count.empty{color:var(--text-dim);cursor:pointer}', 'empty No-tags count is clickable');
 // (C) recrop shoulder guide raised onto the shoulder line
-has('M8,74 C26,62 74,62 92,74', 'shoulder guide curve raised');
+has('M8,77 C26,66 74,66 92,77', 'shoulder guide curve position (v7.49)');
 lacks('M6,90 C22,66 78,66 94,90', 'v7.47 (still-too-low) shoulder curve removed');
 lacks('M8,100 C20,78 80,78 92,100', 'old low shoulder curve removed');
 
@@ -605,6 +605,28 @@ has('.am-tags-row .am-flabel{width:44px}', 'tag-row label narrowed so the + fits
 has('flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis', 'tag count shrinks before the + clips');
 has('.am-tags-row{position:relative;padding-bottom:2px;gap:6px}', 'tag row gap tightened');
 // (recrop shoulder path already asserted above at the updated value)
+
+/* v7.49 asserts: 6 feedback items */
+has('v7.49:', 'v7.49 deploy marker present');
+// (B) 4-corner recrop resize
+has('.recrop-handle.tl{', 'recrop corner handles styled');
+has('data-corner="tl"', 'recrop corner handles present');
+has("d.corner==='bl'", 'corner-aware resize keeps opposite corner fixed');
+// (C) tag count read-only vs picker (live branch)
+has('function gridTagCountClick(', 'grid count uses live read-only/picker branch');
+has('gridTagCountClick(', 'count button wired to gridTagCountClick');
+// (D) alphabetical tags
+has('.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()))', 'grid tag options sorted alphabetically');
+// (E) sandbox tab not clipped by toolbar style
+has('.sb-btn:not(.mode-btn)', 'toolbar .sb-btn scoped away from the mode tab');
+// (F) airport note fields → subitem port
+has('sb-note-startair', 'beginning-airport field present');
+has('sb-note-endair', 'end-airport field present');
+has('startAirport:nt.startAirport', 'port entries carry airports');
+has('function resolveAirportCols(', 'airport subitem columns resolved by title');
+has('cvObj[airCols.start]', 'port writes beginning airport');
+has('cvObj[airCols.end]', 'port writes end airport');
+has("filled===4?'both'", 'caret green requires all four fields');
 
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

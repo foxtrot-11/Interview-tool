@@ -206,8 +206,8 @@
   .sb-optional{font-size:12px;font-weight:500;color:var(--text-dim)}
   .sb-step-desc{font-size:13px;color:var(--text-muted);line-height:1.5;margin-bottom:10px;max-width:820px}
   .sb-step-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-  .sb-btn{font-size:14px;font-weight:600;padding:10px 18px;border-radius:9px;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);transition:all .12s}
-  .sb-btn:hover{transform:translateY(-1px)}
+  .sb-btn:not(.mode-btn){font-size:14px;font-weight:600;padding:10px 18px;border-radius:9px;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);transition:all .12s}
+  .sb-btn:not(.mode-btn):hover{transform:translateY(-1px)}
   .sb-btn-pick{min-width:210px;text-align:left;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .sb-btn-soft{background:var(--surface2);color:var(--text)}
   .sb-btn-soft:hover{border-color:var(--accent,#3AA2E0)}
@@ -220,7 +220,7 @@
   .sb-note-caret:hover{transform:scale(1.12)}
   .sb-note-caret.note-none{background:#f4f4f5;border-color:#d4d4d8;color:#3f3f46}       /* white — nothing logged */
   .sb-note-caret.note-partial{background:#f5c518;border-color:#d9a800;color:#3a2f00}    /* yellow — one field */
-  .sb-note-caret.note-both{background:#2ea043;border-color:#238636;color:#fff}         /* green — pay + dates */
+  .sb-note-caret.note-both{background:#2ea043;border-color:#238636;color:#fff}         /* green — pay + dates + both airports */
   .sb-thumb{width:128px;height:128px;border-radius:6px;overflow:hidden;background:var(--surface);margin:0 auto}
   .sb-thumb img{width:100%;height:100%;object-fit:cover;pointer-events:none}
   .sb-name{font-size:12px;line-height:1.25;margin-top:4px;word-break:break-word;max-height:32px;overflow:hidden}
@@ -316,7 +316,11 @@
   .recrop-guide{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   .recrop-guide ellipse,.recrop-guide line,.recrop-guide path{stroke:rgba(255,255,255,.65);stroke-width:1;fill:none;vector-effect:non-scaling-stroke}
   .recrop-guide.off{display:none}
-  .recrop-handle{position:absolute;right:-8px;bottom:-8px;width:16px;height:16px;background:var(--accent);border-radius:3px;cursor:nwse-resize;touch-action:none}
+  .recrop-handle{position:absolute;width:16px;height:16px;background:var(--accent);border-radius:3px;touch-action:none}
+  .recrop-handle.tl{left:-8px;top:-8px;cursor:nwse-resize}
+  .recrop-handle.tr{right:-8px;top:-8px;cursor:nesw-resize}
+  .recrop-handle.bl{left:-8px;bottom:-8px;cursor:nesw-resize}
+  .recrop-handle.br{right:-8px;bottom:-8px;cursor:nwse-resize}
   .recrop-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   /* ── Shoot tag boxes + searchable picker (v7.12) ── */
   .shoot-boxes{display:flex;flex-wrap:wrap;gap:6px;min-height:26px}
@@ -1662,11 +1666,15 @@
     <div id="sb-note-modal" class="unsaved-modal" style="z-index:9750">
       <div class="unsaved-panel" style="max-width:520px;width:min(96vw,520px)">
         <div class="unsaved-title" id="sb-note-title">Shoot note</div>
-        <div class="unsaved-text">These carry to the ported subitem (Pay information + Dates Booked). Leave both blank to clear.</div>
+        <div class="unsaved-text">These carry to the ported subitem (Pay information + Dates Booked + Beginning/End Airport). Leave all blank to clear.</div>
         <label class="iv-upload-label" for="sb-note-pay" style="display:block;margin-top:10px">Pay Information for this shoot</label>
         <textarea id="sb-note-pay" class="scrape-input" style="width:100%;min-height:64px;resize:vertical" placeholder="e.g. $1,200 flat, paid on wrap"></textarea>
         <label class="iv-upload-label" for="sb-note-dates" style="display:block;margin-top:10px">Dates Booked</label>
         <textarea id="sb-note-dates" class="scrape-input" style="width:100%;min-height:64px;resize:vertical" placeholder="e.g. Aug 4–6, call time 9am"></textarea>
+        <label class="iv-upload-label" for="sb-note-startair" style="display:block;margin-top:10px">Beginning Airport</label>
+        <input id="sb-note-startair" class="scrape-input" style="width:100%;box-sizing:border-box" placeholder="e.g. LAX (departure)">
+        <label class="iv-upload-label" for="sb-note-endair" style="display:block;margin-top:10px">End Airport</label>
+        <input id="sb-note-endair" class="scrape-input" style="width:100%;box-sizing:border-box" placeholder="e.g. JFK (return)">
         <div class="unsaved-actions" style="margin-top:14px">
           <button class="kb-save" onclick="sbSaveNote()">Save note</button>
           <button class="kb-hs-cancel" onclick="sbNoteClose()">Cancel</button>
@@ -1682,15 +1690,17 @@
         <div class="recrop-stage" id="recrop-stage">
           <img id="recrop-img" draggable="false">
           <div class="recrop-box" id="recrop-box" style="display:none">
-            <div class="recrop-handle" id="recrop-handle"></div>
+            <div class="recrop-handle tl" data-corner="tl"></div>
+            <div class="recrop-handle tr" data-corner="tr"></div>
+            <div class="recrop-handle bl" data-corner="bl"></div>
+            <div class="recrop-handle br" data-corner="br"></div>
             <svg class="recrop-guide" id="recrop-guide" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <!-- v7.41 (41.7): passport-style head+shoulders guide. Head oval, eye line, shoulders. -->
               <ellipse cx="50" cy="38" rx="18" ry="24"></ellipse>
               <line x1="26" y1="40" x2="74" y2="40" stroke-dasharray="3,3"></line>
-              <!-- v7.48: shoulder line — a cubic Bezier only reaches ~1/3 toward its control pts at the
-                   midpoint, so control y must be well above the target. This apexes at ~y65 (shoulder
-                   ridge, just below the oval's y62 chin) with ends at y74 (deltoid tops). -->
-              <path d="M8,74 C26,62 74,62 92,74" fill="none"></path>
+              <!-- v7.49: shoulder line nudged down a touch (v7.48 apex ~y65 read a bit high).
+                   mid = 0.25*77 + 0.75*66 = ~y69, ends y77. -->
+              <path d="M8,77 C26,66 74,66 92,77" fill="none"></path>
               <line x1="50" y1="4" x2="50" y2="16" stroke-dasharray="2,3" opacity="0.5"></line>
             </svg>
           </div>
@@ -2269,6 +2279,14 @@ function gridCloseAllTagPickers(){
   document.querySelectorAll('[id^="amtaglist-pop-"]').forEach(p=>p.classList.remove('open'));
   document.querySelectorAll('.am-tile.picker-open').forEach(t=>t.classList.remove('picker-open'));
 }
+// v7.49: the tag COUNT button shows a read-only list of the model's tags when it has any,
+// and jumps straight to the add picker when it has none. Decided live (not baked into the
+// tile's onclick) so it stays correct after in-session add/remove without a re-render.
+function gridTagCountClick(id){
+  const m=gridModel(id);
+  if(m && gridShootLabels(m).length>0) gridToggleTagList(id);
+  else gridToggleTagPicker(id);
+}
 function gridToggleTagPicker(id){
   closeRowPicker();
   const p=document.getElementById('amtag-picker-'+id); if(!p) return;
@@ -2281,7 +2299,7 @@ function gridToggleTagPicker(id){
     gridRenderTagList(id);
   }
 }
-function gridTagOptions(){ return (boardDropdownOptions[SHOOT_COL]||[]).map(o=>String(o.label)); }
+function gridTagOptions(){ return (boardDropdownOptions[SHOOT_COL]||[]).map(o=>String(o.label)).sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase())); }
 function gridRenderTagList(id){
   const list=document.getElementById('amtag-list-'+id); if(!list) return;
   const m=gridModel(id); if(!m) return;
@@ -2328,7 +2346,7 @@ function gridRefreshChips(id){
 }
 function gridFillTagList(id){
   const m=gridModel(id); const pop=document.getElementById('amtaglist-pop-'+id); if(!m||!pop) return;
-  const labels=gridShootLabels(m);
+  const labels=gridShootLabels(m).slice().sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
   const list = labels.length
     ? `<div class="am-taglist-head">Shoot tags</div>`+labels.map(l=>`<div class="am-taglist-item">${escapeHtml(l)}</div>`).join('')
     : `<div class="am-taglist-item dim">No shoot tags</div>`;
@@ -2468,7 +2486,7 @@ function renderAllModels(){
       </div>
       <div class="am-field-row am-tags-row" onclick="event.stopPropagation()">
         <span class="am-flabel">Tag</span>
-        <button type="button" class="am-tag-count${tagCount?'':' empty'}" id="amcount-${m.id}" onclick="event.stopPropagation();gridToggleTagPicker('${m.id}')" title="${tagCount?'Edit tags':'Add a tag'}">${countLabel}</button>
+        <button type="button" class="am-tag-count${tagCount?'':' empty'}" id="amcount-${m.id}" onclick="event.stopPropagation();gridTagCountClick('${m.id}')" title="${tagCount?'Show tags':'Add a tag'}">${countLabel}</button>
         <button type="button" class="am-tag-btn" onclick="event.stopPropagation();gridToggleTagPicker('${m.id}')" title="Add / edit tags">+</button>
         <div class="shoot-picker am-taglist-pop" id="amtaglist-pop-${m.id}" onclick="event.stopPropagation()"></div>
         <div class="shoot-picker" id="amtag-picker-${m.id}" onclick="event.stopPropagation()">
@@ -3041,18 +3059,27 @@ async function openRecrop(itemIdArg, headIdArg){
 }
 function rcApply(){ const b=document.getElementById('recrop-box'); const s=rcState.box; b.style.left=s.x+'px'; b.style.top=s.y+'px'; b.style.width=s.s+'px'; b.style.height=s.s+'px'; }
 function rcClamp(){ const st=rcState; st.box.s=Math.max(40,Math.min(st.box.s,Math.min(st.dw,st.dh))); st.box.x=Math.max(0,Math.min(st.box.x,st.dw-st.box.s)); st.box.y=Math.max(0,Math.min(st.box.y,st.dh-st.box.s)); }
-(function(){ // recrop pointer wiring — square box: drag to move, corner handle to resize
+(function(){ // recrop pointer wiring — square box: drag body to move, any corner handle to resize
   document.addEventListener('pointerdown',e=>{
     if(!rcState) return;
     const b=document.getElementById('recrop-box'); if(!b||!b.contains(e.target)) return;
     e.preventDefault();
-    rcState.drag={ mode:(e.target.id==='recrop-handle')?'size':'move', px:e.clientX, py:e.clientY, x0:rcState.box.x, y0:rcState.box.y, s0:rcState.box.s };
+    const corner=e.target.dataset?e.target.dataset.corner:null;
+    rcState.drag={ mode:corner?'size':'move', corner, px:e.clientX, py:e.clientY, x0:rcState.box.x, y0:rcState.box.y, s0:rcState.box.s };
   });
   document.addEventListener('pointermove',e=>{
     if(!rcState||!rcState.drag) return;
-    const d=rcState.drag, dx=e.clientX-d.px, dy=e.clientY-d.py;
-    if(d.mode==='move'){ rcState.box.x=d.x0+dx; rcState.box.y=d.y0+dy; }
-    else { rcState.box.s=d.s0+Math.max(dx,dy); }
+    const d=rcState.drag, dx=e.clientX-d.px, dy=e.clientY-d.py, box=rcState.box;
+    if(d.mode==='move'){ box.x=d.x0+dx; box.y=d.y0+dy; }
+    else {
+      // Resize the SQUARE keeping the opposite corner fixed. Growth is positive toward the dragged corner.
+      let grow, ns;
+      if(d.corner==='br'){ grow=Math.max(dx,dy);  ns=Math.max(40,d.s0+grow); box.x=d.x0;           box.y=d.y0; }
+      else if(d.corner==='bl'){ grow=Math.max(-dx,dy); ns=Math.max(40,d.s0+grow); box.x=d.x0+d.s0-ns; box.y=d.y0; }
+      else if(d.corner==='tr'){ grow=Math.max(dx,-dy); ns=Math.max(40,d.s0+grow); box.x=d.x0;           box.y=d.y0+d.s0-ns; }
+      else { /* tl */          grow=Math.max(-dx,-dy);ns=Math.max(40,d.s0+grow); box.x=d.x0+d.s0-ns; box.y=d.y0+d.s0-ns; }
+      box.s=ns;
+    }
     rcClamp(); rcApply();
   });
   document.addEventListener('pointerup',()=>{ if(rcState) rcState.drag=null; });
@@ -3296,11 +3323,13 @@ function sbNormalizeZones(z){
 }
 function sbEncode(){ const p={t:sbState.tag,z:sbState.zones,n:sbState.notes}; return btoa(unescape(encodeURIComponent(JSON.stringify(p)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
 function sbDecode(s){ try{ return JSON.parse(decodeURIComponent(escape(atob(String(s||'').replace(/-/g,'+').replace(/_/g,'/'))))); }catch(e){ return null; } }
-// Coerce incoming notes (share-link/save) to {id:{pay,dates}} with string values; drop empties.
+// Coerce incoming notes (share-link/save) to {id:{pay,dates,startAirport,endAirport}}; drop empties.
 function sbNormalizeNotes(n){
   const out={}; if(n && typeof n==='object'){
-    for(const k of Object.keys(n)){ const v=n[k]||{}; const pay=String(v.pay||'').trim(), dates=String(v.dates||'').trim();
-      if(pay||dates) out[String(k)]={pay, dates}; }
+    for(const k of Object.keys(n)){ const v=n[k]||{};
+      const pay=String(v.pay||'').trim(), dates=String(v.dates||'').trim();
+      const startAirport=String(v.startAirport||'').trim(), endAirport=String(v.endAirport||'').trim();
+      if(pay||dates||startAirport||endAirport) out[String(k)]={pay, dates, startAirport, endAirport}; }
   }
   return out;
 }
@@ -3439,9 +3468,10 @@ async function renderSandbox(){
   empty.style.display='none'; board.style.display='';
   if(sbState.pendingLabel){ const c2=document.getElementById('sb-count'); if(c2) c2.textContent=`New tag “${sbState.pendingLabel}” — add the first person to create it in Monday`; }
   const tile=id=>{ const m=byId[id]; const ia=gridImgAsset(m); const url=ia?(kbHeadCache[ia]||''):''; const nt=sbState.notes[String(id)];
-    const hasPay=!!(nt&&nt.pay&&String(nt.pay).trim()), hasDates=!!(nt&&nt.dates&&String(nt.dates).trim());
-    const noteState = (hasPay&&hasDates)?'both':((hasPay||hasDates)?'partial':'none'); // v7.39: white / yellow / green
-    const noteTitle = noteState==='both'?'Pay + dates logged — click to edit':(noteState==='partial'?'Missing pay or dates — click to complete':'Add pay / dates');
+    const flds=[nt&&nt.pay, nt&&nt.dates, nt&&nt.startAirport, nt&&nt.endAirport].map(v=>!!(v&&String(v).trim()));
+    const filled=flds.filter(Boolean).length;
+    const noteState = filled===4?'both':(filled>0?'partial':'none'); // v7.49: green only when pay+dates+both airports set
+    const noteTitle = noteState==='both'?'Pay + dates + airports logged — click to edit':(noteState==='partial'?`${filled}/4 logged — click to complete`:'Add pay / dates / airports');
     return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret note-${noteState}" title="${noteTitle}" onclick="sbOpenNote(event,'${id}')">▾</button><button type="button" class="sb-edit-btn" title="Open full editor" onclick="sbOpenFullEditor(event,'${id}')">✎</button></div>`; };
   // A zone renders as fixed numbered slots (main ≥8, alt ≥4). Slot position = subitem number at Port.
   const slots=(z,alt)=>{ const ids=sbState.zones[z]||[]; const n=Math.max(alt?SB_ALT_MIN:SB_MIN_SLOTS, ids.length); let h='';
@@ -3614,6 +3644,8 @@ function sbOpenNote(e, id){
   const title=document.getElementById('sb-note-title'); if(title) title.textContent='Shoot note — '+nm;
   document.getElementById('sb-note-pay').value=nt.pay||'';
   document.getElementById('sb-note-dates').value=nt.dates||'';
+  document.getElementById('sb-note-startair').value=nt.startAirport||'';
+  document.getElementById('sb-note-endair').value=nt.endAirport||'';
   document.getElementById('sb-note-modal').classList.add('open');
 }
 function sbNoteClose(){ document.getElementById('sb-note-modal')?.classList.remove('open'); sbNoteId=null; }
@@ -3621,8 +3653,10 @@ function sbSaveNote(){
   if(sbNoteId==null) return;
   const pay=(document.getElementById('sb-note-pay').value||'').trim();
   const dates=(document.getElementById('sb-note-dates').value||'').trim();
-  if(pay||dates) sbState.notes[sbNoteId]={pay, dates};
-  else delete sbState.notes[sbNoteId];   // both blank → drop the entry so the caret un-highlights
+  const startAirport=(document.getElementById('sb-note-startair').value||'').trim();
+  const endAirport=(document.getElementById('sb-note-endair').value||'').trim();
+  if(pay||dates||startAirport||endAirport) sbState.notes[sbNoteId]={pay, dates, startAirport, endAirport};
+  else delete sbState.notes[sbNoteId];   // all blank → drop the entry so the caret un-highlights
   sbNoteClose();
   renderSandbox();   // refresh caret .has state
 }
@@ -3737,9 +3771,9 @@ async function sbPortOpen(){
   // Mains: position i → TYPE{i}. Alternates (all 3 columns) collapse to ALTERNATE type, numbered
   // in column order (BOTTOM→VERSE→TOP) since Monday has a single ALTERNATE subitem type.
   const entries=[];
-  ['b','v','t'].forEach(z=>(sbState.zones[z]||[]).forEach((id,i)=>{ const m=byId[id]; if(m){ const nt=sbState.notes[String(id)]||{}; entries.push({model:m, type:SB_TYPE[z], num:i+1, pay:nt.pay||'', dates:nt.dates||''}); } }));
+  ['b','v','t'].forEach(z=>(sbState.zones[z]||[]).forEach((id,i)=>{ const m=byId[id]; if(m){ const nt=sbState.notes[String(id)]||{}; entries.push({model:m, type:SB_TYPE[z], num:i+1, pay:nt.pay||'', dates:nt.dates||'', startAirport:nt.startAirport||'', endAirport:nt.endAirport||''}); } }));
   let altNum=0;
-  ['ab','av','at'].forEach(z=>(sbState.zones[z]||[]).forEach(id=>{ const m=byId[id]; if(m){ altNum++; const nt=sbState.notes[String(id)]||{}; entries.push({model:m, type:'ALTERNATE', num:altNum, pay:nt.pay||'', dates:nt.dates||''}); } }));
+  ['ab','av','at'].forEach(z=>(sbState.zones[z]||[]).forEach(id=>{ const m=byId[id]; if(m){ altNum++; const nt=sbState.notes[String(id)]||{}; entries.push({model:m, type:'ALTERNATE', num:altNum, pay:nt.pay||'', dates:nt.dates||'', startAirport:nt.startAirport||'', endAirport:nt.endAirport||''}); } }));
   if(!entries.length){ showToast('Nothing to port','error'); return; }
   const tagOpt=(boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.id)===String(sbState.tag));
   await portShowPlan(null, null, `Sandbox “${tagOpt?tagOpt.label:sbState.tag}” → row “${portSelectedRowName||portSelectedRowId}” (order = subitem number)`, slots=>sbBuildPlan(entries, slots));
@@ -3753,15 +3787,16 @@ function sbBuildPlan(entries, slots){
     const desired=en.type+en.num, mid=String(en.model.id);
     // v7.29: pay/dates were attached to the entry in sbPortOpen (keeps this fn pure/testable).
     const pay=en.pay||'', dates=en.dates||'';
+    const startAirport=en.startAirport||'', endAirport=en.endAirport||''; // v7.49
     const slot=byName[desired.toUpperCase()];
     if(slot){
       const linked=(slot.linked||[]).map(String);
       if(linked.includes(mid)){ skipped.push({model:en.model, reason:'already in '+desired}); return; }
       const others=linked.filter(x=>x!==mid);
       let rep; if(others.length){ const k=kanbanItems.find(it=>String(it.id)===others[0]); rep=k?k.name:('id '+others[0]); }
-      actions.push({model:en.model, type:en.type, mode:'fill', slotId:slot.id, slotName:slot.name, replaces:rep, pay, dates});
+      actions.push({model:en.model, type:en.type, mode:'fill', slotId:slot.id, slotName:slot.name, replaces:rep, pay, dates, startAirport, endAirport});
     } else {
-      actions.push({model:en.model, type:en.type, mode:'create', slotName:desired, pay, dates});
+      actions.push({model:en.model, type:en.type, mode:'create', slotName:desired, pay, dates, startAirport, endAirport});
     }
   });
   return {actions, skipped};
@@ -3822,8 +3857,29 @@ async function portShowPlan(models, typeOf, subtitle, planFn){
     }
   }catch(e){ list.innerHTML='<div class="port-err">Error reading row: '+escapeHtml(e.message||String(e))+'</div>'; }
 }
+// v7.49: the "Beginning Airport" / "End Airport" subitem columns are resolved by TITLE on the
+// CASTING PRIORITY STACK subitem board (ids aren't hardcoded — the user said "columns of the same
+// name"). Cached after the first lookup. Returns {start,end} column ids (null if not found → skipped).
+let sbAirportCols=undefined;
+async function resolveAirportCols(){
+  if(sbAirportCols!==undefined) return sbAirportCols;
+  sbAirportCols={start:null,end:null};
+  try{
+    const d=await gql(`{boards(ids:[${CASTING_SUBITEM_BOARD_ID}]){columns{id title}}}`);
+    const cols=(((d.boards||[])[0]||{}).columns)||[];
+    const norm=s=>String(s||'').trim().toLowerCase();
+    const exact=t=>{ const c=cols.find(x=>norm(x.title)===t); return c?c.id:null; };
+    const rx=re=>{ const c=cols.find(x=>re.test(norm(x.title))); return c?c.id:null; };
+    sbAirportCols.start = exact('beginning airport') || rx(/(begin|start|depart).*airport|airport.*(start|depart)/);
+    sbAirportCols.end   = exact('end airport')       || rx(/(end|arriv|return).*airport|airport.*(end|arriv|return)/);
+  }catch(e){ console.warn('airport column resolve failed:', e.message); }
+  return sbAirportCols;
+}
 async function portConfirm(){
   if(!portPlan||!portPlan.actions.length) return;
+  // v7.49: resolve airport subitem columns once (by title) if any action carries an airport value.
+  const needAir = portPlan.actions.some(a=>a.startAirport||a.endAirport);
+  const airCols = needAir ? await resolveAirportCols() : {start:null,end:null};
   // Pull any name edits from the preview inputs before writing (v7.17).
   document.querySelectorAll('#port-list .port-name-input').forEach(inp=>{
     const i=Number(inp.dataset.pi); const v=(inp.value||'').trim();
@@ -3849,6 +3905,8 @@ async function portConfirm(){
       // The plain 5-APPROVED port path leaves a.pay/a.dates unset, so these are safe no-ops there.
       if(a.pay) cvObj['text_mm522jb4']=a.pay;
       if(a.dates) cvObj['long_text_mm35h07x']={text:a.dates};
+      if(a.startAirport && airCols.start) cvObj[airCols.start]=a.startAirport;   // v7.49
+      if(a.endAirport && airCols.end) cvObj[airCols.end]=a.endAirport;           // v7.49
       await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
         {i:slotId,b:CASTING_SUBITEM_BOARD_ID,c:JSON.stringify(cvObj)});
       a.done=true; ok++;
@@ -6765,6 +6823,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.49: (six feedback items) Client-only. (A) RECROP SHOULDER GUIDE nudged down again (v7.48 apex ~y65 read a touch high) → M8,77 C26,66 74,66 92,77, apex ~y69. (B) RECROP BOX resizes from ALL FOUR corners now, not just bottom-right — four handles, each keeps the opposite corner fixed while preserving the square. (C) GRID TAG CLICK: clicking a model that HAS tags now opens a read-only popover showing just their tags (distinct from the "+", which still opens the add/edit picker); a model with NO tags still jumps straight to the picker. Decided live (gridTagCountClick) so it can't go stale after in-session edits. (D) TAG LISTS are alphabetical (case-insensitive) in the grid picker and the read-only popover. (E) CASTING SANDBOX TAB no longer renders as a clipped outlined box — it was accidentally inheriting the sandbox toolbar's .sb-btn style (rounded border + big padding); that rule is now scoped :not(.mode-btn). (F) SANDBOX SHOOT NOTES gained "Beginning Airport" + "End Airport" fields alongside Pay + Dates Booked; the tile caret is now green only when ALL FOUR are filled (yellow if 1–3, white if none). At Port they write to the CASTING PRIORITY STACK subitem columns of the same name, resolved BY TITLE on the subitem board (ids aren't hardcoded; if a column isn't found by title it's skipped, no error). Notes ride the share-link + save-state automatically (whole-object JSON). NOTE: airport writes only happen on PORT and only on the production board — verify on prod that the two columns are matched by title.
    v7.48: (two fixes from v7.47 feedback) Client-only. (A) GRID "+" CUTOFF: on narrow tiles (the grid floor is 150px columns) the tag row's fixed 70px label + count + "+" overflowed the tile and overflow:hidden clipped the "+". Tag-row-specific fix (rating/date rows untouched): the "TAG" label is 44px there, the row gap is tighter, and the count button can now shrink (min-width:0 + ellipsis) so the "+" — which stays flex:none — is always fully visible. (B) RECROP SHOULDER GUIDE (again): v7.47 raised it but not enough — a cubic Bezier only reaches ~1/3 of the way to its control points at the midpoint, so control-y 66 still apexed at ~y72 (chest). Recomputed: path M8,74 C26,62 74,62 92,74 apexes at ~y65 (on the shoulder ridge, just below the oval's y62 chin) with ends at y74 (deltoid tops), instead of drooping to the bottom corners.
    v7.47: (cleanup + two small fixes) Client-only. (A) DEAD CODE removed: kbApplyHeadshot and its fake animated progress bar (kbHsProgressStart/kbHsProgressDone/kbHsTimer) + the .kb-hs-prog CSS — all superseded by the v7.46 background change-headshot job; nothing called them anymore. (B) GRID TAG "+": on every grid tile (All Models, 5-APPROVED, and the other scopes) both the tag-count button AND the "+" now open the add/edit picker in one click — previously an empty "No tags" tile made you take an extra click. The count button always opens the picker regardless of whether the model already has tags (the picker shows current tags with ✓ and lets you add/remove/create), so behavior is uniform across every tile and there's no stale-handler edge case. (C) RECROP SHOULDER GUIDE: the head+shoulders overlay's shoulder curve was peaking around y78 and diving to the bottom corners, so it sat on the chest; raised it (apex ~y66, ends ~y90) so it traces the actual shoulder line.
    v7.46: (three independent changes) Client-only. (A) CHANGE HEADSHOT now goes through the background job queue, same as recrop (v7.45): the kanban modal's "★ Change headshot" no longer blocks — it enqueues a "Change headshot · <name>" job (cancelable while queued; once the atomic rearrange starts it's finalizing and can't be canceled), field edits still save synchronously, and the tile repaints on completion. The old inline kbApplyHeadshot + fake progress bar are retired from the save path (kept defined, unused). (B) KANBAN DROP ZONES: columns now stretch to equal height (align-items:stretch) and each column body fills its column (flex:1, min-height:140px), so the whole column — including empty ones — is a big drop target instead of a narrow strip; you can nudge a card into the neighboring column without precise aiming. (C) NEW SHOOT TAG FROM THE SANDBOX: the shoot-tag picker has a "+ New tag…" row (and typing a non-matching name + Enter offers "+ Create <name>"). Because Monday can't create an empty dropdown label via the API, a new tag starts PROVISIONAL: it's selected immediately and the (empty) board opens so you can add people; the label is actually created in Monday the moment you drop the FIRST person in (the existing create_labels_if_missing write), after which it's promoted to a real tag id. Do it all without leaving the sandbox. NOTE: tags are only written on the PRODUCTION board (staging placement is visual-only), same as the existing sandbox add-person behavior.
