@@ -566,5 +566,23 @@ has('async function clearHeadMedThumb(itemId, bId)', 'clearHeadMedThumb board-th
 has('async function clearExtraMedThumbs(itemId, bId)', 'clearExtraMedThumbs board-threaded');
 has('await rearrangePhotos(itemId,[newId],[oldHead,...extrasBefore].filter(x=>x!=null), bId)', 'recrop rearrange uses snapshotted board');
 
+/* v7.46 asserts: change-headshot → queue, kanban drop zones, new sandbox shoot tag */
+has('v7.46:', 'v7.46 deploy marker present');
+// (A) change headshot → background queue
+has('function enqueueChangeHeadJob(', 'change-headshot enqueue helper present');
+has('async function runChangeHeadPhase(', 'change-headshot background worker present');
+has("job.kind==='changehead'", 'runPhotoJob branches on changehead kind');
+has('enqueueChangeHeadJob({ itemId:String(id), modelName:nm, boardId:BOARD_ID, assetId })', 'saveKanbanCard enqueues the headshot change (non-blocking)');
+lacks('await kbApplyHeadshot(id);', 'change-headshot no longer applied inline/blocking in saveKanbanCard');
+// (B) kanban drop zones
+has('align-items:stretch', 'kanban columns stretch to equal height');
+has('flex:1 1 auto;min-height:140px', 'kanban column body fills the column (large drop target)');
+// (C) new shoot tag from the sandbox
+has('function sbNewTag(', 'sandbox new-tag creator present');
+has('if(sbState.pendingLabel) return sbState.pendingLabel;', 'provisional tag label resolves before Monday id exists');
+has('if(!sbState.tag && !sbState.pendingLabel)', 'renderSandbox accepts a provisional tag');
+has('sb-newtag', 'the + New tag row is rendered/styled');
+has("String(sbState.pendingLabel).toLowerCase()===label.toLowerCase()", 'provisional tag is promoted to a real id after first add');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

@@ -108,11 +108,11 @@
   /* ── KANBAN ── */
   .mode-btn.active[data-mode="all"]{background:#e8e8f0;color:#111}
   .mode-btn.active[data-mode="kanban"]{background:#3AA2E0;color:#fff}
-  .kanban-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
+  .kanban-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:stretch}
   .kb-col{flex:0 0 300px;width:300px;min-width:0;overflow:hidden;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;max-height:calc(100vh - 230px)}
   .kb-col-head{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:0.04em;color:#111;padding:10px 12px;border-radius:7px 7px 0 0}
   .kb-count{opacity:0.65;margin-left:4px}
-  .kb-col-body{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
+  .kb-col-body{flex:1 1 auto;min-height:140px;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
   .kb-card{flex:0 0 auto;background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
   /* v7.43: drag-to-change-status */
   .kb-card[draggable="true"] .kb-card-top{cursor:grab}
@@ -331,6 +331,8 @@
   #shoot-picker-search{width:100%;margin-bottom:6px}
   .shoot-picker-list{max-height:240px;overflow:auto}
   .shoot-opt{padding:6px 8px;font-size:12px;border-radius:4px;cursor:pointer;color:var(--text)}
+  .shoot-opt.sb-newtag{color:var(--accent);font-weight:700;border-top:1px solid var(--border);margin-top:4px;border-radius:0 0 4px 4px}
+  .shoot-opt.sb-newtag:hover{background:rgba(58,162,224,.12)}
   .shoot-opt:hover{background:var(--surface2)}
   .shoot-opt.sel{color:var(--accent)}
   .shoot-opt.create{color:#facc15}
@@ -3344,6 +3346,7 @@ function sbTagOptions(){
 }
 function sbSyncTagButton(){
   const btn=document.getElementById('sb-tag-btn'); if(!btn) return;
+  if(sbState.pendingLabel){ btn.textContent=sbState.pendingLabel+' (new) ▾'; return; }
   const cur=sbState.tag ? (boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.id)===String(sbState.tag)) : null;
   btn.textContent=(cur?String(cur.label):'Shoot tag…')+' ▾';
 }
@@ -3355,20 +3358,47 @@ function sbToggleTagPicker(){
 }
 function sbRenderTagList(){
   const list=document.getElementById('sb-tag-list'); if(!list) return;
-  const q=((document.getElementById('sb-tag-search')||{}).value||'').trim().toLowerCase();
-  const opts=sbTagOptions().filter(o=>!q || String(o.label).toLowerCase().includes(q));
-  list.innerHTML = opts.length
+  const q=((document.getElementById('sb-tag-search')||{}).value||'').trim();
+  const ql=q.toLowerCase();
+  const opts=sbTagOptions().filter(o=>!ql || String(o.label).toLowerCase().includes(ql));
+  const rows = opts.length
     ? opts.map(o=>`<div class="shoot-opt${String(o.id)===String(sbState.tag)?' sel':''}" onclick="sbPickTag('${o.id}')">${String(o.id)===String(sbState.tag)?'✓ ':''}${escapeHtml(String(o.label))}</div>`).join('')
     : '<div class="shoot-opt dim">No matching tags</div>';
+  // v7.46: create a brand-new shoot tag right here. If the search has an exact-ish name, offer it;
+  // otherwise a generic "+ New tag…" that prompts for the name.
+  const exact = q && sbTagOptions().some(o=>String(o.label).toLowerCase()===ql);
+  const newRow = (q && !exact)
+    ? `<div class="shoot-opt sb-newtag" onclick="sbNewTag('${escapeHtml(q).replace(/'/g,"\\'")}')">+ Create “${escapeHtml(q)}”</div>`
+    : `<div class="shoot-opt sb-newtag" onclick="sbNewTag()">+ New tag…</div>`;
+  list.innerHTML = rows + newRow;
 }
 function sbTagEnter(){
-  const q=((document.getElementById('sb-tag-search')||{}).value||'').trim().toLowerCase();
+  const raw=((document.getElementById('sb-tag-search')||{}).value||'').trim();
+  const q=raw.toLowerCase();
   const first=sbTagOptions().filter(o=>!q || String(o.label).toLowerCase().includes(q))[0];
   if(first) sbPickTag(first.id);
+  else if(raw) sbNewTag(raw);   // v7.46: no match → create it
 }
 function sbPickTag(id){
   const p=document.getElementById('sb-tag-picker'); if(p) p.classList.remove('open');
   sbTagChanged(String(id));
+}
+// v7.46: create a NEW shoot tag from the sandbox. Monday can't create an empty dropdown label,
+// so this makes a PROVISIONAL local tag and selects it; the label is actually created in Monday
+// the moment the first person is dropped into it (sbAddPick's create_labels_if_missing write).
+function sbNewTag(preset){
+  const p=document.getElementById('sb-tag-picker'); if(p) p.classList.remove('open');
+  let name=(preset!=null?String(preset):(prompt('New shoot tag name:')||'')).trim();
+  if(!name) return;
+  const existing=(boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.label).toLowerCase()===name.toLowerCase());
+  if(existing){ sbTagChanged(String(existing.id)); showToast(`“${existing.label}” already exists — selected it`,'success'); return; }
+  sbState={tag:null, pendingLabel:name, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}, notes:{}};
+  sbSelected=null; sbSyncTagButton(); renderSandbox();
+  if(String(BOARD_ID)!==String(MAIN_BOARD_ID)){
+    showToast(`New tag “${name}” — note: tags are only written on the production board`,'error');
+  } else {
+    showToast(`New tag “${name}” — add the first person to create it in Monday`,'success');
+  }
 }
 // v7.37.2 / v7.40: statuses that never belong in the sandbox — 3=REJECTED, 0=RETIRED,
 // 6=DELETE, 11=EVERNOTE, 12=DUPLICATE. Shared by sbMembers and the empty-cell add-model search.
@@ -3384,14 +3414,33 @@ function sbMembers(tagId){
 }
 function sbDefaultZone(roleLabels){ const t=portDecideType(roleLabels); return t==='VERSE'?'v':t==='TOP'?'t':t==='BOTTOM'?'b':'av'; }
 function sbTagChanged(v){
-  sbState={tag:v||null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}, notes:{}};
+  sbState={tag:v||null, pendingLabel:null, zones:{b:[],v:[],t:[],ab:[],av:[],at:[]}, notes:{}};
   sbSelected=null;
   sbSyncTagButton();
   renderSandbox();
 }
 // Keep zones consistent with reality: drop ids that lost the tag/status, dedupe, default-place new ones.
 function sbSyncMembership(){
-  if(!sbState.tag) return [];
+  if(!sbState.tag){
+    // v7.46: provisional new tag — nobody carries it in Monday yet, so "members" are just the
+    // people we've optimistically dropped into the board (resolved from the shared store).
+    if(sbState.pendingLabel){
+      const roleOpts=boardDropdownOptions['dropdown_mknbe0p0']||[];
+      const seen=new Set();
+      const out=[];
+      for(const z of Object.keys(sbState.zones)){
+        sbState.zones[z]=(sbState.zones[z]||[]).map(String).filter(id=>{
+          if(seen.has(id)) return false;
+          const m=kanbanItems.find(x=>String(x.id)===String(id)); if(!m) return false;
+          seen.add(id);
+          out.push({id:String(m.id), name:m.name, head:m.head, roleLabels:(m.f&&m.f.role||[]).map(rid=>{const o=roleOpts.find(x=>Number(x.id)===Number(rid));return o?String(o.label):'';}).filter(Boolean)});
+          return true;
+        });
+      }
+      return out;
+    }
+    return [];
+  }
   const mem=sbMembers(sbState.tag); const byId={}; mem.forEach(m=>byId[m.id]=m);
   const seen=new Set();
   for(const z of Object.keys(sbState.zones)){
@@ -3409,14 +3458,17 @@ async function renderSandbox(){
   if(ld) ld.style.display='none';
   if(sbPending){
     const p=sbPending; sbPending=null;
-    sbState={tag:(p&&p.t)?String(p.t):null, zones:sbNormalizeZones(p&&p.z), notes:sbNormalizeNotes(p&&p.n)};
+    sbState={tag:(p&&p.t)?String(p.t):null, pendingLabel:null, zones:sbNormalizeZones(p&&p.z), notes:sbNormalizeNotes(p&&p.n)};
     sbSyncTagButton();
   }
-  if(!sbState.tag){ empty.style.display=''; empty.textContent='Pick a shoot tag to load its people.'; board.style.display='none'; const c=document.getElementById('sb-count'); if(c)c.textContent=''; return; }
+  if(!sbState.tag && !sbState.pendingLabel){ empty.style.display=''; empty.textContent='Pick a shoot tag to load its people.'; board.style.display='none'; const c=document.getElementById('sb-count'); if(c)c.textContent=''; return; }
   const mem=sbSyncMembership(); const byId={}; mem.forEach(m=>byId[m.id]=m);
   const c=document.getElementById('sb-count'); if(c) c.textContent=mem.length?mem.length+' people':'';
-  if(!mem.length){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag yet (rejected, retired, delete, duplicate, and Evernote-import models are excluded). Add the tag to a model first — from any editor.'; board.style.display='none'; return; }
+  // v7.46: a provisional new tag has no members yet — still show the (empty) board so the first
+  // person can be dropped in, which is what actually creates the label in Monday.
+  if(!mem.length && !sbState.pendingLabel){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag yet (rejected, retired, delete, duplicate, and Evernote-import models are excluded). Add the tag to a model first — from any editor.'; board.style.display='none'; return; }
   empty.style.display='none'; board.style.display='';
+  if(sbState.pendingLabel){ const c2=document.getElementById('sb-count'); if(c2) c2.textContent=`New tag “${sbState.pendingLabel}” — add the first person to create it in Monday`; }
   const tile=id=>{ const m=byId[id]; const ia=gridImgAsset(m); const url=ia?(kbHeadCache[ia]||''):''; const nt=sbState.notes[String(id)];
     const hasPay=!!(nt&&nt.pay&&String(nt.pay).trim()), hasDates=!!(nt&&nt.dates&&String(nt.dates).trim());
     const noteState = (hasPay&&hasDates)?'both':((hasPay||hasDates)?'partial':'none'); // v7.39: white / yellow / green
@@ -3497,6 +3549,7 @@ function sbZoneClick(zone){ if(sbSelected) sbMove(sbSelected, zone, null); }
 // "Save state" / "Send to casting row"), so you never have to leave the sandbox to tag someone.
 let sbAddTarget=null;   // {zone, index}
 function sbCurrentTagLabel(){
+  if(sbState.pendingLabel) return sbState.pendingLabel;   // v7.46: provisional new tag, not yet in Monday
   if(!sbState.tag) return null;
   const o=(boardDropdownOptions[SHOOT_COL]||[]).find(x=>String(x.id)===String(sbState.tag));
   return o?String(o.label):null;
@@ -3515,7 +3568,7 @@ function sbAddCandidates(){
     .sort((a,b)=>a.name.localeCompare(b.name));
 }
 function sbOpenAddPicker(zone, index, slotEl){
-  if(!sbState.tag){ showToast('Pick a shoot tag first','error'); return; }
+  if(!sbState.tag && !sbState.pendingLabel){ showToast('Pick a shoot tag first','error'); return; }
   sbAddTarget={zone, index};
   let pop=document.getElementById('sb-addpick');
   if(!pop){ pop=document.createElement('div'); pop.id='sb-addpick'; pop.className='sb-addpick'; document.body.appendChild(pop); }
@@ -3567,7 +3620,14 @@ async function sbAddPick(id){
       // remap local shoot ids from labels so it now legitimately "carries" the tag
       const opts=boardDropdownOptions[SHOOT_COL]||[];
       m.f.shoot=existing.map(t=>{const o=opts.find(x=>String(x.label).toLowerCase()===t.toLowerCase());return o?Number(o.id):null;}).filter(v=>v!=null);
+      // v7.46: if this was a provisional NEW tag, it now exists in Monday — promote it to a real id
+      // so subsequent adds + membership use the id normally.
+      if(sbState.pendingLabel && String(sbState.pendingLabel).toLowerCase()===label.toLowerCase()){
+        const created=opts.find(o=>String(o.label).toLowerCase()===label.toLowerCase());
+        if(created){ sbState.tag=String(created.id); sbState.pendingLabel=null; sbSyncTagButton(); }
+      }
       showToast(`Added “${label}” to ${m.name}`,'success');
+      renderSandbox();   // v7.46: reflect real membership/count (and drop the "new tag" hint)
     }catch(err){ showToast('Tag write failed: '+err.message,'error'); }
   } else if(String(BOARD_ID)!==String(MAIN_BOARD_ID)){
     showToast('Placed (tag not written on this board)','success');
@@ -4175,11 +4235,18 @@ async function saveKanbanCard(id){
   const full=document.getElementById('kb-modal-body'); if(!full||!full._init) return;
   const init=full._init, msg=document.getElementById('kbe-msg-'+id);
   // 1) If a new headshot is pending, apply it FIRST (shows its own progress bar).
+  // 1) If a new headshot is pending, hand it to the background queue (v7.46) — no longer blocks
+  //    the modal. Field changes below still save synchronously, exactly as before.
   const hadPendingHs = !!kbPendingHeadshot;
   if(hadPendingHs){
-    if(msg) msg.textContent='Saving headshot…';
-    try{ await kbApplyHeadshot(id); }
-    catch(e){ if(msg) msg.textContent='Headshot error: '+escapeHtml(e.message||String(e))+' — stopped; field changes not saved. Try Save again.'; return; }
+    const assetId=kbPendingHeadshot;
+    const mm=(typeof kanbanItems!=='undefined'&&kanbanItems)?kanbanItems.find(x=>String(x.id)===String(id)):null;
+    const nm = mm ? mm.name : 'Model';
+    enqueueChangeHeadJob({ itemId:String(id), modelName:nm, boardId:BOARD_ID, assetId });
+    kbPendingHeadshot=null; kbRechooseMode=false;
+    if(typeof kbRenderPhotos==='function') kbRenderPhotos();
+    if(typeof refreshInflightNotes==='function') refreshInflightNotes();
+    if(msg) msg.textContent='Headshot change queued ✓';
   }
   // 2) Diff and save any field changes (same diff the unsaved-changes gate uses).
   const dcv=kbCollectChangedCols(full);
@@ -4197,12 +4264,12 @@ async function saveKanbanCard(id){
     if(out.met!==undefined){ cols[metCol]=out.met; const el=document.getElementById('kbf_'+metCol); if(el) el.value=out.met; }
     if(out.warn) measWarn=' ⚠ '+out.warn;
   }
-  if(Object.keys(cols).length===0){ if(msg) msg.textContent = hadPendingHs ? 'Headshot saved ✓' : 'No changes to save'; return; }
-  if(msg) msg.textContent = hadPendingHs ? 'Headshot saved ✓ — saving other changes…' : 'Saving…';
+  if(Object.keys(cols).length===0){ if(msg) msg.textContent = hadPendingHs ? 'Headshot change queued ✓' : 'No changes to save'; return; }
+  if(msg) msg.textContent = hadPendingHs ? 'Headshot queued ✓ — saving other changes…' : 'Saving…';
   try{
     await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
       {i:id, b:String(MAIN_BOARD_ID), c:JSON.stringify(cols)});
-    if(msg) msg.textContent = (hadPendingHs ? 'All changes saved ✓' : 'Saved ✓') + measWarn;
+    if(msg) msg.textContent = (hadPendingHs ? 'Changes saved ✓ (headshot processing)' : 'Saved ✓') + measWarn;
     const m=kanbanItems.find(x=>x.id===id);
     if(m){
       if(newGen!==null) m.notes=newGen; if(newTw!==null) m.twUrl=newTw; m.updated_at=new Date().toISOString(); if(statusChanged) m.statusIdx=newStatusIdx;
@@ -6197,6 +6264,16 @@ function enqueueRecropJob({itemId, modelName, boardId, croppedFile, headId}){
   });
 }
 
+// CHANGE-HEADSHOT job (v7.46) — promote an EXISTING photo (assetId) to the headshot. No upload,
+// so it goes straight to the atomic rearrange; the current photo set is read fresh at run time.
+function enqueueChangeHeadJob({itemId, modelName, boardId, assetId}){
+  if(assetId==null) return null;
+  return pushJob({
+    itemId, modelName, boardId, kind:'changehead', detail:'Change headshot',
+    assetId: String(assetId)
+  });
+}
+
 function pushJob(extra){
   const job = Object.assign({
     id: ++bgJobSeq,
@@ -6263,6 +6340,8 @@ async function runPhotoJob(job){
   try{
     if(job.kind==='recrop'){
       headChanged = await runRecropPhase(job, bId, setPhase);
+    } else if(job.kind==='changehead'){
+      headChanged = await runChangeHeadPhase(job, bId, setPhase);
     } else {
       headChanged = await runSavePhase(job, bId, setPhase);
     }
@@ -6369,6 +6448,24 @@ async function runRecropPhase(job, bId, setPhase){
   await clearHeadMedThumb(itemId, bId);   // head changed — drop stale thumb, fall back to full
   await clearExtraMedThumbs(itemId, bId); // rearrange reassigned extra ids — clear dead pairings
   return true;   // headshot always changes on a recrop
+}
+
+// CHANGE-HEADSHOT kind (v7.46): promote an existing photo to the headshot. There's no upload, so
+// the whole job is the atomic server rearrange — cancelable only while QUEUED (running == finalizing).
+async function runChangeHeadPhase(job, bId, setPhase){
+  const itemId=job.itemId, assetId=job.assetId;
+  job._phase='finalizing'; setPhase(30, 'Setting as headshot… (a few seconds)');
+  const parseIds=(cvArr,colId)=>{ const cv=(cvArr||[]).find(x=>x.id===colId); if(!cv||!cv.value) return []; try{ return (JSON.parse(cv.value).files||[]).map(f=>String(f.assetId)); }catch{ return []; } };
+  const cur=await gql(`{items(ids:[${itemId}]){column_values(ids:["files_mkncw5nm","file_mkp1n4bt"]){id value}}}`);
+  const head=parseIds(cur.items[0].column_values,'files_mkncw5nm');
+  const extras=parseIds(cur.items[0].column_values,'file_mkp1n4bt');
+  const all=[...head,...extras];
+  if(!all.some(a=>a===String(assetId))) throw new Error('that photo is no longer on the model');
+  const rest=all.filter(a=>a!==String(assetId));
+  await rearrangePhotos(itemId,[assetId],rest,bId);
+  await clearHeadMedThumb(itemId, bId);
+  await clearExtraMedThumbs(itemId, bId);
+  return true;
 }
 
 // After a background headshot change, pull the NEW head + med-head asset (id+url) fresh from
@@ -6699,6 +6796,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.46: (three independent changes) Client-only. (A) CHANGE HEADSHOT now goes through the background job queue, same as recrop (v7.45): the kanban modal's "★ Change headshot" no longer blocks — it enqueues a "Change headshot · <name>" job (cancelable while queued; once the atomic rearrange starts it's finalizing and can't be canceled), field edits still save synchronously, and the tile repaints on completion. The old inline kbApplyHeadshot + fake progress bar are retired from the save path (kept defined, unused). (B) KANBAN DROP ZONES: columns now stretch to equal height (align-items:stretch) and each column body fills its column (flex:1, min-height:140px), so the whole column — including empty ones — is a big drop target instead of a narrow strip; you can nudge a card into the neighboring column without precise aiming. (C) NEW SHOOT TAG FROM THE SANDBOX: the shoot-tag picker has a "+ New tag…" row (and typing a non-matching name + Enter offers "+ Create <name>"). Because Monday can't create an empty dropdown label via the API, a new tag starts PROVISIONAL: it's selected immediately and the (empty) board opens so you can add people; the label is actually created in Monday the moment you drop the FIRST person in (the existing create_labels_if_missing write), after which it's promoted to a real tag id. Do it all without leaving the sandbox. NOTE: tags are only written on the PRODUCTION board (staging placement is visual-only), same as the existing sandbox add-person behavior.
    v7.45: (recrop joins the background queue + cancelable jobs) Client-only, builds on v7.44. Recrop headshot was still fully blocking (its own separate flow, untouched by v7.44) — hitting "Save crop" froze the editor and the modal's Cancel didn't actually stop the upload (it just hid the modal while the work finished anyway). Now: (1) "Save crop" packages the crop into a background RECROP job and closes the modal immediately, so you can go model-to-model recropping without waiting. (2) The floating job widget shows each task's detail ("Recrop · <name>" / "Photo save · <name>") with a per-row Cancel button. (3) Cancel semantics are honest: a QUEUED job is dropped cleanly (never runs); a job UPLOADING its crop is aborted mid-transfer; but once a job hits the FINALIZING phase (the server-side atomic rearrange that clears+re-uploads all photos, a few seconds) Cancel is refused with a note — dropping the client there can't safely interrupt the server and could orphan photos. (4) The recrop modal's own Cancel now genuinely stops everything because nothing is enqueued until you hit Save crop. (5) Serialization is now GLOBAL — one photo job at a time across all models (recrop + save share one lane) — which is gentler on the free-tier server during a batch and keeps the un-cancelable finalize window to a single job. (6) Board id is snapshotted per job and threaded through the recrop write helpers too (rearrangePhotos + the med-thumb clears), so a mid-batch board switch can't retarget a write. On success the model's tile repaints with the new face; failures show red + Retry (same as v7.44). NOTE: real uploads only succeed on PRODUCTION; on staging every job fails into the red/Retry path, which is how queue/cancel/serialization/widget are verified there.
    v7.44: (background non-blocking photo uploads) Client-only; the one behavior change is that saving a headshot/extra photo no longer freezes the editor. Hitting Save still writes all FIELD data synchronously (as before), but the PHOTO upload is now packaged into a background job and run in a queue while you keep working — navigate, edit other models, whatever. Progress shows in a floating widget bottom-right (one row per job: name + %, live spinner, green flash + "Done ✓" on success, red row + Retry on failure). Per-item serialization: only one photo job runs per model at a time; a second photo change to the same model queues behind the first (so two uploads can't race the same columns). Opening the photo area for a model whose upload is still running shows an "upload in progress" note. On success the model's grid/kanban tile repaints with the new face (head + med-thumb refreshed in the shared store, stale URLs dropped) without a full reload. Board safety: each job snapshots the active board id at enqueue and threads it through every write helper (replaceHeadshotFast + the med-thumb writes), so switching to the Evernote/batch board mid-upload cannot retarget the write. A close/refresh while a job is in flight warns you first. The old blocking upload overlay is retired (its markup is left inert). NOTE: real uploads only succeed on PRODUCTION — on staging Monday rejects writes to the staging board's item IDs, so a save there exercises the red/Retry path (queue, widget, serialization, and revert-on-fail are all testable on staging).
    v7.43: (kanban interactivity) Two changes, client-only, WRITES model status to Monday. (1) Drag any kanban card from one column to another to change that model's MODEL STATUS — the card moves immediately (optimistic) and the new status is written to Monday via the same change_multiple_column_values {label:{index}} call the editor already uses; on a write failure the card snaps back and an error toast shows. Dropping a card back on its own column does nothing. Each column writes its PRIMARY status id (the 5-APPROVED column, which also visually holds retired/delete/outside-exclusive, writes APPROVED; ALL-STAR writes all-star; EXCLUSIVE writes exclusive; etc.). (2) The kanban card modal already has an editable MODEL STATUS control that writes on Save — confirmed working; between it and drag, you can now move models through the pipeline directly in kanban. NOTE: like all main-board writes, drag-to-move only succeeds on PRODUCTION — on staging Monday rejects writes to the staging board's item IDs, so a drag there will revert with an error toast (test drag on prod with a throwaway move).
