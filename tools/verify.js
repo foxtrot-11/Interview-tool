@@ -700,5 +700,12 @@ has('id="delete-model-row"', 'delete moved to a bottom danger zone');
 has('.danger-zone{display:flex', 'danger zone styled');
 has("_db.style.display=(currentMode==='3')?'none':'flex'", 'delete shows only in the full editor');
 
+/* v7.57: recrop a freshly-uploaded local headshot */
+has('v7.57:', 'v7.57 deploy marker present');
+has('async function openRecropLocal(', 'local-file recrop entry present');
+has('function maybeRecropLocalHeadshot(', 'auto-recrop gate present');
+has("rcState.mode==='local'", 'saveRecrop handles local-file mode (callback, no job)');
+has('maybeRecropLocalHeadshot(files[0]', 'dropped headshot triggers recrop');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

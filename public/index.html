@@ -3106,6 +3106,36 @@ async function openRecrop(itemIdArg, headIdArg){
     rcApply(); st.textContent=''; document.getElementById('recrop-save').disabled=false;
   }catch(e){ st.textContent='Error: '+(e.message||String(e)); }
 }
+// v7.57: recrop a LOCAL file that was just dropped/picked (not yet on Monday). Loads it straight
+// from a blob URL and, on Save crop, hands the cropped File back via onDone instead of enqueuing a
+// job — the caller keeps it as the pending headshot upload.
+async function openRecropLocal(file, onDone){
+  if(!file) return;
+  const modal=document.getElementById('recrop-modal'); modal.classList.add('open');
+  const img=document.getElementById('recrop-img'); const st=document.getElementById('recrop-status');
+  st.textContent='Loading image…'; img.removeAttribute('src');
+  document.getElementById('recrop-box').style.display='none';
+  document.getElementById('recrop-save').disabled=true;
+  try{
+    if(rcState&&rcState.url) URL.revokeObjectURL(rcState.url);
+    const url=URL.createObjectURL(file);
+    await new Promise((res,rej)=>{ img.onload=res; img.onerror=()=>rej(new Error('image decode failed')); img.src=url; });
+    await new Promise(r2=>requestAnimationFrame(r2));
+    const dw=img.clientWidth, dh=img.clientHeight;
+    if(!dw||!dh) throw new Error('image failed to lay out');
+    const s=Math.round(Math.min(dw,dh)*0.8);
+    rcState={url, mode:'local', onDone:(onDone||null), dw, dh, box:{x:Math.round((dw-s)/2), y:Math.round((dh-s)/2), s}, drag:null};
+    document.getElementById('recrop-box').style.display='';
+    rcApply(); st.textContent=''; document.getElementById('recrop-save').disabled=false;
+  }catch(e){ st.textContent='Error: '+(e.message||String(e)); }
+}
+// Auto-open recrop on a freshly-selected local headshot, but only for types the browser can draw
+// to canvas (HEIC/HEIF can't be, so those are kept as-is and cropped server-side on upload).
+function maybeRecropLocalHeadshot(file, onDone){
+  if(!file) return;
+  const t=(file.type||'').toLowerCase();
+  if(t==='image/jpeg'||t==='image/png'||t==='image/webp'||t==='image/gif') openRecropLocal(file, onDone);
+}
 function rcApply(){ const b=document.getElementById('recrop-box'); const s=rcState.box; b.style.left=s.x+'px'; b.style.top=s.y+'px'; b.style.width=s.s+'px'; b.style.height=s.s+'px'; }
 // v7.53: rotate the source image 90° CW by baking the rotation into a new image, then reset the
 // crop box. The crop math stays a plain crop of whatever the img currently shows — no rotation
@@ -3175,6 +3205,14 @@ async function saveRecrop(){
     const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
     if(!blob) throw new Error('crop failed');
     const file=new File([blob],'headshot-crop.jpg',{type:'image/jpeg'});
+    // v7.57: local-file mode — hand the cropped file back to the caller (it uploads on Save); no job.
+    if(rcState.mode==='local'){
+      const cb=rcState.onDone;
+      closeRecrop();
+      if(cb) cb(file);
+      showToast('Headshot cropped — will upload on Save','success');
+      return;
+    }
     const itemId=rcState.itemId, headId=rcState.headId;
     // v7.45: hand the crop to the background queue instead of uploading inline. The modal closes
     // right away so you can move to the next model; the actual upload+rearrange runs in the
@@ -6020,15 +6058,18 @@ function addPhotos(files, type){
   if(type === 'headshot'){
     headshotFiles = [files[0]]; // only keep 1
     renderPreviews('headshot-previews', headshotFiles, 'headshot');
+    maybeRecropLocalHeadshot(files[0], f=>{ headshotFiles=[f]; renderPreviews('headshot-previews', headshotFiles, 'headshot'); });
   } else if(type === 'iv-headshot'){
     ivHeadshotFile = [files[0]]; // only keep 1
     renderPreviews('iv-headshot-previews', ivHeadshotFile, 'iv-headshot');
+    maybeRecropLocalHeadshot(files[0], f=>{ ivHeadshotFile=[f]; renderPreviews('iv-headshot-previews', ivHeadshotFile, 'iv-headshot'); });
   } else if(type === 'iv-extra'){
     ivExtraFiles.push(...files);
     renderPreviews('iv-extras-previews', ivExtraFiles, 'iv-extra');
   } else if(type === 'fv-headshot'){
     fvHeadshotFile = [files[0]];
     renderPreviews('fv-headshot-previews', fvHeadshotFile, 'fv-headshot');
+    maybeRecropLocalHeadshot(files[0], f=>{ fvHeadshotFile=[f]; renderPreviews('fv-headshot-previews', fvHeadshotFile, 'fv-headshot'); });
   } else if(type === 'fv-extra'){
     fvExtraFiles.push(...files);
     renderPreviews('fv-extras-previews', fvExtraFiles, 'fv-extra');
@@ -7060,6 +7101,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.57: (crop uploaded headshots too) Client-only. When you drop/click a NEW photo into the "Replace Headshot → Monday" box (full editor, interview editor, or new-model), the recrop modal now opens on that LOCAL file so you can crop (and rotate) it before upload — matching the v7.56 pick-from-existing flow. "Save crop" hands the cropped file back as the pending headshot (uploads on Save, via the fast replace path); "Cancel" keeps the photo as-is. HEIC/HEIF are skipped (browsers can't canvas them) and upload as-is. New helpers: openRecropLocal (blob-url load, no /asset-bytes fetch) + a mode:'local' branch in saveRecrop that returns the file via callback instead of enqueuing a recrop job.
    v7.56: (three tweaks) Client-only. (A) The "+ New tag" row is now at the TOP of the Casting Sandbox shoot-tag picker (was at the bottom). (B) DELETE MODEL moved out of the top header (it sat right next to Save Changes — easy to mis-click) to a "danger zone" at the very bottom of the full editor, below the last section, with an explanatory note. Only appears in the full editor (not the interview view). (C) Picking a new headshot (Re-choose → click a photo) now opens the RECROP modal on that photo so you can crop it before it becomes the headshot — one flow. "Save crop" enqueues a single recrop job (cropped photo → headshot); the original stays in Extra pictures. Replaces v7.53's immediate as-is swap.
    v7.55: (fix) Client-only. The app's left nav column is a fixed 200px in the .main grid and stayed reserved even when blank, so grids/kanban/sandbox showed an empty 200px gutter (most obvious in the sandbox, which adds its own steps column on top). buildSidebarNav now toggles a .no-sidebar class on .main for blank-nav modes, collapsing the column (grid-template-columns:1fr, sidebar hidden) so content uses full width. Editor modes still get the 200px question-nav sidebar (every editor-open path rebuilds it to full/interview).
    v7.54: (fix) Client-only. The v7.52 nav status dropdown reused the id/class "status-dd-menu" that ALREADY belonged to the editor's sticky MODEL STATUS quick-change dropdown. Two bugs resulted: (1) the nav dropdown opened but was invisible — the older .status-dd-menu CSS (position:absolute; overflow:hidden) overrode the new position:fixed and the tab bar clipped it (you saw only the scrollbar); (2) a silent regression where the editor's own status dropdown had been populating the nav menu (duplicate id). Renamed the nav dropdown's menu to .nav-status-menu / #nav-status-menu (fixed-positioned, JS-placed under the button). Both dropdowns now work independently. Mobile was unaffected (native select).
