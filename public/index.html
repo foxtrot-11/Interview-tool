@@ -182,6 +182,8 @@
   /* v7.42: open-full-editor button, bottom-right of each sandbox tile */
   .sb-edit-btn{position:absolute;top:103px;right:6px;width:28px;height:28px;line-height:26px;padding:0;border-radius:7px;border:1.5px solid var(--accent,#3AA2E0);background:var(--surface2);color:var(--accent,#3AA2E0);font-size:14px;cursor:pointer;opacity:.92;transition:transform .1s}
   .sb-edit-btn:hover{transform:scale(1.12);background:var(--accent,#3AA2E0);color:#fff}
+  .sb-trash-btn{position:absolute;left:6px;bottom:6px;width:28px;height:28px;line-height:26px;padding:0;border-radius:7px;border:1.5px solid #f87171;background:var(--surface2);color:#f87171;font-size:14px;cursor:pointer;opacity:.9;transition:transform .1s}
+  .sb-trash-btn:hover{transform:scale(1.12);background:#f87171;color:#fff}
   /* v7.40: empty-slot add-model picker */
   .sb-addpick{position:fixed;z-index:200;background:var(--surface2);border:1px solid var(--accent,#3AA2E0);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);padding:10px;display:none}
   .sb-addpick-head{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px}
@@ -658,6 +660,9 @@
   .strip-photo-thumb.is-pending { border:3px solid #f87171; }
   .strip-photo-thumb.is-pending::after { content:'NEW HEADSHOT'; position:absolute; bottom:0; left:0; right:0; background:rgba(248,113,113,0.92); color:#fff; font-size:8px; letter-spacing:0.12em; font-weight:600; text-align:center; padding:2px 0; }
   .rechoose-active .strip-photo-thumb:not(.is-headshot):hover { border-color:#f87171; }
+  .remove-active .strip-photo-thumb:not(.is-headshot):hover { border-color:#f87171; }
+  .strip-photo-thumb.is-removing { border:3px solid #f87171; opacity:.55; }
+  .strip-photo-thumb.is-removing::after { content:'REMOVE'; position:absolute; bottom:0; left:0; right:0; background:rgba(248,113,113,0.95); color:#fff; font-size:8px; letter-spacing:0.12em; font-weight:700; text-align:center; padding:2px 0; }
   .photo-controls { display:flex; flex-direction:column; gap:6px; align-items:flex-end; flex-shrink:0; }
   .photo-action-btn { background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); border-radius:var(--radius); padding:6px 12px; font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
   .photo-action-btn:hover { border-color:var(--accent); color:var(--accent); }
@@ -978,6 +983,7 @@
       <div class="photo-controls" id="photo-controls" style="display:none">
         <button class="photo-action-btn" id="rechoose-btn" onclick="toggleRechoose()">Re-choose Headshot</button>
         <button class="photo-action-btn" id="recrop-btn" onclick="openRecrop()">✂ Recrop Headshot</button>
+        <button class="photo-action-btn" id="removephotos-btn" onclick="toggleRemovePhotos()">Remove Photos</button>
         <div class="photo-hint" id="photo-hint"></div>
       </div>
     </div>
@@ -3472,7 +3478,7 @@ async function renderSandbox(){
     const filled=flds.filter(Boolean).length;
     const noteState = filled===4?'both':(filled>0?'partial':'none'); // v7.49: green only when pay+dates+both airports set
     const noteTitle = noteState==='both'?'Pay + dates + airports logged — click to edit':(noteState==='partial'?`${filled}/4 logged — click to complete`:'Add pay / dates / airports');
-    return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret note-${noteState}" title="${noteTitle}" onclick="sbOpenNote(event,'${id}')">▾</button><button type="button" class="sb-edit-btn" title="Open full editor" onclick="sbOpenFullEditor(event,'${id}')">✎</button></div>`; };
+    return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret note-${noteState}" title="${noteTitle}" onclick="sbOpenNote(event,'${id}')">▾</button><button type="button" class="sb-edit-btn" title="Open full editor" onclick="sbOpenFullEditor(event,'${id}')">✎</button><button type="button" class="sb-trash-btn" title="Remove this shoot tag from ${escapeHtml(m?m.name:id)}" onclick="sbRemoveFromTag(event,'${id}')">🗑</button></div>`; };
   // A zone renders as fixed numbered slots (main ≥8, alt ≥4). Slot position = subitem number at Port.
   const slots=(z,alt)=>{ const ids=sbState.zones[z]||[]; const n=Math.max(alt?SB_ALT_MIN:SB_MIN_SLOTS, ids.length); let h='';
     for(let i=0;i<n;i++){ const id=ids[i]; const lbl=alt?'ALT':(SB_TYPE[z].slice(0,1)+(i+1));
@@ -3631,6 +3637,40 @@ async function sbAddPick(id){
   } else if(String(BOARD_ID)!==String(MAIN_BOARD_ID)){
     showToast('Placed (tag not written on this board)','success');
   }
+}
+
+// v7.50: remove the CURRENT sandbox tag from ONE model — writes the removal to Monday and drops
+// them from the sandbox. Only the shoot tag is touched; photos/other data are untouched.
+async function sbRemoveFromTag(e, id){
+  if(e){ e.stopPropagation(); e.preventDefault(); }
+  id=String(id);
+  const m=kanbanItems.find(x=>String(x.id)===String(id)); if(!m) return;
+  const label=sbCurrentTagLabel();
+  if(!label){ showToast('No shoot tag selected','error'); return; }
+  const nm=m.name||id;
+  if(!confirm(`Remove the shoot tag “${label}” from ${nm}?\n\nThis removes the tag from this model in Monday and takes them out of this sandbox. Their photos and all other data are untouched.`)) return;
+  // Optimistic: pull them out of every zone so the tile disappears immediately.
+  for(const z of Object.keys(sbState.zones)) sbState.zones[z]=(sbState.zones[z]||[]).filter(x=>String(x)!==id);
+  delete sbState.notes[id];
+  if(String(BOARD_ID)===String(MAIN_BOARD_ID)){
+    try{
+      const opts=boardDropdownOptions[SHOOT_COL]||[];
+      const remaining=opts.filter(o=>((m.f&&m.f.shoot)||[]).map(Number).includes(Number(o.id)))
+        .map(o=>String(o.label)).filter(l=>l.toLowerCase()!==label.toLowerCase());
+      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
+        {i:String(id), b:BOARD_ID, c:JSON.stringify({[SHOOT_COL]:{labels:remaining}})});
+      m.f.shoot=remaining.map(t=>{const o=opts.find(x=>String(x.label).toLowerCase()===t.toLowerCase());return o?Number(o.id):null;}).filter(v=>v!=null);
+      showToast(`Removed “${label}” from ${nm}`,'success');
+    }catch(err){
+      showToast('Tag removal failed: '+err.message,'error');
+      renderSandbox(); return;   // reconcile will re-add them since Monday still has the tag
+    }
+  } else {
+    const rm=(boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.label).toLowerCase()===label.toLowerCase());
+    if(rm && m.f && Array.isArray(m.f.shoot)) m.f.shoot=m.f.shoot.filter(x=>Number(x)!==Number(rm.id));
+    showToast('Removed (not written on this board)','success');
+  }
+  renderSandbox();
 }
 
 // v7.29: per-person shoot note (pay + dates). Opened from the tile caret.
@@ -3857,29 +3897,11 @@ async function portShowPlan(models, typeOf, subtitle, planFn){
     }
   }catch(e){ list.innerHTML='<div class="port-err">Error reading row: '+escapeHtml(e.message||String(e))+'</div>'; }
 }
-// v7.49: the "Beginning Airport" / "End Airport" subitem columns are resolved by TITLE on the
-// CASTING PRIORITY STACK subitem board (ids aren't hardcoded — the user said "columns of the same
-// name"). Cached after the first lookup. Returns {start,end} column ids (null if not found → skipped).
-let sbAirportCols=undefined;
-async function resolveAirportCols(){
-  if(sbAirportCols!==undefined) return sbAirportCols;
-  sbAirportCols={start:null,end:null};
-  try{
-    const d=await gql(`{boards(ids:[${CASTING_SUBITEM_BOARD_ID}]){columns{id title}}}`);
-    const cols=(((d.boards||[])[0]||{}).columns)||[];
-    const norm=s=>String(s||'').trim().toLowerCase();
-    const exact=t=>{ const c=cols.find(x=>norm(x.title)===t); return c?c.id:null; };
-    const rx=re=>{ const c=cols.find(x=>re.test(norm(x.title))); return c?c.id:null; };
-    sbAirportCols.start = exact('beginning airport') || rx(/(begin|start|depart).*airport|airport.*(start|depart)/);
-    sbAirportCols.end   = exact('end airport')       || rx(/(end|arriv|return).*airport|airport.*(end|arriv|return)/);
-  }catch(e){ console.warn('airport column resolve failed:', e.message); }
-  return sbAirportCols;
-}
+// v7.50: real subitem column ids supplied by the user (were resolved by title in v7.49).
+const SUBITEM_START_AIR_COL='text_mm5exz7q';  // Beginning Airport (flying FROM)
+const SUBITEM_END_AIR_COL='text_mm5f30a9';    // End Airport (flying TO — shoot location)
 async function portConfirm(){
   if(!portPlan||!portPlan.actions.length) return;
-  // v7.49: resolve airport subitem columns once (by title) if any action carries an airport value.
-  const needAir = portPlan.actions.some(a=>a.startAirport||a.endAirport);
-  const airCols = needAir ? await resolveAirportCols() : {start:null,end:null};
   // Pull any name edits from the preview inputs before writing (v7.17).
   document.querySelectorAll('#port-list .port-name-input').forEach(inp=>{
     const i=Number(inp.dataset.pi); const v=(inp.value||'').trim();
@@ -3905,8 +3927,8 @@ async function portConfirm(){
       // The plain 5-APPROVED port path leaves a.pay/a.dates unset, so these are safe no-ops there.
       if(a.pay) cvObj['text_mm522jb4']=a.pay;
       if(a.dates) cvObj['long_text_mm35h07x']={text:a.dates};
-      if(a.startAirport && airCols.start) cvObj[airCols.start]=a.startAirport;   // v7.49
-      if(a.endAirport && airCols.end) cvObj[airCols.end]=a.endAirport;           // v7.49
+      if(a.startAirport) cvObj[SUBITEM_START_AIR_COL]=a.startAirport;   // v7.50
+      if(a.endAirport) cvObj[SUBITEM_END_AIR_COL]=a.endAirport;         // v7.50
       await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
         {i:slotId,b:CASTING_SUBITEM_BOARD_ID,c:JSON.stringify(cvObj)});
       a.done=true; ok++;
@@ -5594,11 +5616,14 @@ async function saveRecord(){
 // headshot swap can rewrite the columns without losing any attachments.
 let photoState = { headshotEntries: [], extraEntries: [] };
 let candidatePhotos = [];          // display list: {assetId, url, name, isHeadshot}
+let removePhotoMode = false;       // v7.50: selecting extras to delete from Monday
+let pendingRemoveIds = new Set();  // v7.50: asset ids marked for removal
 let pendingHeadshotAssetId = null; // chosen replacement, applied on Save
 let rechooseMode = false;
 let lightboxIndex = 0;
 
 async function loadCandidatePhotos(itemId){
+  removePhotoMode=false; pendingRemoveIds.clear();   // v7.50: never carry a removal selection across models
   const grid = document.getElementById('strip-photo-grid');
   const avatarWrap = document.getElementById('candidate-avatar-wrap');
   grid.innerHTML = '';
@@ -5672,14 +5697,20 @@ function renderPhotoGrid(){
   const grid = document.getElementById('strip-photo-grid');
   grid.innerHTML = '';
   grid.classList.toggle('rechoose-active', rechooseMode);
+  grid.classList.toggle('remove-active', removePhotoMode);
   candidatePhotos.forEach((p, i) => {
     const thumb = document.createElement('div');
     let cls = 'strip-photo-thumb';
-    if(p.assetId === pendingHeadshotAssetId) cls += ' is-pending';
+    if(removePhotoMode && !p.isHeadshot && pendingRemoveIds.has(p.assetId)) cls += ' is-removing';
+    else if(p.assetId === pendingHeadshotAssetId) cls += ' is-pending';
     else if(p.isHeadshot) cls += ' is-headshot';
     thumb.className = cls;
     thumb.innerHTML = `<img src="${escapeHtml(p.thumbUrl||p.url)}" title="${escapeHtml(p.name)}" loading="lazy">`;
-    thumb.onclick = () => rechooseMode ? selectPendingHeadshot(p.assetId) : openLightbox(i);
+    if(removePhotoMode){
+      thumb.onclick = () => togglePhotoForRemoval(p);   // headshot ignored inside
+    } else {
+      thumb.onclick = () => rechooseMode ? selectPendingHeadshot(p.assetId) : openLightbox(i);
+    }
     grid.appendChild(thumb);
   });
   updatePhotoHint();
@@ -5688,6 +5719,20 @@ function renderPhotoGrid(){
 function updatePhotoHint(){
   const hint = document.getElementById('photo-hint');
   const btn = document.getElementById('rechoose-btn');
+  const rmBtn = document.getElementById('removephotos-btn');
+  const recropBtn = document.getElementById('recrop-btn');
+  if(removePhotoMode){
+    // Remove-photos mode owns the strip; hide the headshot controls to avoid mixed selections.
+    if(btn) btn.style.display='none';
+    if(recropBtn) recropBtn.style.display='none';
+    const n = pendingRemoveIds.size;
+    hint.textContent = 'Click extra photos to mark them for removal, then apply. The headshot can\u2019t be removed here.';
+    if(rmBtn){ rmBtn.textContent = n ? `Remove ${n} selected` : 'Cancel'; rmBtn.classList.add('danger'); }
+    return;
+  }
+  if(btn) btn.style.display='';
+  if(recropBtn) recropBtn.style.display='';
+  if(rmBtn){ rmBtn.textContent='Remove Photos'; rmBtn.classList.remove('danger'); }
   if(rechooseMode){
     hint.textContent = 'Click a photo to make it the new headshot';
     btn.textContent = 'Cancel';
@@ -5703,7 +5748,39 @@ function updatePhotoHint(){
   }
 }
 
+// v7.50: Remove-photos flow. Button cycles: "Remove Photos" → (mode) "Cancel"/"Remove N selected".
+function toggleRemovePhotos(){
+  if(!removePhotoMode){
+    // entering: clear any headshot-selection mode so the two don't fight over the grid
+    rechooseMode=false; pendingHeadshotAssetId=null;
+    removePhotoMode=true; pendingRemoveIds.clear();
+    renderPhotoGrid(); return;
+  }
+  // already in mode: 0 selected → cancel; ≥1 → apply
+  if(pendingRemoveIds.size===0){ removePhotoMode=false; renderPhotoGrid(); return; }
+  applyRemovePhotos();
+}
+function togglePhotoForRemoval(p){
+  if(!p || p.isHeadshot){ showToast('The headshot can\u2019t be removed here — use Recrop / Re-choose','error'); return; }
+  if(pendingRemoveIds.has(p.assetId)) pendingRemoveIds.delete(p.assetId);
+  else pendingRemoveIds.add(p.assetId);
+  renderPhotoGrid();
+}
+function applyRemovePhotos(){
+  if(!currentItem || pendingRemoveIds.size===0) return;
+  const head = (candidatePhotos||[]).find(p=>p.isHeadshot);
+  const headAssetId = head ? head.assetId : null;
+  const keptExtraIds = (candidatePhotos||[]).filter(p=>!p.isHeadshot && !pendingRemoveIds.has(p.assetId)).map(p=>p.assetId);
+  const n = pendingRemoveIds.size;
+  if(!confirm(`Permanently remove ${n} photo${n>1?'s':''} from ${currentItem.name} in Monday?\n\nThis deletes ${n>1?'them':'it'} from Extra pictures for good. The headshot is kept.`)) return;
+  enqueueRemovePhotosJob({ itemId:currentItem.id, modelName:currentItem.name, boardId:BOARD_ID, headAssetId, keptExtraIds });
+  removePhotoMode=false; pendingRemoveIds.clear();
+  renderPhotoGrid();
+  if(typeof refreshInflightNotes==='function') refreshInflightNotes();
+}
+
 function toggleRechoose(){
+  if(removePhotoMode){ removePhotoMode=false; pendingRemoveIds.clear(); }   // v7.50: leave remove mode
   if(pendingHeadshotAssetId){ pendingHeadshotAssetId = null; rechooseMode = false; }
   else rechooseMode = !rechooseMode;
   renderPhotoGrid();
@@ -6301,6 +6378,16 @@ function enqueueChangeHeadJob({itemId, modelName, boardId, assetId}){
   });
 }
 
+// REMOVE-PHOTOS job (v7.50) — rebuild the extras column WITHOUT the selected assets (the server
+// clears + re-uploads only the keepers, so the removed ones are gone). Head is preserved.
+function enqueueRemovePhotosJob({itemId, modelName, boardId, headAssetId, keptExtraIds}){
+  return pushJob({
+    itemId, modelName, boardId, kind:'removephotos', detail:'Remove photos',
+    headAssetId: headAssetId!=null?String(headAssetId):null,
+    keptExtraIds: (keptExtraIds||[]).map(String)
+  });
+}
+
 function pushJob(extra){
   const job = Object.assign({
     id: ++bgJobSeq,
@@ -6369,6 +6456,8 @@ async function runPhotoJob(job){
       headChanged = await runRecropPhase(job, bId, setPhase);
     } else if(job.kind==='changehead'){
       headChanged = await runChangeHeadPhase(job, bId, setPhase);
+    } else if(job.kind==='removephotos'){
+      headChanged = await runRemovePhotosPhase(job, bId, setPhase);
     } else {
       headChanged = await runSavePhase(job, bId, setPhase);
     }
@@ -6493,6 +6582,19 @@ async function runChangeHeadPhase(job, bId, setPhase){
   await clearHeadMedThumb(itemId, bId);
   await clearExtraMedThumbs(itemId, bId);
   return true;
+}
+
+// REMOVE-PHOTOS (v7.50): rebuild both columns from head + KEPT extras only; removed extras are
+// dropped (server clears then re-uploads the keepers). Straight to finalizing (cancelable only
+// while queued). Head is preserved (re-uploaded), so head/extra med-thumbs are cleared + refreshed.
+async function runRemovePhotosPhase(job, bId, setPhase){
+  const itemId=job.itemId;
+  job._phase='finalizing'; setPhase(30, 'Removing photos… (a few seconds)');
+  const head = job.headAssetId ? [job.headAssetId] : [];
+  await rearrangePhotos(itemId, head, job.keptExtraIds||[], bId);
+  await clearHeadMedThumb(itemId, bId);
+  await clearExtraMedThumbs(itemId, bId);
+  return true;   // asset ids churned → refresh head/tile
 }
 
 // After a background headshot change, pull the NEW head + med-head asset (id+url) fresh from
@@ -6823,6 +6925,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.50: (three items) Client-only. (A) AIRPORT COLUMN IDS: the v7.49 title-resolver is replaced with the real subitem column ids (Beginning Airport text_mm5exz7q, End Airport text_mm5f30a9) — no more lookup/guessing. (B) SANDBOX TAG REMOVAL: each sandbox tile has a small red 🗑 (bottom-left). Click → confirm → removes THIS shoot tag from that model on Monday (writes the remaining labels back; only the tag is touched, photos/other data untouched) and drops them from the sandbox. On staging it's local-only (no write), same as add. On write failure it re-renders so the model reappears (Monday still has the tag). (C) REMOVE EXTRA PHOTOS: the full editor's photo strip gets a "Remove Photos" button under Recrop. Click → the strip enters remove-mode (the headshot controls hide); click extras to mark them (red REMOVE badge); the button becomes "Remove N selected" → confirm → a background "Remove photos" job rebuilds the extras column WITHOUT the selected assets (server clears + re-uploads only the keepers, so the removed ones are deleted from Monday). Headshot is preserved and can't be selected. Cancelable while queued. For clearing scraped slop. NOTE: both (B) and (C) only write on the PRODUCTION board.
    v7.49: (six feedback items) Client-only. (A) RECROP SHOULDER GUIDE nudged down again (v7.48 apex ~y65 read a touch high) → M8,77 C26,66 74,66 92,77, apex ~y69. (B) RECROP BOX resizes from ALL FOUR corners now, not just bottom-right — four handles, each keeps the opposite corner fixed while preserving the square. (C) GRID TAG CLICK: clicking a model that HAS tags now opens a read-only popover showing just their tags (distinct from the "+", which still opens the add/edit picker); a model with NO tags still jumps straight to the picker. Decided live (gridTagCountClick) so it can't go stale after in-session edits. (D) TAG LISTS are alphabetical (case-insensitive) in the grid picker and the read-only popover. (E) CASTING SANDBOX TAB no longer renders as a clipped outlined box — it was accidentally inheriting the sandbox toolbar's .sb-btn style (rounded border + big padding); that rule is now scoped :not(.mode-btn). (F) SANDBOX SHOOT NOTES gained "Beginning Airport" + "End Airport" fields alongside Pay + Dates Booked; the tile caret is now green only when ALL FOUR are filled (yellow if 1–3, white if none). At Port they write to the CASTING PRIORITY STACK subitem columns of the same name, resolved BY TITLE on the subitem board (ids aren't hardcoded; if a column isn't found by title it's skipped, no error). Notes ride the share-link + save-state automatically (whole-object JSON). NOTE: airport writes only happen on PORT and only on the production board — verify on prod that the two columns are matched by title.
    v7.48: (two fixes from v7.47 feedback) Client-only. (A) GRID "+" CUTOFF: on narrow tiles (the grid floor is 150px columns) the tag row's fixed 70px label + count + "+" overflowed the tile and overflow:hidden clipped the "+". Tag-row-specific fix (rating/date rows untouched): the "TAG" label is 44px there, the row gap is tighter, and the count button can now shrink (min-width:0 + ellipsis) so the "+" — which stays flex:none — is always fully visible. (B) RECROP SHOULDER GUIDE (again): v7.47 raised it but not enough — a cubic Bezier only reaches ~1/3 of the way to its control points at the midpoint, so control-y 66 still apexed at ~y72 (chest). Recomputed: path M8,74 C26,62 74,62 92,74 apexes at ~y65 (on the shoulder ridge, just below the oval's y62 chin) with ends at y74 (deltoid tops), instead of drooping to the bottom corners.
    v7.47: (cleanup + two small fixes) Client-only. (A) DEAD CODE removed: kbApplyHeadshot and its fake animated progress bar (kbHsProgressStart/kbHsProgressDone/kbHsTimer) + the .kb-hs-prog CSS — all superseded by the v7.46 background change-headshot job; nothing called them anymore. (B) GRID TAG "+": on every grid tile (All Models, 5-APPROVED, and the other scopes) both the tag-count button AND the "+" now open the add/edit picker in one click — previously an empty "No tags" tile made you take an extra click. The count button always opens the picker regardless of whether the model already has tags (the picker shows current tags with ✓ and lets you add/remove/create), so behavior is uniform across every tile and there's no stale-handler edge case. (C) RECROP SHOULDER GUIDE: the head+shoulders overlay's shoulder curve was peaking around y78 and diving to the bottom corners, so it sat on the chest; raised it (apex ~y66, ends ~y90) so it traces the actual shoulder line.

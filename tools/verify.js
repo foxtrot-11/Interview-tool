@@ -623,10 +623,28 @@ has('.sb-btn:not(.mode-btn)', 'toolbar .sb-btn scoped away from the mode tab');
 has('sb-note-startair', 'beginning-airport field present');
 has('sb-note-endair', 'end-airport field present');
 has('startAirport:nt.startAirport', 'port entries carry airports');
-has('function resolveAirportCols(', 'airport subitem columns resolved by title');
-has('cvObj[airCols.start]', 'port writes beginning airport');
-has('cvObj[airCols.end]', 'port writes end airport');
+has('SUBITEM_START_AIR_COL=', 'beginning-airport subitem col id (v7.50 hardcoded)');
+has('cvObj[SUBITEM_START_AIR_COL]', 'port writes beginning airport');
+has('cvObj[SUBITEM_END_AIR_COL]', 'port writes end airport');
 has("filled===4?'both'", 'caret green requires all four fields');
+
+/* v7.50 asserts: airport col ids, sandbox tag removal, remove extra photos */
+has('v7.50:', 'v7.50 deploy marker present');
+// (A) hardcoded airport col ids
+has('text_mm5exz7q', 'beginning-airport column id present');
+has('text_mm5f30a9', 'end-airport column id present');
+lacks('function resolveAirportCols(', 'v7.49 title resolver removed');
+// (B) sandbox tag removal
+has('function sbRemoveFromTag(', 'sandbox tag-removal handler present');
+has('sb-trash-btn', 'sandbox trash button rendered/styled');
+has('create_labels_if_missing:false', 'tag removal writes remaining labels');
+// (C) remove extra photos
+has('function toggleRemovePhotos(', 'remove-photos toggle present');
+has('function enqueueRemovePhotosJob(', 'remove-photos enqueue present');
+has('async function runRemovePhotosPhase(', 'remove-photos worker present');
+has("job.kind==='removephotos'", 'runPhotoJob branches on removephotos');
+has('is-removing', 'remove selection styled');
+has('removePhotoMode=false; pendingRemoveIds.clear()', 'remove mode resets on photo (re)load');
 
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
