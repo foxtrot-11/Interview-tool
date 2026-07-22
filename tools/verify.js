@@ -666,5 +666,24 @@ has('class="sb-layout"', 'sandbox two-column layout present');
 has('class="sb-side"', 'sandbox steps sidebar present');
 has('.sb-side{flex:0 0 380px', 'sandbox sidebar sized');
 
+/* v7.53 asserts: delete model, dropdown fix, mobile parity, recrop rotate, rechoose→queue */
+has('v7.53:', 'v7.53 deploy marker present');
+// (A) delete model
+has('function deleteCurrentModel(', 'delete-model handler present');
+has('id="delete-model-btn"', 'delete-model button present');
+has('label:{index:6}', 'delete sets MODEL STATUS to DELETE (index 6)');
+// (B) dropdown clipping fix
+has('position:fixed;z-index:9500', 'status menu is fixed-positioned (escapes overflow clip)');
+has('r.bottom+4', 'status menu positioned under its button on open');
+// (C) mobile parity
+has('<optgroup label="Status">', 'mobile select groups statuses');
+has('<option value="sb">Casting Sandbox</option>', 'mobile has casting sandbox');
+has('<option value="kanban">Kanban</option>', 'mobile has kanban');
+// (D) recrop rotate
+has('function rotateRecrop(', 'recrop rotate handler present');
+has('id="recrop-rotate"', 'recrop rotate button present');
+// (E) rechoose → queue
+has('enqueueChangeHeadJob({ itemId:currentItem.id, modelName:currentItem.name, boardId:BOARD_ID, assetId })', 'rechoose enqueues a background job');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
