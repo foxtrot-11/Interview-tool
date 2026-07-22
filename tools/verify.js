@@ -646,5 +646,9 @@ has("job.kind==='removephotos'", 'runPhotoJob branches on removephotos');
 has('is-removing', 'remove selection styled');
 has('removePhotoMode=false; pendingRemoveIds.clear()', 'remove mode resets on photo (re)load');
 
+/* v7.51: trash button position fix */
+has('v7.51:', 'v7.51 deploy marker present');
+has('.sb-trash-btn{position:absolute;left:6px;top:103px', 'trash button on thumbnail (not overlapping name)');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
