@@ -686,12 +686,19 @@ has('<option value="kanban">Kanban</option>', 'mobile has kanban');
 has('function rotateRecrop(', 'recrop rotate handler present');
 has('id="recrop-rotate"', 'recrop rotate button present');
 // (E) rechoose → queue
-has('enqueueChangeHeadJob({ itemId:currentItem.id, modelName:currentItem.name, boardId:BOARD_ID, assetId })', 'rechoose enqueues a background job');
+has('openRecrop(currentItem.id, assetId)', 'v7.56: picking a new headshot opens recrop to crop it first');
 
 /* v7.55: collapse blank left nav column */
 has('v7.55:', 'v7.55 deploy marker present');
 has('.main.no-sidebar{grid-template-columns:1fr}', 'blank nav collapses the column');
 has("classList.toggle('no-sidebar', type==='blank')", 'buildSidebarNav toggles the collapse');
+
+/* v7.56: new-tag at top, delete at bottom, pick→crop */
+has('v7.56:', 'v7.56 deploy marker present');
+has('list.innerHTML = newRow + rows', 'new-tag row is at the top of the picker');
+has('id="delete-model-row"', 'delete moved to a bottom danger zone');
+has('.danger-zone{display:flex', 'danger zone styled');
+has("_db.style.display=(currentMode==='3')?'none':'flex'", 'delete shows only in the full editor');
 
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

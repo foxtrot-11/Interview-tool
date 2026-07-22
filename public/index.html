@@ -352,7 +352,7 @@
   #shoot-picker-search{width:100%;margin-bottom:6px}
   .shoot-picker-list{max-height:240px;overflow:auto}
   .shoot-opt{padding:6px 8px;font-size:12px;border-radius:4px;cursor:pointer;color:var(--text)}
-  .shoot-opt.sb-newtag{color:var(--accent);font-weight:700;border-top:1px solid var(--border);margin-top:4px;border-radius:0 0 4px 4px}
+  .shoot-opt.sb-newtag{color:var(--accent);font-weight:700;border-bottom:1px solid var(--border);margin-bottom:4px;border-radius:4px 4px 0 0}
   .shoot-opt.sb-newtag:hover{background:rgba(58,162,224,.12)}
   .shoot-opt:hover{background:var(--surface2)}
   .shoot-opt.sel{color:var(--accent)}
@@ -488,8 +488,10 @@
   .save-btn{background:var(--accent);color:var(--bg);border:none;border-radius:var(--radius);padding:7px 18px;font-family:var(--font-display);font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:all 0.15s;white-space:nowrap}
   .save-btn:hover{background:#d8c4ff;transform:translateY(-1px)}
   .save-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
-  .save-btn.del-btn{background:#df2f4a;color:#fff;margin-left:8px}
+  .save-btn.del-btn{background:#df2f4a;color:#fff}
   .save-btn.del-btn:hover{background:#c02038}
+  .danger-zone{display:flex;align-items:center;gap:12px;margin-top:32px;padding-top:16px;border-top:1px solid var(--border)}
+  .danger-zone-note{font-size:11px;color:var(--text-dim)}
 
   /* SELECTOR BAR */
   .selector-bar{flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 28px;z-index:90;position:relative}
@@ -989,7 +991,6 @@
         <button class="dup-refresh-btn" id="copy-model-link-btn" style="display:none" onclick="copyModelLink()" title="Copy a link that opens this model's page">🔗 Copy link</button>
       </span>
       <button class="save-btn" id="save-btn" onclick="saveAll()" disabled style="margin-left:auto">Save Changes</button>
-      <button class="save-btn del-btn" id="delete-model-btn" onclick="deleteCurrentModel()" style="display:none" title="Move this model to the DELETE group in Monday (not a permanent delete)">🗑 Delete Model</button>
       <div id="save-progress-bar" style="display:none;position:absolute;bottom:0;left:0;height:3px;background:var(--accent);border-radius:2px;width:0%;transition:width 0.3s ease"></div>
     </div>
     <div class="candidate-strip" id="candidate-strip">
@@ -1262,6 +1263,10 @@
         <div class="section-nav"><button class="nav-btn" onclick="goFSection(5)">← Prev</button><div class="section-progress">7/7</div><button class="save-btn" onclick="saveAll()">✓ Save All</button></div>
       </div>
 
+      <div class="danger-zone" id="delete-model-row" style="display:none">
+        <button class="save-btn del-btn" id="delete-model-btn" onclick="deleteCurrentModel()" title="Move this model to the DELETE group in Monday (not a permanent delete)">🗑 Delete Model</button>
+        <span class="danger-zone-note">Moves this model to the DELETE group in Monday (not a permanent delete).</span>
+      </div>
     </div><!-- /full-view -->
 
     <!-- ════════════════════════════════════════════
@@ -3437,7 +3442,7 @@ function sbRenderTagList(){
   const newRow = (q && !exact)
     ? `<div class="shoot-opt sb-newtag" onclick="sbNewTag('${escapeHtml(q).replace(/'/g,"\\'")}')">+ Create “${escapeHtml(q)}”</div>`
     : `<div class="shoot-opt sb-newtag" onclick="sbNewTag()">+ New tag…</div>`;
-  list.innerHTML = rows + newRow;
+  list.innerHTML = newRow + rows;
 }
 function sbTagEnter(){
   const raw=((document.getElementById('sb-tag-search')||{}).value||'').trim();
@@ -5250,7 +5255,7 @@ async function loadCandidate(itemId){
   catch(e){ console.error('populateForm error:', e); showToast('Some fields failed to load: '+e.message,'error'); }
   loadCandidatePhotos(currentItem.id);
   document.getElementById('save-btn').disabled=false;
-  { const _db=document.getElementById('delete-model-btn'); if(_db) _db.style.display=''; }   // v7.53: existing model → deletable
+  { const _db=document.getElementById('delete-model-row'); if(_db) _db.style.display=(currentMode==='3')?'none':'flex'; }   // v7.56: delete lives at the bottom of the full editor
   isDirty=false;
   document.getElementById('unsaved-dot').classList.remove('visible');
   document.getElementById('save-status').textContent='';
@@ -5920,14 +5925,10 @@ function selectPendingHeadshot(assetId){
   if(!p) return;
   if(p.isHeadshot){ rechooseMode = false; renderPhotoGrid(); return; } // already the headshot
   rechooseMode = false;
-  // v7.53: apply via the background queue (like recrop / change-headshot) — no waiting for Save.
-  if(currentItem && currentItem.id){
-    enqueueChangeHeadJob({ itemId:currentItem.id, modelName:currentItem.name, boardId:BOARD_ID, assetId });
-    pendingHeadshotAssetId = null;
-    renderPhotoGrid();
-    if(typeof refreshInflightNotes==='function') refreshInflightNotes();
-    showToast('Headshot change queued','success');
-  }
+  renderPhotoGrid();
+  // v7.56: instead of swapping as-is, open the recrop modal ON the chosen photo so you can crop it
+  // before it becomes the headshot. "Save crop" enqueues one recrop job (cropped photo → headshot).
+  if(currentItem && currentItem.id){ openRecrop(currentItem.id, assetId); }
 }
 
 // Re-choose an existing photo as the headshot. Delegates to the atomic server
@@ -6943,7 +6944,7 @@ function scrollToField(targetId){
 // ── RESET ──
 function resetForm(){
   currentItem=null;isDirty=false;statusValues={};selectValues={};multiValues={};
-  { const _db=document.getElementById('delete-model-btn'); if(_db) _db.style.display='none'; }   // v7.53
+  { const _db=document.getElementById('delete-model-row'); if(_db) _db.style.display='none'; }   // v7.56
   shootTags=[];shootTagsDirty=false;{const _st=document.getElementById('shoot-tags-block'); if(_st) _st.style.display='none';}
   compatSavedIds=new Set();
   pendingHeadshotAssetId=null;rechooseMode=false;candidatePhotos=[];closeLightbox();
@@ -7059,6 +7060,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.56: (three tweaks) Client-only. (A) The "+ New tag" row is now at the TOP of the Casting Sandbox shoot-tag picker (was at the bottom). (B) DELETE MODEL moved out of the top header (it sat right next to Save Changes — easy to mis-click) to a "danger zone" at the very bottom of the full editor, below the last section, with an explanatory note. Only appears in the full editor (not the interview view). (C) Picking a new headshot (Re-choose → click a photo) now opens the RECROP modal on that photo so you can crop it before it becomes the headshot — one flow. "Save crop" enqueues a single recrop job (cropped photo → headshot); the original stays in Extra pictures. Replaces v7.53's immediate as-is swap.
    v7.55: (fix) Client-only. The app's left nav column is a fixed 200px in the .main grid and stayed reserved even when blank, so grids/kanban/sandbox showed an empty 200px gutter (most obvious in the sandbox, which adds its own steps column on top). buildSidebarNav now toggles a .no-sidebar class on .main for blank-nav modes, collapsing the column (grid-template-columns:1fr, sidebar hidden) so content uses full width. Editor modes still get the 200px question-nav sidebar (every editor-open path rebuilds it to full/interview).
    v7.54: (fix) Client-only. The v7.52 nav status dropdown reused the id/class "status-dd-menu" that ALREADY belonged to the editor's sticky MODEL STATUS quick-change dropdown. Two bugs resulted: (1) the nav dropdown opened but was invisible — the older .status-dd-menu CSS (position:absolute; overflow:hidden) overrode the new position:fixed and the tab bar clipped it (you saw only the scrollbar); (2) a silent regression where the editor's own status dropdown had been populating the nav menu (duplicate id). Renamed the nav dropdown's menu to .nav-status-menu / #nav-status-menu (fixed-positioned, JS-placed under the button). Both dropdowns now work independently. Mobile was unaffected (native select).
    v7.53: (five items) Client-only. (A) DELETE MODEL button (red, next to Save Changes) shows whenever an existing model's full/interview editor is open, from any entry point. It does NOT hard-delete — it sets MODEL STATUS to "00 - DELETE" (index 6) via the same {label:{index}} write the kanban drag uses, moving the item to the DELETE group in Monday; since no view shows that status it disappears from the app, and it's restorable in Monday. Confirm dialog first; leaves the editor on success. (B) STATUS DROPDOWN menu was being clipped by the tab bar's overflow:hidden — the menu is now position:fixed and JS-positioned under the button, so it actually appears on click. (C) MOBILE view select now matches the new grouping (a "Status" optgroup) and adds KANBAN + CASTING SANDBOX so mobile has full functionality. (D) RECROP gained a "↻ Rotate" button — rotates the photo 90° CW by baking the rotation into the image and resetting the crop box (crop stays a plain crop, no rotation math downstream). (E) CHOOSING A NEW HEADSHOT (Re-choose) now enqueues a background change-headshot job immediately instead of waiting for Save — same queue as recrop, so you can keep working.
