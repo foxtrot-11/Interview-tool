@@ -107,6 +107,16 @@
   .dup-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px}
   /* ── KANBAN ── */
   .mode-btn.active[data-mode="all"]{background:#e8e8f0;color:#111}
+  /* v7.52: status dropdown (collapses the per-status tabs) */
+  .status-dd{position:relative;display:inline-flex}
+  .status-dd-btn{display:inline-flex;align-items:center;gap:6px}
+  .status-dd-caret{font-size:9px;opacity:.85}
+  .status-dd-menu{position:absolute;top:100%;left:0;z-index:200;display:none;min-width:200px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px;box-shadow:0 8px 24px rgba(0,0,0,.5);flex-direction:column;gap:2px}
+  .status-dd-menu.open{display:flex}
+  .status-dd-opt{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:7px 10px;border:none;background:transparent;color:var(--text);font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-radius:5px}
+  .status-dd-opt:hover{background:var(--surface)}
+  .status-dd-opt.sel{outline:1px solid var(--accent,#3AA2E0)}
+  .status-dot{width:12px;height:12px;border-radius:3px;flex:none;border:1px solid rgba(0,0,0,.3)}
   .mode-btn.active[data-mode="kanban"]{background:#3AA2E0;color:#fff}
   .kanban-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:stretch}
   .kb-col{flex:0 0 300px;width:300px;min-width:0;overflow:hidden;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;max-height:calc(100vh - 230px)}
@@ -199,6 +209,12 @@
   .sb-addpick-cancel:hover{border-color:var(--accent,#3AA2E0);color:var(--text)}
   /* v7.39: stepped sandbox toolbar */
   .sb-toolbar{padding-bottom:6px}
+  /* v7.52: steps in a left sidebar so the board isn't pushed below the fold */
+  .sb-layout{display:flex;gap:20px;align-items:flex-start}
+  .sb-side{flex:0 0 380px;max-width:380px;position:sticky;top:10px;max-height:calc(100vh - 84px);overflow-y:auto;padding-right:4px}
+  .sb-main{flex:1;min-width:0}
+  .sb-side .sb-step-desc{max-width:none}
+  @media(max-width:900px){ .sb-layout{flex-direction:column} .sb-side{position:static;flex:1 1 auto;max-width:none;max-height:none;overflow:visible} }
   .sb-intro{font-size:14px;color:var(--text-muted);margin:4px 2px 14px;line-height:1.5;max-width:900px}
   .sb-step{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--border)}
   .sb-step:first-of-type{border-top:none}
@@ -870,17 +886,22 @@
   <div class="mode-selector" id="mode-selector">
     <div class="drawer-head">Menu</div>
     <button class="mode-btn" data-mode="new" onclick="setMode('new')">+ NEW MODEL</button>
-    <button class="mode-btn" data-mode="all" onclick="setMode('all')">ALL MODELS</button>
-    <button class="mode-btn active" data-mode="0" onclick="setMode('0')">0-APPLICANT</button>
-    <button class="mode-btn" data-mode="1" onclick="setMode('1')">1-SCREEN</button>
-    <button class="mode-btn" data-mode="2" onclick="setMode('2')">2-POTENTIAL</button>
-    <button class="mode-btn" data-mode="3" onclick="setMode('3')">3-INTERVIEW</button>
-    <button class="mode-btn" data-mode="4" onclick="setMode('4')">4-REVIEW</button>
-    <button class="mode-btn" data-mode="5a" onclick="setMode('5a')">5-APPROVED</button>
-    <button class="mode-btn" data-mode="5r" onclick="setMode('5r')">5-REJECTED</button>
-    <button class="mode-btn batch-btn" data-mode="batch" onclick="setMode('batch')">EVERNOTE BATCH IMPORT</button>
+    <div class="status-dd" id="status-dd">
+      <button class="mode-btn status-dd-btn active" id="status-dd-btn" data-mode="all" onclick="toggleStatusMenu(event)"><span id="status-dd-label">ALL MODELS</span> <span class="status-dd-caret">▾</span></button>
+      <div class="status-dd-menu" id="status-dd-menu">
+        <button class="status-dd-opt" data-mode="all" onclick="pickStatus('all')"><span class="status-dot" style="background:#e8e8f0"></span>ALL MODELS</button>
+        <button class="status-dd-opt" data-mode="0" onclick="pickStatus('0')"><span class="status-dot" style="background:#c4c4c4"></span>0-APPLICANT</button>
+        <button class="status-dd-opt" data-mode="1" onclick="pickStatus('1')"><span class="status-dot" style="background:#cab641"></span>1-SCREEN</button>
+        <button class="status-dd-opt" data-mode="2" onclick="pickStatus('2')"><span class="status-dot" style="background:#ff6d3b"></span>2-POTENTIAL</button>
+        <button class="status-dd-opt" data-mode="3" onclick="pickStatus('3')"><span class="status-dot" style="background:#ffcb00"></span>3-INTERVIEW</button>
+        <button class="status-dd-opt" data-mode="4" onclick="pickStatus('4')"><span class="status-dot" style="background:#579bfc"></span>4-REVIEW</button>
+        <button class="status-dd-opt" data-mode="5a" onclick="pickStatus('5a')"><span class="status-dot" style="background:#037f4c"></span>5-APPROVED</button>
+        <button class="status-dd-opt" data-mode="5r" onclick="pickStatus('5r')"><span class="status-dot" style="background:#df2f4a"></span>5-REJECTED</button>
+      </div>
+    </div>
     <button class="mode-btn kanban-btn" data-mode="kanban" onclick="setMode('kanban')">KANBAN</button>
     <button class="mode-btn dup-btn" data-mode="dup" onclick="setMode('dup')">DUPLICATES</button>
+    <button class="mode-btn batch-btn" data-mode="batch" onclick="setMode('batch')">EVERNOTE BATCH IMPORT</button>
     <button class="mode-btn sb-btn" data-mode="sb" onclick="setMode('sb')">CASTING SANDBOX</button>
   </div>
 
@@ -1538,6 +1559,8 @@
 
     <!-- CASTING SANDBOX (v7.17): visual drag-to-arrange per shoot tag; share via #sb= link; port with per-column types -->
     <div id="sb-view" style="display:none">
+      <div class="sb-layout">
+      <aside class="sb-side">
       <div class="am-toolbar sb-toolbar">
         <div class="am-toolbar-row">
           <div class="am-title">Casting Sandbox</div>
@@ -1612,9 +1635,13 @@
           </div>
         </div>
       </div>
+      </aside>
+      <div class="sb-main">
       <div id="sb-loading" class="dup-loading" style="display:none"><span class="dup-spinner"></span><span id="sb-load-status">Loading…</span></div>
       <div id="sb-empty" class="am-empty">Pick a shoot tag to load its people.</div>
       <div id="sb-board" class="sb-board" style="display:none"></div>
+      </div>
+      </div>
     </div>
 
     <!-- Kanban/All-Models editor modal — top-level so it renders from ANY tab (was nested inside kanban-view, which display:none'd it on the All Models tab) -->
@@ -4364,12 +4391,16 @@ async function init(){
     if((location.hash||'').startsWith('#sb=')){
       const p=sbDecode(location.hash.slice(4));
       if(p){ sbPending=p; setMode('sb'); }
+      else setMode('all');
     }
     // v7.23: a #model=<id> link opens that model's full page directly.
     else if((location.hash||'').startsWith('#model=')){
       const mid=location.hash.slice(7).trim();
-      if(/^\d+$/.test(mid)) openModelDeepLink(mid);
+      if(/^\d+$/.test(mid)) openModelDeepLink(mid); else setMode('all');
     }
+    // v7.52: default view is ALL MODELS — loads the whole shared store up front so status/kanban/
+    // sandbox tabs render instantly from cache (no per-tab reload).
+    else { setMode('all'); }
   }catch(e){
     document.querySelector('#loading-screen .loading-text').textContent='Connection failed: '+e.message;
     console.error(e);
@@ -4484,6 +4515,35 @@ function buildAllDropdowns(){
 }
 
 // ── MODE ──
+// v7.52: status dropdown — one control replaces the per-status tabs. Colors mirror Monday.
+const STATUS_META={
+  all:{label:'ALL MODELS', bg:'#e8e8f0', fg:'#111'},
+  '0':{label:'0-APPLICANT', bg:'#c4c4c4', fg:'#111'},
+  '1':{label:'1-SCREEN', bg:'#cab641', fg:'#111'},
+  '2':{label:'2-POTENTIAL', bg:'#ff6d3b', fg:'#fff'},
+  '3':{label:'3-INTERVIEW', bg:'#ffcb00', fg:'#111'},
+  '4':{label:'4-REVIEW', bg:'#579bfc', fg:'#fff'},
+  '5a':{label:'5-APPROVED', bg:'#037f4c', fg:'#fff'},
+  '5r':{label:'5-REJECTED', bg:'#df2f4a', fg:'#fff'}
+};
+let lastStatusMode='all';
+function toggleStatusMenu(e){ if(e){e.stopPropagation();} const m=document.getElementById('status-dd-menu'); if(m) m.classList.toggle('open'); }
+function closeStatusMenu(){ const m=document.getElementById('status-dd-menu'); if(m) m.classList.remove('open'); }
+function pickStatus(mode){ closeStatusMenu(); setMode(mode); }
+// Keep the dropdown button in sync with the active mode: labelled + Monday-colored while a status
+// view is showing; neutral (but keeping its last label) while on kanban/dup/batch/sb/new.
+function syncStatusDropdown(mode){
+  const btn=document.getElementById('status-dd-btn'), lab=document.getElementById('status-dd-label'); if(!btn||!lab) return;
+  const isStatus=Object.prototype.hasOwnProperty.call(STATUS_META, mode);
+  if(isStatus) lastStatusMode=mode;
+  const meta=STATUS_META[lastStatusMode]||STATUS_META.all;
+  lab.textContent=meta.label;
+  if(isStatus){ btn.classList.add('active'); btn.style.background=meta.bg; btn.style.color=meta.fg; }
+  else { btn.classList.remove('active'); btn.style.background=''; btn.style.color=''; }
+  document.querySelectorAll('.status-dd-opt').forEach(o=>o.classList.toggle('sel', o.dataset.mode===lastStatusMode));
+}
+document.addEventListener('click',e=>{ const dd=document.getElementById('status-dd'); if(dd && !dd.contains(e.target)) closeStatusMenu(); });
+
 async function setMode(mode){
   closeDrawer();
   // Unsaved-changes gates (v7.11): never tear down an editor with unsaved work silently.
@@ -4504,6 +4564,7 @@ async function setMode(mode){
   }
   currentMode=mode;
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  syncStatusDropdown(mode);   // v7.52: reflect status in the dropdown button
   resetForm();
   hide('kanban-view');
   hide('am-view');
@@ -6925,6 +6986,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.52: (nav + sandbox layout) Client-only. (A) TOP BAR compressed: the seven-plus status tabs collapse into ONE "Status ▾" dropdown (options ALL MODELS, 0-APPLICANT, 1-SCREEN, 2-POTENTIAL, 3-INTERVIEW, 4-REVIEW, 5-APPROVED, 5-REJECTED, each with a Monday-matching color swatch; the button itself takes that status's color while active). Nothing about the views changes — each option just calls the same setMode(). Remaining top tabs: + NEW MODEL, Status ▾, KANBAN, DUPLICATES, EVERNOTE BATCH IMPORT, CASTING SANDBOX. (B) The app now boots straight into ALL MODELS, which loads the whole shared store up front, so switching to any status grid / kanban / sandbox renders instantly from cache instead of reloading (deep-links #sb=/#model= still take priority). (C) CASTING SANDBOX: the four numbered steps moved from a tall top block into a sticky LEFT sidebar, so the board is visible without scrolling; on narrow screens (<900px) it stacks back to vertical.
    v7.51: (one fix) Client-only. Sandbox tile 🗑 (tag-remove) button was at the tile's bottom-left, overlapping the model name. Moved onto the thumbnail's bottom-left (top:103px, mirroring the ✎ edit button on the bottom-right) so it sits on the image corner, not the name.
    v7.50: (three items) Client-only. (A) AIRPORT COLUMN IDS: the v7.49 title-resolver is replaced with the real subitem column ids (Beginning Airport text_mm5exz7q, End Airport text_mm5f30a9) — no more lookup/guessing. (B) SANDBOX TAG REMOVAL: each sandbox tile has a small red 🗑 (bottom-left). Click → confirm → removes THIS shoot tag from that model on Monday (writes the remaining labels back; only the tag is touched, photos/other data untouched) and drops them from the sandbox. On staging it's local-only (no write), same as add. On write failure it re-renders so the model reappears (Monday still has the tag). (C) REMOVE EXTRA PHOTOS: the full editor's photo strip gets a "Remove Photos" button under Recrop. Click → the strip enters remove-mode (the headshot controls hide); click extras to mark them (red REMOVE badge); the button becomes "Remove N selected" → confirm → a background "Remove photos" job rebuilds the extras column WITHOUT the selected assets (server clears + re-uploads only the keepers, so the removed ones are deleted from Monday). Headshot is preserved and can't be selected. Cancelable while queued. For clearing scraped slop. NOTE: both (B) and (C) only write on the PRODUCTION board.
    v7.49: (six feedback items) Client-only. (A) RECROP SHOULDER GUIDE nudged down again (v7.48 apex ~y65 read a touch high) → M8,77 C26,66 74,66 92,77, apex ~y69. (B) RECROP BOX resizes from ALL FOUR corners now, not just bottom-right — four handles, each keeps the opposite corner fixed while preserving the square. (C) GRID TAG CLICK: clicking a model that HAS tags now opens a read-only popover showing just their tags (distinct from the "+", which still opens the add/edit picker); a model with NO tags still jumps straight to the picker. Decided live (gridTagCountClick) so it can't go stale after in-session edits. (D) TAG LISTS are alphabetical (case-insensitive) in the grid picker and the read-only popover. (E) CASTING SANDBOX TAB no longer renders as a clipped outlined box — it was accidentally inheriting the sandbox toolbar's .sb-btn style (rounded border + big padding); that rule is now scoped :not(.mode-btn). (F) SANDBOX SHOOT NOTES gained "Beginning Airport" + "End Airport" fields alongside Pay + Dates Booked; the tile caret is now green only when ALL FOUR are filled (yellow if 1–3, white if none). At Port they write to the CASTING PRIORITY STACK subitem columns of the same name, resolved BY TITLE on the subitem board (ids aren't hardcoded; if a column isn't found by title it's skipped, no error). Notes ride the share-link + save-state automatically (whole-object JSON). NOTE: airport writes only happen on PORT and only on the production board — verify on prod that the two columns are matched by title.

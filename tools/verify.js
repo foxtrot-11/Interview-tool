@@ -650,5 +650,21 @@ has('removePhotoMode=false; pendingRemoveIds.clear()', 'remove mode resets on ph
 has('v7.51:', 'v7.51 deploy marker present');
 has('.sb-trash-btn{position:absolute;left:6px;top:103px', 'trash button on thumbnail (not overlapping name)');
 
+/* v7.52 asserts: status dropdown, default-all boot, sandbox left sidebar */
+has('v7.52:', 'v7.52 deploy marker present');
+// (A) status dropdown
+has('const STATUS_META=', 'status meta/colors present');
+has('function syncStatusDropdown(', 'status dropdown sync present');
+has('function pickStatus(', 'status option handler present');
+has('class="status-dd"', 'status dropdown container present');
+has('syncStatusDropdown(mode)', 'setMode syncs the status dropdown');
+lacks('onclick="setMode(\'5a\')">5-APPROVED', 'per-status tab buttons removed from the bar');
+// (B) default all on boot
+has("else { setMode('all'); }", 'app boots into ALL MODELS');
+// (C) sandbox left sidebar
+has('class="sb-layout"', 'sandbox two-column layout present');
+has('class="sb-side"', 'sandbox steps sidebar present');
+has('.sb-side{flex:0 0 380px', 'sandbox sidebar sized');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
