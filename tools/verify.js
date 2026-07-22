@@ -673,8 +673,11 @@ has('function deleteCurrentModel(', 'delete-model handler present');
 has('id="delete-model-btn"', 'delete-model button present');
 has('label:{index:6}', 'delete sets MODEL STATUS to DELETE (index 6)');
 // (B) dropdown clipping fix
-has('position:fixed;z-index:9500', 'status menu is fixed-positioned (escapes overflow clip)');
+has('.nav-status-menu{position:fixed;z-index:9500', 'nav status menu is fixed-positioned under a unique class');
 has('r.bottom+4', 'status menu positioned under its button on open');
+/* v7.54: nav dropdown no longer collides with the editor status dropdown */
+has('id="nav-status-menu"', 'nav dropdown menu uniquely named');
+has("getElementById('nav-status-menu')", 'nav dropdown JS targets the unique menu');
 // (C) mobile parity
 has('<optgroup label="Status">', 'mobile select groups statuses');
 has('<option value="sb">Casting Sandbox</option>', 'mobile has casting sandbox');

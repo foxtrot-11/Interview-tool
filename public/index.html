@@ -111,8 +111,8 @@
   .status-dd{position:relative;display:inline-flex}
   .status-dd-btn{display:inline-flex;align-items:center;gap:6px}
   .status-dd-caret{font-size:9px;opacity:.85}
-  .status-dd-menu{position:fixed;z-index:9500;display:none;min-width:200px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px;box-shadow:0 8px 24px rgba(0,0,0,.5);flex-direction:column;gap:2px}
-  .status-dd-menu.open{display:flex}
+  .nav-status-menu{position:fixed;z-index:9500;display:none;min-width:200px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px;box-shadow:0 8px 24px rgba(0,0,0,.5);flex-direction:column;gap:2px}
+  .nav-status-menu.open{display:flex}
   .status-dd-opt{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:7px 10px;border:none;background:transparent;color:var(--text);font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-radius:5px}
   .status-dd-opt:hover{background:var(--surface)}
   .status-dd-opt.sel{outline:1px solid var(--accent,#3AA2E0)}
@@ -890,7 +890,7 @@
     <button class="mode-btn" data-mode="new" onclick="setMode('new')">+ NEW MODEL</button>
     <div class="status-dd" id="status-dd">
       <button class="mode-btn status-dd-btn active" id="status-dd-btn" data-mode="all" onclick="toggleStatusMenu(event)"><span id="status-dd-label">ALL MODELS</span> <span class="status-dd-caret">▾</span></button>
-      <div class="status-dd-menu" id="status-dd-menu">
+      <div class="nav-status-menu" id="nav-status-menu">
         <button class="status-dd-opt" data-mode="all" onclick="pickStatus('all')"><span class="status-dot" style="background:#e8e8f0"></span>ALL MODELS</button>
         <button class="status-dd-opt" data-mode="0" onclick="pickStatus('0')"><span class="status-dot" style="background:#c4c4c4"></span>0-APPLICANT</button>
         <button class="status-dd-opt" data-mode="1" onclick="pickStatus('1')"><span class="status-dot" style="background:#cab641"></span>1-SCREEN</button>
@@ -4562,13 +4562,13 @@ const STATUS_META={
 let lastStatusMode='all';
 function toggleStatusMenu(e){
   if(e){e.stopPropagation();}
-  const m=document.getElementById('status-dd-menu'), btn=document.getElementById('status-dd-btn');
+  const m=document.getElementById('nav-status-menu'), btn=document.getElementById('status-dd-btn');
   if(!m) return;
   const opening=!m.classList.contains('open');
   m.classList.toggle('open');
   if(opening && btn){ const r=btn.getBoundingClientRect(); m.style.left=Math.round(r.left)+'px'; m.style.top=Math.round(r.bottom+4)+'px'; }
 }
-function closeStatusMenu(){ const m=document.getElementById('status-dd-menu'); if(m) m.classList.remove('open'); }
+function closeStatusMenu(){ const m=document.getElementById('nav-status-menu'); if(m) m.classList.remove('open'); }
 function pickStatus(mode){ closeStatusMenu(); setMode(mode); }
 // Keep the dropdown button in sync with the active mode: labelled + Monday-colored while a status
 // view is showing; neutral (but keeping its last label) while on kanban/dup/batch/sb/new.
@@ -7055,6 +7055,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.54: (fix) Client-only. The v7.52 nav status dropdown reused the id/class "status-dd-menu" that ALREADY belonged to the editor's sticky MODEL STATUS quick-change dropdown. Two bugs resulted: (1) the nav dropdown opened but was invisible — the older .status-dd-menu CSS (position:absolute; overflow:hidden) overrode the new position:fixed and the tab bar clipped it (you saw only the scrollbar); (2) a silent regression where the editor's own status dropdown had been populating the nav menu (duplicate id). Renamed the nav dropdown's menu to .nav-status-menu / #nav-status-menu (fixed-positioned, JS-placed under the button). Both dropdowns now work independently. Mobile was unaffected (native select).
    v7.53: (five items) Client-only. (A) DELETE MODEL button (red, next to Save Changes) shows whenever an existing model's full/interview editor is open, from any entry point. It does NOT hard-delete — it sets MODEL STATUS to "00 - DELETE" (index 6) via the same {label:{index}} write the kanban drag uses, moving the item to the DELETE group in Monday; since no view shows that status it disappears from the app, and it's restorable in Monday. Confirm dialog first; leaves the editor on success. (B) STATUS DROPDOWN menu was being clipped by the tab bar's overflow:hidden — the menu is now position:fixed and JS-positioned under the button, so it actually appears on click. (C) MOBILE view select now matches the new grouping (a "Status" optgroup) and adds KANBAN + CASTING SANDBOX so mobile has full functionality. (D) RECROP gained a "↻ Rotate" button — rotates the photo 90° CW by baking the rotation into the image and resetting the crop box (crop stays a plain crop, no rotation math downstream). (E) CHOOSING A NEW HEADSHOT (Re-choose) now enqueues a background change-headshot job immediately instead of waiting for Save — same queue as recrop, so you can keep working.
    v7.52: (nav + sandbox layout) Client-only. (A) TOP BAR compressed: the seven-plus status tabs collapse into ONE "Status ▾" dropdown (options ALL MODELS, 0-APPLICANT, 1-SCREEN, 2-POTENTIAL, 3-INTERVIEW, 4-REVIEW, 5-APPROVED, 5-REJECTED, each with a Monday-matching color swatch; the button itself takes that status's color while active). Nothing about the views changes — each option just calls the same setMode(). Remaining top tabs: + NEW MODEL, Status ▾, KANBAN, DUPLICATES, EVERNOTE BATCH IMPORT, CASTING SANDBOX. (B) The app now boots straight into ALL MODELS, which loads the whole shared store up front, so switching to any status grid / kanban / sandbox renders instantly from cache instead of reloading (deep-links #sb=/#model= still take priority). (C) CASTING SANDBOX: the four numbered steps moved from a tall top block into a sticky LEFT sidebar, so the board is visible without scrolling; on narrow screens (<900px) it stacks back to vertical.
    v7.51: (one fix) Client-only. Sandbox tile 🗑 (tag-remove) button was at the tile's bottom-left, overlapping the model name. Moved onto the thumbnail's bottom-left (top:103px, mirroring the ✎ edit button on the bottom-right) so it sits on the image corner, not the name.
