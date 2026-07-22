@@ -688,5 +688,10 @@ has('id="recrop-rotate"', 'recrop rotate button present');
 // (E) rechoose → queue
 has('enqueueChangeHeadJob({ itemId:currentItem.id, modelName:currentItem.name, boardId:BOARD_ID, assetId })', 'rechoose enqueues a background job');
 
+/* v7.55: collapse blank left nav column */
+has('v7.55:', 'v7.55 deploy marker present');
+has('.main.no-sidebar{grid-template-columns:1fr}', 'blank nav collapses the column');
+has("classList.toggle('no-sidebar', type==='blank')", 'buildSidebarNav toggles the collapse');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);
