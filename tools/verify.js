@@ -728,5 +728,12 @@ has("job.kind==='regenthumb'", 'runPhotoJob branches on regenthumb');
 has('id="thumb-backfill-btn"', 'backfill button present');
 has("m.head && !m.medHead", 'candidates = headshot present but thumb missing');
 
+/* v7.60: throttle + bound the thumbnail batch */
+has('v7.60:', 'v7.60 deploy marker present');
+has('BG_BATCH_THROTTLE_MS = 1200', 'batch throttle constant present');
+has("if(job.kind==='regenthumb') setTimeout(()=>{ try{ pumpBgJobs(); }catch(e){} }, BG_BATCH_THROTTLE_MS)", 'batch jobs paced; interactive jobs pump immediately');
+has('const CAP=250;', 'batch capped per click');
+has('bgJobs = bgJobs.filter(j=>j!==job); renderBgJobs();', 'finished batch rows auto-cleared');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

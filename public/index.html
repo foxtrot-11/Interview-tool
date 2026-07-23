@@ -6475,6 +6475,7 @@ async function saveNewModel(targetMode){
 let bgJobs = [];           // {id,itemId,modelName,detail,boardId,kind,...,status,pct,phase,error,_phase,_xhr,_canceled}
 let bgJobSeq = 0;          // monotonic id source
 const bgRunning = new Set(); // itemIds with a job currently running (kept for hasActivePhotoJob)
+const BG_BATCH_THROTTLE_MS = 1200; // v7.60: pause between batch (regenthumb) jobs; interactive jobs are not throttled
 // v7.45: serialization is now GLOBAL (one photo job at a time across all models) — batching
 // recrops shouldn't hammer the free-tier server with concurrent rearranges, and it keeps the
 // short un-cancelable "finalizing" window to a single job.
@@ -6545,9 +6546,15 @@ function startThumbBackfill(){
   const cands=thumbBackfillCandidates();
   if(!cands.length){ showToast('No missing headshot thumbnails','success'); return; }
   if(String(BOARD_ID)!==String(MAIN_BOARD_ID)){ showToast('Thumbnails are only written on the production board','error'); return; }
-  if(!confirm(`Regenerate ${cands.length} missing headshot thumbnail${cands.length>1?'s':''}?\n\nRuns in the background, one at a time — watch the jobs widget (bottom-right). Safe to keep working; you can Cancel any that are still queued.`)) return;
-  cands.forEach(m=>enqueueRegenThumbJob({itemId:m.id, modelName:m.name, boardId:BOARD_ID, headAssetId:m.head}));
-  showToast(`Queued ${cands.length} thumbnail${cands.length>1?'s':''}`,'success');
+  const CAP=250;   // v7.60: bound the initial enqueue; the button reappears with the remaining count when these finish
+  const batch=cands.slice(0, CAP);
+  const more=cands.length-batch.length;
+  const msg=`Regenerate ${batch.length} missing headshot thumbnail${batch.length>1?'s':''}?`
+    + (more>0?`\n\n(${cands.length} total — this does the first ${batch.length}; click again for the rest when they finish.)`:'')
+    + `\n\nRuns in the background, one at a time and paced — watch the jobs widget (bottom-right). Safe to keep working; you can Cancel any still queued.`;
+  if(!confirm(msg)) return;
+  batch.forEach(m=>enqueueRegenThumbJob({itemId:m.id, modelName:m.name, boardId:BOARD_ID, headAssetId:m.head}));
+  showToast(`Queued ${batch.length} thumbnail${batch.length>1?'s':''}`,'success');
 }
 
 function pushJob(extra){
@@ -6649,13 +6656,20 @@ async function runPhotoJob(job){
   if(outcome==='done'){
     try{ if(headChanged) await refreshItemHeadFromMonday(job.itemId, bId); }catch(e){ console.warn('head refresh skipped:', e.message); }
     try{ if(currentItem && String(currentItem.id)===job.itemId) loadCandidatePhotos(job.itemId); }catch(e){}
-    showToast(`${job.modelName}: ${job.detail.toLowerCase()} done ✓`, 'success');
-    flashBgJobRow(job);
+    if(job.kind==='regenthumb'){
+      bgJobs = bgJobs.filter(j=>j!==job); renderBgJobs();   // v7.60: batch — drop the finished row (keep widget lean), no per-item toast
+    } else {
+      showToast(`${job.modelName}: ${job.detail.toLowerCase()} done ✓`, 'success');
+      flashBgJobRow(job);
+    }
   }
 
-  pumpBgJobs();          // start the next queued job
   refreshInflightNotes();
   if(typeof refreshThumbBackfillBtn==='function') refreshThumbBackfillBtn();   // v7.59
+  // v7.60: pace batch (regenthumb) jobs so a big run stays well under Monday/Render limits;
+  // interactive jobs (recrop/save/change-headshot) pump immediately with no delay.
+  if(job.kind==='regenthumb') setTimeout(()=>{ try{ pumpBgJobs(); }catch(e){} }, BG_BATCH_THROTTLE_MS);
+  else pumpBgJobs();
 }
 
 // SAVE kind: headshot replace (fast path) + extras. Returns true if the headshot changed.
@@ -7104,6 +7118,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.60: (throttle the thumbnail batch) Client-only. The v7.59 backfill ran jobs back-to-back with no pause; on a large run that could brush Monday's API rate limits and bloat the jobs widget. Guards added, to the BATCH (regenthumb) jobs only — interactive recrop/save/change-headshot still pump instantly: (1) a ~1.2s pause between batch jobs (BG_BATCH_THROTTLE_MS) so a big run stays well under Monday/Render limits; (2) finished batch rows are auto-removed from the widget (and their per-item toast suppressed) so the widget stays lean during a long run; (3) a 250-per-click cap on how many are queued at once — the button reappears with the remaining count when they finish, so you just click again. The queue was already global one-at-a-time (never concurrent), so this is about pacing/limits, not concurrency.
    v7.59: (batch thumbnail backfill) Client-only. Headshots changed before v7.58 had their small grid thumbnail (head med-thumb) cleared but not regenerated, so the grid loads full-res for them. New "⟳ Fix N missing thumbnails" button in the ALL MODELS toolbar (shown only when N>0): scans the store for models with a headshot but no med-thumb (m.head && !m.medHead, excluding retired/delete/evernote/duplicate), and on confirm enqueues one background "Thumbnail" job per model. Each job fetches the headshot bytes same-origin via /asset-bytes (no CORS), downscales, and uploads the thumb (setHeadMedThumb) — the full headshot asset is untouched (no rearrange). Runs through the existing queue (one at a time, cancelable while queued, widget progress); the button count drops as jobs finish. Prod-only (writes). Reuses the v7.58 completion refresh to update each tile.
    v7.58: (P1+P2 cleanup — first release that also touches server.js) NOT client-only. Dead code removed: applyHeadshotSwap + pendingHeadshotAssetId + the is-pending render/CSS branch (unreachable since v7.56 routed rechoose through recrop), refreshHeadEverywhere (zero callers), and the inert #iv/#fv-upload-progress overlay DOM (unused since the v7.44 background queue). Performance: (a) .am-tile gets content-visibility:auto + contain-intrinsic-size so off-screen grid tiles skip layout/paint — big win at ~950 tiles; (b) new O(1) modelById() index replaces 15 linear kanbanItems.find scans (rebuilt in loadKanban; array is never spliced so it stays valid; self-heals on miss); (c) recrop now regenerates the head med-thumb from the crop file instead of clearing it, so the grid keeps fast thumbnails after a recrop. Robustness: the 13 idempotent change_*column_value writes now use gqlRetry (create_item/create_subitem/delete_item deliberately stay on plain gql — retrying a non-idempotent write could double-create). Security: server.js /upload and /move-asset now validate columnId/targetColumnId against ^[a-z0-9_]+$ before interpolating into the GraphQL string (closes a minor server-side injection). No behavior changes for the user. Note: sbBuildPlan kept its inline lookup to stay pure/testable.
    v7.57: (crop uploaded headshots too) Client-only. When you drop/click a NEW photo into the "Replace Headshot → Monday" box (full editor, interview editor, or new-model), the recrop modal now opens on that LOCAL file so you can crop (and rotate) it before upload — matching the v7.56 pick-from-existing flow. "Save crop" hands the cropped file back as the pending headshot (uploads on Save, via the fast replace path); "Cancel" keeps the photo as-is. HEIC/HEIF are skipped (browsers can't canvas them) and upload as-is. New helpers: openRecropLocal (blob-url load, no /asset-bytes fetch) + a mode:'local' branch in saveRecrop that returns the file via callback instead of enqueuing a recrop job.
