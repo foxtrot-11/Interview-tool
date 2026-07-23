@@ -159,7 +159,6 @@ has(`if(a.mode==='fill' && a.origName!==a.slotName) cvObj.name=a.slotName;`, 'fi
 has(`function kbOpenRecrop()`, 'kanban-modal recrop entry exists');
 has(`✂ Recrop</button>`, 'kanban-modal has the ✂ Recrop button');
 has(`async function openRecrop(itemIdArg, headIdArg)`, 'openRecrop generalized for modal callers');
-has(`function refreshHeadEverywhere(itemId, hsOpt)`, 'refreshHeadEverywhere accepts explicit headshot');
 has(`const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',ab:'ALTERNATE',av:'ALTERNATE',at:'ALTERNATE'};`, 'sandbox column→TYPE map (VERSE naming kept)');
 has(`location.hash||'').startsWith('#sb=')`, 'share-link boot hook present');
 has(`sbRenderRowList(); return;`, 'portLoadRows refreshes the sandbox picker too');
@@ -354,7 +353,6 @@ has('await setHeadMedThumb(newId, file)', 'new-model headshot generates med-thum
 has('addExtraMedThumb(newId, file, exId)', 'new-model extras generate paired med-thumbs');
 has('await setHeadMedThumb(job.itemId, file, bId)', 'headshot-replace regenerates med-thumb (v7.44: in runPhotoJob, board-threaded)');
 has('await clearHeadMedThumb(itemId, bId)', 'recrop clears head med-thumb (fallback to full; v7.45 board-threaded)');
-has('await clearHeadMedThumb(currentItem.id)', 'promote-existing clears head med-thumb');
 has('`medthumb-${fullAssetId}.jpg`', 'extra med-thumb named by source asset id (pairing)');
 
 /* v7.36 asserts: med-thumb hardening + scrape UX */
@@ -706,6 +704,20 @@ has('async function openRecropLocal(', 'local-file recrop entry present');
 has('function maybeRecropLocalHeadshot(', 'auto-recrop gate present');
 has("rcState.mode==='local'", 'saveRecrop handles local-file mode (callback, no job)');
 has('maybeRecropLocalHeadshot(files[0]', 'dropped headshot triggers recrop');
+
+/* v7.58 cleanup: dead code removed, perf, gqlRetry standardization */
+has('v7.58:', 'v7.58 deploy marker present');
+lacks('function applyHeadshotSwap(', 'dead applyHeadshotSwap removed');
+lacks('let pendingHeadshotAssetId', 'dead pendingHeadshotAssetId removed');
+lacks('function refreshHeadEverywhere(', 'dead refreshHeadEverywhere removed');
+lacks('id="iv-upload-progress"', 'inert iv upload overlay removed');
+lacks('id="fv-upload-progress"', 'inert fv upload overlay removed');
+has('function modelById(', 'O(1) id->model index present');
+has('kanbanItems=items; rebuildModelIndex()', 'index rebuilt on load');
+has('content-visibility:auto;contain-intrinsic-size:0 300px', 'grid tiles skip off-screen render');
+has('await setHeadMedThumb(itemId, job.croppedFile, bId)', 'recrop regenerates head med-thumb');
+has('await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values', 'idempotent writes use gqlRetry');
+lacks('await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values', 'no idempotent column writes left on plain gql');
 
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

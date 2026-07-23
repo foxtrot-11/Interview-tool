@@ -55,5 +55,9 @@ expect('casting rows read', `{boards(ids:[8533133380]){items_page(limit:500){ite
 expect('port create_subitem', `mutation($p:ID!,$n:String!){create_subitem(parent_item_id:$p,item_name:$n){id}}`, {p:'1',n:'TOP1'}, true);
 expect('main tracker read', `{boards(ids:[3636652411]){items_page(limit:200){items{id}}}}`, {}, true);
 
+console.log('[4] v7.58 columnId injection guards present');
+{ n++; if(/\/\^\[a-z0-9_\]\+\$\/i\.test\(String\(columnId\)\)/.test(src)) console.log('  ✓ /upload validates columnId'); else { fails++; console.log('  ✗ /upload columnId guard missing'); }
+  n++; if(/\/\^\[a-z0-9_\]\+\$\/i\.test\(String\(targetColumnId\)\)/.test(src)) console.log('  ✓ /move-asset validates targetColumnId'); else { fails++; console.log('  ✗ /move-asset targetColumnId guard missing'); } }
+
 console.log(`\n${n} assertions, ${fails} failed`);
 process.exit(fails?1:0);

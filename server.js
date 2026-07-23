@@ -259,6 +259,11 @@ app.post('/upload', dataLimiter, requireAuth, uploadSingle, async (req, res) => 
     if (!req.file || !itemId || !columnId) {
       return res.status(400).json({ error: 'missing file, itemId, or columnId' });
     }
+    // v7.58: columnId is interpolated into the GraphQL string below, so constrain it to the
+    // Monday column-id charset to close off injection via a crafted columnId.
+    if (!/^[a-z0-9_]+$/i.test(String(columnId))) {
+      return res.status(400).json({ error: 'invalid columnId' });
+    }
 
     const query = `mutation add_file($file: File!) { add_file_to_column (item_id: ${parseInt(itemId, 10)}, column_id: "${columnId}", file: $file) { id } }`;
 
@@ -287,6 +292,9 @@ app.post('/move-asset', dataLimiter, requireAuth, async (req, res) => {
     const { itemId, targetColumnId, assetId } = req.body || {};
     if (!itemId || !targetColumnId || !assetId) {
       return res.status(400).json({ error: 'missing itemId, targetColumnId, or assetId' });
+    }
+    if (!/^[a-z0-9_]+$/i.test(String(targetColumnId))) {   // v7.58: same guard as /upload
+      return res.status(400).json({ error: 'invalid targetColumnId' });
     }
     const newId = await copyAssetToColumn(itemId, targetColumnId, assetId);
     res.json({ ok: true, newAssetId: newId });

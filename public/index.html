@@ -260,7 +260,7 @@
   .am-clear:hover{border-color:var(--danger);color:var(--danger)}
   .am-count{font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
   .am-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
-  .am-tile{position:relative;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s}
+  .am-tile{position:relative;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s;content-visibility:auto;contain-intrinsic-size:0 300px}
   .am-tile:hover{border-color:var(--accent)}
   /* v7.38.1: .am-caret removed — was a dead decorative affordance */
   .am-thumb{width:100%;aspect-ratio:1/1;background:var(--surface);display:flex;align-items:center;justify-content:center;overflow:hidden}
@@ -680,8 +680,6 @@
   .strip-photo-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
   .strip-photo-thumb.is-headshot { border:3px solid #facc15; }
   .strip-photo-thumb.is-headshot::after { content:'HEADSHOT'; position:absolute; bottom:0; left:0; right:0; background:rgba(250,204,21,0.92); color:#111; font-size:8px; letter-spacing:0.12em; font-weight:600; text-align:center; padding:2px 0; }
-  .strip-photo-thumb.is-pending { border:3px solid #f87171; }
-  .strip-photo-thumb.is-pending::after { content:'NEW HEADSHOT'; position:absolute; bottom:0; left:0; right:0; background:rgba(248,113,113,0.92); color:#fff; font-size:8px; letter-spacing:0.12em; font-weight:600; text-align:center; padding:2px 0; }
   .rechoose-active .strip-photo-thumb:not(.is-headshot):hover { border-color:#f87171; }
   .remove-active .strip-photo-thumb:not(.is-headshot):hover { border-color:#f87171; }
   .strip-photo-thumb.is-removing { border:3px solid #f87171; opacity:.55; }
@@ -1047,14 +1045,6 @@
           <div class="photo-previews" id="fv-extras-previews"></div>
         </div>
       </div>
-      <div class="upload-progress" id="fv-upload-progress">
-        <div class="upload-progress-label">
-          <span id="fv-upload-label">Uploading...</span>
-          <span id="fv-upload-pct">0%</span>
-        </div>
-        <div class="upload-bar-track"><div class="upload-bar-fill" id="fv-upload-bar"></div></div>
-        <div class="upload-step-list" id="fv-upload-steps"></div>
-      </div>
       <div class="photo-inflight-note" id="fv-photo-inflight">A photo save for this model is still uploading in the background — new photo changes will queue behind it.</div>
     </div>
     <div id="empty-state">
@@ -1375,14 +1365,6 @@
             <div class="photo-zone-sub">Appended to Extra Pictures in Monday on save</div>
           </div>
           <div class="photo-previews" id="iv-extras-previews"></div>
-          <div class="upload-progress" id="iv-upload-progress">
-            <div class="upload-progress-label">
-              <span id="iv-upload-label">Uploading...</span>
-              <span id="iv-upload-pct">0%</span>
-            </div>
-            <div class="upload-bar-track"><div class="upload-bar-fill" id="iv-upload-bar"></div></div>
-            <div class="upload-step-list" id="iv-upload-steps"></div>
-          </div>
           <div class="photo-inflight-note" id="iv-photo-inflight">A photo save for this model is still uploading in the background — new photo changes will queue behind it.</div>
         </div>
 
@@ -1964,6 +1946,20 @@ const KANBAN_COLS = [
 const KANBAN_COLOR = {'0':'#c4c4c4','1':'#cab641','2':'#ff6d3b','3':'#ffcb00','4':'#579bfc','5a':'#037f4c','as':'#9d50dd','ex':'#00c875','5r':'#df2f4a','ev':'#fdab3d'};
 const KB_STATUS_ORDER = [5,8,10,7,9,2,105,4,1,0,6,3,11,12]; // dropdown order (incl. Evernote/Duplicate so a card can be moved out)
 let kanbanItems = [];
+// v7.58: O(1) id->model lookup (was 16 linear kanbanItems.find scans). Rebuilt after each load;
+// the array is only reassigned in loadKanban and never spliced, so the index stays valid. Falls
+// back to a scan (and self-heals) for any id added after the last rebuild.
+let _kbById = null;
+function rebuildModelIndex(){ _kbById = new Map((kanbanItems||[]).map(m=>[String(m.id), m])); }
+function modelById(id){
+  if(id==null) return undefined;
+  if(!_kbById) rebuildModelIndex();
+  const hit=_kbById.get(String(id));
+  if(hit) return hit;
+  const m=(kanbanItems||[]).find(x=>String(x.id)===String(id));
+  if(m) _kbById.set(String(id), m);
+  return m;
+}
 let kbHeadCache = {};
 const KB_AUTO_THRESHOLD = 60;   // columns bigger than this load photos only on demand
 let kbBuckets = [];
@@ -2287,7 +2283,7 @@ function gridShootLabels(m){
   const opts=boardDropdownOptions[SHOOT_COL]||[];
   return ((m.f&&m.f.shoot)||[]).map(id=>{const o=opts.find(x=>Number(x.id)===Number(id));return o?String(o.label):null;}).filter(Boolean);
 }
-function gridModel(id){ return kanbanItems.find(x=>String(x.id)===String(id)); }
+function gridModel(id){ return modelById(id); }
 
 // Does a buffered edit actually differ from what's stored? (so we can drop no-op edits)
 function gridEditIsMeaningful(id){
@@ -2451,13 +2447,13 @@ async function gridSaveAll(){
       // Rating (Final) via the same mutation shape saveRecord uses.
       if('rating' in e){
         const val = e.rating==null ? '' : String(e.rating);
-        await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+        await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
           {i:String(id), b:BOARD_ID, c:JSON.stringify({['numeric_mm1zjjrp']: val})});
         if(m.f) m.f.rFinal = e.rating==null?null:Number(e.rating);
       }
       // Shoot tags via the create_labels_if_missing mutation (same as saveRecord).
       if('shoot' in e){
-        await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:true){id}}`,
+        await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:true){id}}`,
           {i:String(id), b:BOARD_ID, c:JSON.stringify({[SHOOT_COL]:{labels:e.shoot}})});
         savedShootLabels[id]=e.shoot.slice();
       }
@@ -2674,7 +2670,7 @@ async function loadKanban(){
       cursor=page.cursor; pages++;
       setLoad(`Loading models… ${items.length} loaded`);
     } while(cursor && pages<40); // page through the WHOLE board (stops as soon as cursor runs out)
-    kanbanItems=items;
+    kanbanItems=items; rebuildModelIndex();
     gridEdits={};   // v7.38: board reloaded — any pending tile edits are now stale
     kbColLoaded={};
     kbLoadedOnce=true;
@@ -2900,7 +2896,7 @@ async function kbDrop(e,i){
   const id = kbDragId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
   kbDragId=null;
   if(!id) return;
-  const m=kanbanItems.find(x=>String(x.id)===String(id)); if(!m) return;
+  const m=modelById(id); if(!m) return;
   const targetIdx = KANBAN_COLS[i].ids[0];      // the column's primary status id
   const idxToCol = kbIdxToCol();
   if(idxToCol[m.statusIdx]===i) return;         // same column → nothing to do
@@ -3022,7 +3018,7 @@ function kbPhotoMsg(t){ const el=document.getElementById('kb-photo-msg'); if(el)
 function kbRefreshCardThumb(id){
   const hs=kbModalPhotos.find(p=>p.isHeadshot); if(!hs) return;
   kbHeadCache[hs.assetId]=hs.url;
-  const m=kanbanItems.find(x=>x.id===id); if(m) m.head=hs.assetId;
+  const m=modelById(id); if(m) m.head=hs.assetId;
   const el=document.getElementById('kbthumb-'+id);
   if(el) el.innerHTML=`<img loading="lazy" src="${escapeHtml(hs.url)}" alt="">`;
   const ael=document.getElementById('amthumb-'+id);
@@ -3217,7 +3213,7 @@ async function saveRecrop(){
     // v7.45: hand the crop to the background queue instead of uploading inline. The modal closes
     // right away so you can move to the next model; the actual upload+rearrange runs in the
     // job widget (one at a time, cancelable while queued/uploading). boardId snapshotted here.
-    const m=(typeof kanbanItems!=='undefined'&&kanbanItems)?kanbanItems.find(x=>String(x.id)===String(itemId)):null;
+    const m=(typeof kanbanItems!=='undefined'&&kanbanItems)?modelById(itemId):null;
     const name = m ? m.name : ((currentItem && String(currentItem.id)===String(itemId)) ? currentItem.name : 'Model');
     enqueueRecropJob({ itemId, modelName:name, boardId:BOARD_ID, croppedFile:file, headId });
     closeRecrop();                                   // back to the editor immediately
@@ -3230,15 +3226,6 @@ async function saveRecrop(){
 }
 // After a recrop/photo change, update the shared store + any grid/kanban tiles for this item.
 // hsOpt (v7.17): pass the headshot explicitly when the full editor's candidatePhotos isn't the source of truth.
-function refreshHeadEverywhere(itemId, hsOpt){
-  const hs=hsOpt||((candidatePhotos||[]).find(p=>p.isHeadshot));
-  const m=(typeof kanbanItems!=='undefined'&&kanbanItems)?kanbanItems.find(x=>String(x.id)===String(itemId)):null;
-  if(m) m.head=hs?hs.assetId:null;
-  if(hs){
-    kbHeadCache[String(hs.assetId)]=hs.url;
-    ['amthumb-','kbthumb-'].forEach(pre=>{ const el=document.getElementById(pre+itemId); if(el) el.innerHTML=`<img loading="lazy" src="${escapeHtml(hs.url)}" alt="">`; });
-  }
-}
 
 // ── Sidebar field search + scrollspy (v7.12) ──
 function qnavFilter(q){
@@ -3541,7 +3528,7 @@ function sbSyncMembership(){
       for(const z of Object.keys(sbState.zones)){
         sbState.zones[z]=(sbState.zones[z]||[]).map(String).filter(id=>{
           if(seen.has(id)) return false;
-          const m=kanbanItems.find(x=>String(x.id)===String(id)); if(!m) return false;
+          const m=modelById(id); if(!m) return false;
           seen.add(id);
           out.push({id:String(m.id), name:m.name, head:m.head, roleLabels:(m.f&&m.f.role||[]).map(rid=>{const o=roleOpts.find(x=>Number(x.id)===Number(rid));return o?String(o.label):'';}).filter(Boolean)});
           return true;
@@ -3714,7 +3701,7 @@ function sbRenderAddList(){
 }
 async function sbAddPick(id){
   const target=sbAddTarget; if(!target) return;
-  const m=kanbanItems.find(x=>String(x.id)===String(id)); if(!m){ sbCloseAddPicker(); return; }
+  const m=modelById(id); if(!m){ sbCloseAddPicker(); return; }
   const label=sbCurrentTagLabel();
   sbCloseAddPicker();
   // Place immediately (optimistic) so the UI feels instant…
@@ -3725,7 +3712,7 @@ async function sbAddPick(id){
     try{
       const existing=(boardDropdownOptions[SHOOT_COL]||[]).filter(o=>(m.f.shoot||[]).map(Number).includes(Number(o.id))).map(o=>String(o.label));
       if(!existing.some(l=>l.toLowerCase()===label.toLowerCase())) existing.push(label);
-      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:true){id}}`,
+      await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:true){id}}`,
         {i:String(id), b:BOARD_ID, c:JSON.stringify({[SHOOT_COL]:{labels:existing}})});
       await refreshShootOptions();
       // remap local shoot ids from labels so it now legitimately "carries" the tag
@@ -3750,7 +3737,7 @@ async function sbAddPick(id){
 async function sbRemoveFromTag(e, id){
   if(e){ e.stopPropagation(); e.preventDefault(); }
   id=String(id);
-  const m=kanbanItems.find(x=>String(x.id)===String(id)); if(!m) return;
+  const m=modelById(id); if(!m) return;
   const label=sbCurrentTagLabel();
   if(!label){ showToast('No shoot tag selected','error'); return; }
   const nm=m.name||id;
@@ -3763,7 +3750,7 @@ async function sbRemoveFromTag(e, id){
       const opts=boardDropdownOptions[SHOOT_COL]||[];
       const remaining=opts.filter(o=>((m.f&&m.f.shoot)||[]).map(Number).includes(Number(o.id)))
         .map(o=>String(o.label)).filter(l=>l.toLowerCase()!==label.toLowerCase());
-      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
+      await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
         {i:String(id), b:BOARD_ID, c:JSON.stringify({[SHOOT_COL]:{labels:remaining}})});
       m.f.shoot=remaining.map(t=>{const o=opts.find(x=>String(x.label).toLowerCase()===t.toLowerCase());return o?Number(o.id):null;}).filter(v=>v!=null);
       showToast(`Removed “${label}” from ${nm}`,'success');
@@ -4035,7 +4022,7 @@ async function portConfirm(){
       if(a.dates) cvObj['long_text_mm35h07x']={text:a.dates};
       if(a.startAirport) cvObj[SUBITEM_START_AIR_COL]=a.startAirport;   // v7.50
       if(a.endAirport) cvObj[SUBITEM_END_AIR_COL]=a.endAirport;         // v7.50
-      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+      await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
         {i:slotId,b:CASTING_SUBITEM_BOARD_ID,c:JSON.stringify(cvObj)});
       a.done=true; ok++;
     }catch(e){ a.err=e.message||String(e); errs++; }
@@ -4190,7 +4177,7 @@ const backToInterviewGrid = backToApprovedGrid;
 // ── Shared-store sync for FULL-EDITOR saves (so grids reflect edits without a Refresh) ──
 function syncStoreFromCv(itemId, cv){
   if(typeof kanbanItems==='undefined'||!kanbanItems||!kanbanItems.length) return;
-  const m=kanbanItems.find(x=>String(x.id)===String(itemId)); if(!m) return;
+  const m=modelById(itemId); if(!m) return;
   try{
     if(cv.label && cv.label.index!=null) m.statusIdx=Number(cv.label.index);
     if(cv.long_text_mktg36ee && typeof cv.long_text_mktg36ee.text==='string'){ m.notes=cv.long_text_mktg36ee.text; m.notesLoaded=true; }
@@ -4348,7 +4335,7 @@ async function renderKanbanEditor(id, full){
   const it=data.items&&data.items[0]; if(!it){ full.innerHTML='<div class="kb-loading-sm">Not found</div>'; return; }
   const cv={}; (it.column_values||[]).forEach(c=>cv[c.id]=c);
   let curIdx=null; try{ curIdx=JSON.parse(cv['label'].value)?.index ?? null; }catch{}
-  const m = kanbanItems.find(x=>x.id===id);
+  const m = modelById(id);
   const headUrl = (m && m.head && kbHeadCache[m.head]) ? kbHeadCache[m.head] : '';
   const headImg = headUrl ? `<img src="${escapeHtml(headUrl)}" alt="">` : '';
   const init = {}, phoneCountry = {};
@@ -4395,7 +4382,7 @@ async function saveKanbanCard(id){
   const hadPendingHs = !!kbPendingHeadshot;
   if(hadPendingHs){
     const assetId=kbPendingHeadshot;
-    const mm=(typeof kanbanItems!=='undefined'&&kanbanItems)?kanbanItems.find(x=>String(x.id)===String(id)):null;
+    const mm=(typeof kanbanItems!=='undefined'&&kanbanItems)?modelById(id):null;
     const nm = mm ? mm.name : 'Model';
     enqueueChangeHeadJob({ itemId:String(id), modelName:nm, boardId:BOARD_ID, assetId });
     kbPendingHeadshot=null; kbRechooseMode=false;
@@ -4425,7 +4412,7 @@ async function saveKanbanCard(id){
     await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
       {i:id, b:String(MAIN_BOARD_ID), c:JSON.stringify(cols)});
     if(msg) msg.textContent = (hadPendingHs ? 'Changes saved ✓ (headshot processing)' : 'Saved ✓') + measWarn;
-    const m=kanbanItems.find(x=>x.id===id);
+    const m=modelById(id);
     if(m){
       if(newGen!==null) m.notes=newGen; if(newTw!==null) m.twUrl=newTw; m.updated_at=new Date().toISOString(); if(statusChanged) m.statusIdx=newStatusIdx;
       // Keep the shared store's filter/sort values in sync with what was just saved (so All Models filters reflect edits instantly).
@@ -5662,7 +5649,7 @@ async function applyStageNameOnSave(){
   const inp = document.getElementById(inputId);
   const newName = (inp ? inp.value : '').trim();
   if(!newName || newName === currentItem.name) return;
-  await gql(`mutation($i:ID!,$b:ID!,$v:String!){change_simple_column_value(item_id:$i,board_id:$b,column_id:"name",value:$v){id}}`,
+  await gqlRetry(`mutation($i:ID!,$b:ID!,$v:String!){change_simple_column_value(item_id:$i,board_id:$b,column_id:"name",value:$v){id}}`,
     {i: currentItem.id, b: BOARD_ID, v: newName});
   currentItem.name = newName;
   // Keep the board cache in sync so the combo/grid show the new name without a reload.
@@ -5691,7 +5678,7 @@ async function deleteCurrentModel(){
   try{
     await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
       {i:String(id), b:String(MAIN_BOARD_ID), c:JSON.stringify({label:{index:6}})});
-    const m=kanbanItems&&kanbanItems.find(x=>String(x.id)===String(id)); if(m) m.statusIdx=6;   // drops out of every scope
+    const m=kanbanItems&&modelById(id); if(m) m.statusIdx=6;   // drops out of every scope
     isDirty=false;
     showToast(`${nm} moved to DELETE`,'success');
     invalidateCache();
@@ -5746,7 +5733,7 @@ async function saveRecord(){
   try{
     applyMetricPairingToInputs();   // US ⇄ metric conversion happens here, before values are gathered
     const cv=buildColumnValues();
-    await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+    await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
       {i:currentItem.id,b:BOARD_ID,c:JSON.stringify(cv)});
     syncStoreFromCv(currentItem.id, cv);   // grids reflect this save without a Refresh
     // SHOOT TAGS: separate mutation so create_labels_if_missing:true is scoped to this column only.
@@ -5754,17 +5741,12 @@ async function saveRecord(){
     // board — full editor (5a/2/4) AND the interview view (3). Was gated to '5a' only, which
     // silently dropped tags added from 3-INTERVIEW.
     if(shootTagsDirty && currentMode!=='new' && String(BOARD_ID)===String(MAIN_BOARD_ID)){
-      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:true){id}}`,
+      await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:true){id}}`,
         {i:currentItem.id,b:BOARD_ID,c:JSON.stringify({[SHOOT_COL]:{labels:shootTags}})});
       shootTagsDirty=false;
       await refreshShootOptions();
-      const sm=kanbanItems&&kanbanItems.find(x=>String(x.id)===String(currentItem.id));
+      const sm=kanbanItems&&modelById(currentItem.id);
       if(sm&&sm.f){ const opts=boardDropdownOptions[SHOOT_COL]||[]; sm.f.shoot=shootTags.map(t=>{const o=opts.find(x=>String(x.label).toLowerCase()===t.toLowerCase());return o?Number(o.id):null;}).filter(v=>v!=null); }
-    }
-    // Apply pending headshot swap (old headshot → extras, chosen → headshot)
-    if(pendingHeadshotAssetId){
-      try { await applyHeadshotSwap(); loadCandidatePhotos(currentItem.id); }
-      catch(e){ showToast('Headshot swap failed: '+e.message,'error'); console.error(e); }
     }
     captureMeasBaseline();          // paired values just saved become the new baseline
     isDirty=false;
@@ -5790,7 +5772,6 @@ let photoState = { headshotEntries: [], extraEntries: [] };
 let candidatePhotos = [];          // display list: {assetId, url, name, isHeadshot}
 let removePhotoMode = false;       // v7.50: selecting extras to delete from Monday
 let pendingRemoveIds = new Set();  // v7.50: asset ids marked for removal
-let pendingHeadshotAssetId = null; // chosen replacement, applied on Save
 let rechooseMode = false;
 let lightboxIndex = 0;
 
@@ -5874,7 +5855,6 @@ function renderPhotoGrid(){
     const thumb = document.createElement('div');
     let cls = 'strip-photo-thumb';
     if(removePhotoMode && !p.isHeadshot && pendingRemoveIds.has(p.assetId)) cls += ' is-removing';
-    else if(p.assetId === pendingHeadshotAssetId) cls += ' is-pending';
     else if(p.isHeadshot) cls += ' is-headshot';
     thumb.className = cls;
     thumb.innerHTML = `<img src="${escapeHtml(p.thumbUrl||p.url)}" title="${escapeHtml(p.name)}" loading="lazy">`;
@@ -5909,10 +5889,6 @@ function updatePhotoHint(){
     hint.textContent = 'Click a photo to make it the new headshot';
     btn.textContent = 'Cancel';
     btn.classList.add('danger');
-  } else if(pendingHeadshotAssetId){
-    hint.textContent = 'New headshot chosen — applies on Save';
-    btn.textContent = 'Cancel New Headshot';
-    btn.classList.add('danger');
   } else {
     hint.textContent = '';
     btn.textContent = 'Re-choose Headshot';
@@ -5924,7 +5900,7 @@ function updatePhotoHint(){
 function toggleRemovePhotos(){
   if(!removePhotoMode){
     // entering: clear any headshot-selection mode so the two don't fight over the grid
-    rechooseMode=false; pendingHeadshotAssetId=null;
+    rechooseMode=false;
     removePhotoMode=true; pendingRemoveIds.clear();
     renderPhotoGrid(); return;
   }
@@ -5953,8 +5929,7 @@ function applyRemovePhotos(){
 
 function toggleRechoose(){
   if(removePhotoMode){ removePhotoMode=false; pendingRemoveIds.clear(); }   // v7.50: leave remove mode
-  if(pendingHeadshotAssetId){ pendingHeadshotAssetId = null; rechooseMode = false; }
-  else rechooseMode = !rechooseMode;
+  rechooseMode = !rechooseMode;
   renderPhotoGrid();
 }
 
@@ -5971,20 +5946,6 @@ function selectPendingHeadshot(assetId){
 
 // Re-choose an existing photo as the headshot. Delegates to the atomic server
 // rearrange so it cannot orphan: chosen → headshot, everything else → extras.
-async function applyHeadshotSwap(){
-  if(!pendingHeadshotAssetId || !currentItem) return;
-  const all = [...photoState.headshotEntries, ...photoState.extraEntries];
-  const chosen = all.find(e => e.assetId === pendingHeadshotAssetId);
-  if(!chosen) throw new Error('Chosen photo not found on item');
-  const restIds = all.filter(e => e.assetId !== pendingHeadshotAssetId).map(e => e.assetId);
-
-  await rearrangePhotos(currentItem.id, [chosen.assetId], restIds);
-  await clearHeadMedThumb(currentItem.id);   // v7.35: promoted an existing photo — drop stale thumb, fall back to full
-  await clearExtraMedThumbs(currentItem.id);   // v7.36 (Finding 1): rearrange reassigned extra ids — clear dead pairings
-
-  pendingHeadshotAssetId = null;
-  rechooseMode = false;
-}
 
 // ── LIGHTBOX ──
 function openLightbox(i){
@@ -6244,7 +6205,7 @@ async function setHeadMedThumb(itemId, sourceFile, bId){
       if(v){ try{ hasExisting = ((JSON.parse(v).files)||[]).length > 0; }catch{} }
     }catch(e){}
     if(hasExisting){
-      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+      await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
         {i:String(itemId), b:(bId||BOARD_ID), c:JSON.stringify({[col]:{clear_all:true}})});
       await new Promise(r=>setTimeout(r, 800)); // let the clear settle (monday is eventually-consistent)
     }
@@ -6258,7 +6219,7 @@ async function setHeadMedThumb(itemId, sourceFile, bId){
 async function clearHeadMedThumb(itemId, bId){
   const col = medHeadCol(bId); if(!col) return;
   try{
-    await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+    await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
       {i:String(itemId), b:(bId||BOARD_ID), c:JSON.stringify({[col]:{clear_all:true}})});
   }catch(e){ console.warn('clearHeadMedThumb skipped:', e.message); }
 }
@@ -6271,7 +6232,7 @@ async function clearHeadMedThumb(itemId, bId){
 async function clearExtraMedThumbs(itemId, bId){
   const col = medExtraCol(bId); if(!col) return;
   try{
-    await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+    await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
       {i:String(itemId), b:(bId||BOARD_ID), c:JSON.stringify({[col]:{clear_all:true}})});
   }catch(e){ console.warn('clearExtraMedThumbs skipped:', e.message); }
 }
@@ -6417,7 +6378,7 @@ async function saveNewModel(targetMode){
     if(multiValues['dropdown_mm1by5q0']?.length) cv['dropdown_mm1by5q0']={ids:multiValues['dropdown_mm1by5q0']};
     if(multiValues['dropdown_mkncp6xy']?.length) cv['dropdown_mkncp6xy']={ids:multiValues['dropdown_mkncp6xy']};
     if(Object.keys(cv).length){
-      await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
+      await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c){id}}`,
         {i:newId, b:BOARD_ID, c:JSON.stringify(cv)});
     }
     setUploadStep(stepList, s1, 'done', '✓ Details saved');
@@ -6736,7 +6697,7 @@ async function runRecropPhase(job, bId, setPhase){
   // Past the point of clean cancel — the atomic server rearrange is about to run.
   job._phase='finalizing'; job._xhr=null; setPhase(75, 'Setting as headshot… (a few seconds)');
   await rearrangePhotos(itemId,[newId],[oldHead,...extrasBefore].filter(x=>x!=null), bId);
-  await clearHeadMedThumb(itemId, bId);   // head changed — drop stale thumb, fall back to full
+  await setHeadMedThumb(itemId, job.croppedFile, bId); // v7.58: regenerate the small head thumb from the crop (was cleared → full-res fallback)
   await clearExtraMedThumbs(itemId, bId); // rearrange reassigned extra ids — clear dead pairings
   return true;   // headshot always changes on a recrop
 }
@@ -6787,7 +6748,7 @@ async function refreshItemHeadFromMonday(itemId, bId){
   const headAsset = headEntry ? assetById[String(headEntry.assetId)] : null;
   const medAsset  = medEntry  ? assetById[String(medEntry.assetId)]  : null;
 
-  const m = (typeof kanbanItems!=='undefined' && kanbanItems) ? kanbanItems.find(x=>String(x.id)===String(itemId)) : null;
+  const m = (typeof kanbanItems!=='undefined' && kanbanItems) ? modelById(itemId) : null;
   if(m){
     if(m.head)    delete kbHeadCache[String(m.head)];
     if(m.medHead) delete kbHeadCache[String(m.medHead)];
@@ -6988,7 +6949,7 @@ function resetForm(){
   { const _db=document.getElementById('delete-model-row'); if(_db) _db.style.display='none'; }   // v7.56
   shootTags=[];shootTagsDirty=false;{const _st=document.getElementById('shoot-tags-block'); if(_st) _st.style.display='none';}
   compatSavedIds=new Set();
-  pendingHeadshotAssetId=null;rechooseMode=false;candidatePhotos=[];closeLightbox();
+  rechooseMode=false;candidatePhotos=[];closeLightbox();
   const pc=document.getElementById('photo-controls');if(pc)pc.style.display='none';
   document.getElementById('unsaved-dot').classList.remove('visible');
   document.getElementById('save-status').textContent='';
@@ -7101,6 +7062,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.58: (P1+P2 cleanup — first release that also touches server.js) NOT client-only. Dead code removed: applyHeadshotSwap + pendingHeadshotAssetId + the is-pending render/CSS branch (unreachable since v7.56 routed rechoose through recrop), refreshHeadEverywhere (zero callers), and the inert #iv/#fv-upload-progress overlay DOM (unused since the v7.44 background queue). Performance: (a) .am-tile gets content-visibility:auto + contain-intrinsic-size so off-screen grid tiles skip layout/paint — big win at ~950 tiles; (b) new O(1) modelById() index replaces 15 linear kanbanItems.find scans (rebuilt in loadKanban; array is never spliced so it stays valid; self-heals on miss); (c) recrop now regenerates the head med-thumb from the crop file instead of clearing it, so the grid keeps fast thumbnails after a recrop. Robustness: the 13 idempotent change_*column_value writes now use gqlRetry (create_item/create_subitem/delete_item deliberately stay on plain gql — retrying a non-idempotent write could double-create). Security: server.js /upload and /move-asset now validate columnId/targetColumnId against ^[a-z0-9_]+$ before interpolating into the GraphQL string (closes a minor server-side injection). No behavior changes for the user. Note: sbBuildPlan kept its inline lookup to stay pure/testable.
    v7.57: (crop uploaded headshots too) Client-only. When you drop/click a NEW photo into the "Replace Headshot → Monday" box (full editor, interview editor, or new-model), the recrop modal now opens on that LOCAL file so you can crop (and rotate) it before upload — matching the v7.56 pick-from-existing flow. "Save crop" hands the cropped file back as the pending headshot (uploads on Save, via the fast replace path); "Cancel" keeps the photo as-is. HEIC/HEIF are skipped (browsers can't canvas them) and upload as-is. New helpers: openRecropLocal (blob-url load, no /asset-bytes fetch) + a mode:'local' branch in saveRecrop that returns the file via callback instead of enqueuing a recrop job.
    v7.56: (three tweaks) Client-only. (A) The "+ New tag" row is now at the TOP of the Casting Sandbox shoot-tag picker (was at the bottom). (B) DELETE MODEL moved out of the top header (it sat right next to Save Changes — easy to mis-click) to a "danger zone" at the very bottom of the full editor, below the last section, with an explanatory note. Only appears in the full editor (not the interview view). (C) Picking a new headshot (Re-choose → click a photo) now opens the RECROP modal on that photo so you can crop it before it becomes the headshot — one flow. "Save crop" enqueues a single recrop job (cropped photo → headshot); the original stays in Extra pictures. Replaces v7.53's immediate as-is swap.
    v7.55: (fix) Client-only. The app's left nav column is a fixed 200px in the .main grid and stayed reserved even when blank, so grids/kanban/sandbox showed an empty 200px gutter (most obvious in the sandbox, which adds its own steps column on top). buildSidebarNav now toggles a .no-sidebar class on .main for blank-nav modes, collapsing the column (grid-template-columns:1fr, sidebar hidden) so content uses full width. Editor modes still get the 200px question-nav sidebar (every editor-open path rebuilds it to full/interview).
@@ -7865,7 +7827,7 @@ async function dupIgnorePersist(){
   const col=await sbEnsureSavesCol(); if(!col) return false;
   const payload=JSON.stringify([...dupIgnoreSet]);
   if(dupIgnoreItemId){
-    await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
+    await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,
       {i:dupIgnoreItemId, b:SANDBOX_SAVES_BOARD_ID, c:JSON.stringify({[col]:{text:payload}})});
   } else {
     const r=await gql(`mutation($b:ID!,$n:String!,$c:JSON!){create_item(board_id:$b,item_name:$n,column_values:$c){id}}`,
