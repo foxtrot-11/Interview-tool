@@ -719,5 +719,14 @@ has('await setHeadMedThumb(itemId, job.croppedFile, bId)', 'recrop regenerates h
 has('await gqlRetry(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values', 'idempotent writes use gqlRetry');
 lacks('await gql(`mutation($i:ID!,$b:ID!,$c:JSON!){change_multiple_column_values', 'no idempotent column writes left on plain gql');
 
+/* v7.59: batch head-thumbnail backfill */
+has('v7.59:', 'v7.59 deploy marker present');
+has('function thumbBackfillCandidates(', 'backfill candidate scan present');
+has('function startThumbBackfill(', 'backfill trigger present');
+has('async function runRegenThumbPhase(', 'regen-thumb worker present');
+has("job.kind==='regenthumb'", 'runPhotoJob branches on regenthumb');
+has('id="thumb-backfill-btn"', 'backfill button present');
+has("m.head && !m.medHead", 'candidates = headshot present but thumb missing');
+
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

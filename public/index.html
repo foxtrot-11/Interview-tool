@@ -1514,6 +1514,7 @@
           <div class="am-title" id="am-title">All Models</div>
           <span class="am-count" id="am-count"></span>
           <button class="dup-refresh-btn" onclick="loadKanban()">↺ Refresh</button>
+          <button class="dup-refresh-btn" id="thumb-backfill-btn" onclick="startThumbBackfill()" style="display:none" title="Generate the small grid thumbnail for headshots missing one (e.g. changed before v7.58)"></button>
         </div>
         <div class="am-toolbar-row">
           <span class="tb-label">Sort</span>
@@ -2671,6 +2672,7 @@ async function loadKanban(){
       setLoad(`Loading models… ${items.length} loaded`);
     } while(cursor && pages<40); // page through the WHOLE board (stops as soon as cursor runs out)
     kanbanItems=items; rebuildModelIndex();
+    if(typeof refreshThumbBackfillBtn==='function') refreshThumbBackfillBtn();   // v7.59: surface missing-thumb count
     gridEdits={};   // v7.38: board reloaded — any pending tile edits are now stale
     kbColLoaded={};
     kbLoadedOnce=true;
@@ -6524,6 +6526,30 @@ function enqueueRemovePhotosJob({itemId, modelName, boardId, headAssetId, keptEx
   });
 }
 
+// REGEN-THUMB job (v7.59) — backfill the small head thumbnail for a model whose head med-thumb
+// column is empty (e.g. headshots changed before v7.58, which cleared but didn't regenerate).
+function enqueueRegenThumbJob({itemId, modelName, boardId, headAssetId}){
+  if(!headAssetId) return null;
+  return pushJob({ itemId, modelName, boardId, kind:'regenthumb', detail:'Thumbnail', headAssetId:String(headAssetId) });
+}
+// Models with a headshot but no med-thumb (excludes retired/delete/evernote/duplicate — not worth it).
+function thumbBackfillCandidates(){
+  return (typeof kanbanItems!=='undefined'&&kanbanItems?kanbanItems:[]).filter(m=> m.head && !m.medHead && ![0,6,11,12].includes(m.statusIdx));
+}
+function refreshThumbBackfillBtn(){
+  const b=document.getElementById('thumb-backfill-btn'); if(!b) return;
+  const n=thumbBackfillCandidates().length;
+  if(n>0){ b.style.display=''; b.textContent=`⟳ Fix ${n} missing thumbnail${n>1?'s':''}`; } else b.style.display='none';
+}
+function startThumbBackfill(){
+  const cands=thumbBackfillCandidates();
+  if(!cands.length){ showToast('No missing headshot thumbnails','success'); return; }
+  if(String(BOARD_ID)!==String(MAIN_BOARD_ID)){ showToast('Thumbnails are only written on the production board','error'); return; }
+  if(!confirm(`Regenerate ${cands.length} missing headshot thumbnail${cands.length>1?'s':''}?\n\nRuns in the background, one at a time — watch the jobs widget (bottom-right). Safe to keep working; you can Cancel any that are still queued.`)) return;
+  cands.forEach(m=>enqueueRegenThumbJob({itemId:m.id, modelName:m.name, boardId:BOARD_ID, headAssetId:m.head}));
+  showToast(`Queued ${cands.length} thumbnail${cands.length>1?'s':''}`,'success');
+}
+
 function pushJob(extra){
   const job = Object.assign({
     id: ++bgJobSeq,
@@ -6594,6 +6620,8 @@ async function runPhotoJob(job){
       headChanged = await runChangeHeadPhase(job, bId, setPhase);
     } else if(job.kind==='removephotos'){
       headChanged = await runRemovePhotosPhase(job, bId, setPhase);
+    } else if(job.kind==='regenthumb'){
+      headChanged = await runRegenThumbPhase(job, bId, setPhase);
     } else {
       headChanged = await runSavePhase(job, bId, setPhase);
     }
@@ -6627,6 +6655,7 @@ async function runPhotoJob(job){
 
   pumpBgJobs();          // start the next queued job
   refreshInflightNotes();
+  if(typeof refreshThumbBackfillBtn==='function') refreshThumbBackfillBtn();   // v7.59
 }
 
 // SAVE kind: headshot replace (fast path) + extras. Returns true if the headshot changed.
@@ -6731,6 +6760,19 @@ async function runRemovePhotosPhase(job, bId, setPhase){
   await clearHeadMedThumb(itemId, bId);
   await clearExtraMedThumbs(itemId, bId);
   return true;   // asset ids churned → refresh head/tile
+}
+
+// REGEN-THUMB (v7.59): fetch the current headshot bytes (same-origin via /asset-bytes, no CORS)
+// and regenerate the small med-thumb. No rearrange — the full headshot asset is untouched.
+async function runRegenThumbPhase(job, bId, setPhase){
+  const itemId=job.itemId, assetId=job.headAssetId;
+  job._phase='finalizing'; setPhase(20, 'Fetching headshot…');
+  const r=await fetch('/asset-bytes?assetId='+encodeURIComponent(assetId), {headers:{'X-App-Auth':APP_PW}});
+  if(!r.ok) throw new Error('asset fetch failed ('+r.status+')');
+  const blob=await r.blob();
+  setPhase(60, 'Building thumbnail…');
+  await setHeadMedThumb(itemId, blob, bId);   // clears + uploads the downscaled thumb
+  return true;   // medHead now exists → refreshItemHeadFromMonday updates store + tile
 }
 
 // After a background headshot change, pull the NEW head + med-head asset (id+url) fresh from
@@ -7062,6 +7104,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.59: (batch thumbnail backfill) Client-only. Headshots changed before v7.58 had their small grid thumbnail (head med-thumb) cleared but not regenerated, so the grid loads full-res for them. New "⟳ Fix N missing thumbnails" button in the ALL MODELS toolbar (shown only when N>0): scans the store for models with a headshot but no med-thumb (m.head && !m.medHead, excluding retired/delete/evernote/duplicate), and on confirm enqueues one background "Thumbnail" job per model. Each job fetches the headshot bytes same-origin via /asset-bytes (no CORS), downscales, and uploads the thumb (setHeadMedThumb) — the full headshot asset is untouched (no rearrange). Runs through the existing queue (one at a time, cancelable while queued, widget progress); the button count drops as jobs finish. Prod-only (writes). Reuses the v7.58 completion refresh to update each tile.
    v7.58: (P1+P2 cleanup — first release that also touches server.js) NOT client-only. Dead code removed: applyHeadshotSwap + pendingHeadshotAssetId + the is-pending render/CSS branch (unreachable since v7.56 routed rechoose through recrop), refreshHeadEverywhere (zero callers), and the inert #iv/#fv-upload-progress overlay DOM (unused since the v7.44 background queue). Performance: (a) .am-tile gets content-visibility:auto + contain-intrinsic-size so off-screen grid tiles skip layout/paint — big win at ~950 tiles; (b) new O(1) modelById() index replaces 15 linear kanbanItems.find scans (rebuilt in loadKanban; array is never spliced so it stays valid; self-heals on miss); (c) recrop now regenerates the head med-thumb from the crop file instead of clearing it, so the grid keeps fast thumbnails after a recrop. Robustness: the 13 idempotent change_*column_value writes now use gqlRetry (create_item/create_subitem/delete_item deliberately stay on plain gql — retrying a non-idempotent write could double-create). Security: server.js /upload and /move-asset now validate columnId/targetColumnId against ^[a-z0-9_]+$ before interpolating into the GraphQL string (closes a minor server-side injection). No behavior changes for the user. Note: sbBuildPlan kept its inline lookup to stay pure/testable.
    v7.57: (crop uploaded headshots too) Client-only. When you drop/click a NEW photo into the "Replace Headshot → Monday" box (full editor, interview editor, or new-model), the recrop modal now opens on that LOCAL file so you can crop (and rotate) it before upload — matching the v7.56 pick-from-existing flow. "Save crop" hands the cropped file back as the pending headshot (uploads on Save, via the fast replace path); "Cancel" keeps the photo as-is. HEIC/HEIF are skipped (browsers can't canvas them) and upload as-is. New helpers: openRecropLocal (blob-url load, no /asset-bytes fetch) + a mode:'local' branch in saveRecrop that returns the file via callback instead of enqueuing a recrop job.
    v7.56: (three tweaks) Client-only. (A) The "+ New tag" row is now at the TOP of the Casting Sandbox shoot-tag picker (was at the bottom). (B) DELETE MODEL moved out of the top header (it sat right next to Save Changes — easy to mis-click) to a "danger zone" at the very bottom of the full editor, below the last section, with an explanatory note. Only appears in the full editor (not the interview view). (C) Picking a new headshot (Re-choose → click a photo) now opens the RECROP modal on that photo so you can crop it before it becomes the headshot — one flow. "Save crop" enqueues a single recrop job (cropped photo → headshot); the original stays in Extra pictures. Replaces v7.53's immediate as-is swap.
