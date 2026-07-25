@@ -656,17 +656,17 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
       const wantFresh = /^(1|true|yes)$/i.test(String(req.query.fresh||''));
       // One attempt = fresh client + connect + query. Retried once on a fast transient failure.
       const attempt = async () => {
-        client = new XpozClient({ apiKey: XPOZ_API_KEY, timeoutMs: wantFresh ? 110000 : 25000 });
+        client = new XpozClient({ apiKey: XPOZ_API_KEY, timeoutMs: wantFresh ? 145000 : 70000 });
         const tConnect = Date.now();
-        await withDeadline(client.connect(), 12000, 'connect');
+        await withDeadline(client.connect(), 20000, 'connect');
         console.log('Xpoz connect ok in '+(Date.now()-tConnect)+'ms (@'+twHandle+', fresh='+wantFresh+')');
         // Field names go over the wire as-is (the SDK does no case conversion), and snake_case is
         // what the backend advertises — asking for only these keeps the response small and fast.
         const tQuery = Date.now();
         const out = await withDeadline(client.twitter.getPostsByAuthor(twHandle, {
-          responseType: 'fast', limit: 25, forceLatest: wantFresh,
-          fields: ['id','created_at_date','media_urls','possibly_sensitive'],
-        }), wantFresh ? 115000 : 30000, 'query');
+          responseType: 'fast', limit: 15, forceLatest: wantFresh,
+          fields: ['created_at_date','media_urls'],
+        }), wantFresh ? 150000 : 75000, 'query');
         console.log('Xpoz query ok in '+(Date.now()-tQuery)+'ms (@'+twHandle+')');
         return out;
       };
@@ -708,10 +708,10 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
         // actionable instead of a wall of JSON, and cap the fallback so nothing huge reaches the client.
         const raw = (e && e.message) ? e.message : String(e);
         let msg;
-        if(/^DEADLINE:connect/.test(raw)) msg='could not establish a connection to Xpoz within 12s (the provider accepted the connection but never answered).';
+        if(/^DEADLINE:connect/.test(raw)) msg='could not establish a connection to Xpoz within 20s (the provider accepted the connection but never answered).';
         else if(/^DEADLINE:query/.test(raw)) msg = wantFresh
           ? 'the live fetch exceeded its time budget. Try again, or scrape without Force refresh.'
-          : 'Xpoz did not return results within 30s. It may be busy — try again shortly, or use Force refresh.';
+          : 'Xpoz did not return results within 75s. Their service is intermittent — try again in a moment.';
         else if(/authentication|token validation|unauthorized|invalid.*key/i.test(raw)) msg='the Xpoz API key was rejected — check XPOZ_API_KEY on the server.';
         else if(/timeout|timed out|ETIMEDOUT/i.test(raw)) msg = wantFresh
           ? 'the live fetch timed out (that path is slow). Try again, or scrape without Force refresh.'

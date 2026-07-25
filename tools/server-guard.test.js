@@ -73,7 +73,7 @@ console.log('[5] v7.61 Xpoz/Twitter integration is safely wired');
 console.log('[6] v7.63 indexed-first (forceLatest is opt-in, not default)');
 { n++; if(/forceLatest: wantFresh/.test(src)) console.log('  \u2713 forceLatest driven by the fresh flag'); else { fails++; console.log('  \u2717 forceLatest not flag-driven'); }
   n++; if(!/forceLatest: true/.test(src)) console.log('  \u2713 forceLatest not hardcoded true (was causing >60s timeouts)'); else { fails++; console.log('  \u2717 forceLatest hardcoded true'); }
-  n++; if(/timeoutMs: wantFresh \? 110000 : 25000/.test(src)) console.log('  \u2713 timeout budget differs per path'); else { fails++; console.log('  \u2717 timeout budget not path-aware'); } }
+  n++; if(/timeoutMs: wantFresh \? 145000 : 70000/.test(src)) console.log('  \u2713 timeout budget differs per path'); else { fails++; console.log('  \u2717 timeout budget not path-aware'); } }
 
 console.log('[7] v7.64 wall-clock deadlines + transient retry (SDK timeoutMs does NOT bound the transport)');
 { n++; if(/const withDeadline = /.test(src)) console.log('  \u2713 wall-clock deadline helper present'); else { fails++; console.log('  \u2717 no deadline helper'); }
@@ -82,6 +82,11 @@ console.log('[7] v7.64 wall-clock deadlines + transient retry (SDK timeoutMs doe
   n++; if(/withDeadline\(client\.close\(\)/.test(src)) console.log('  \u2713 close() is deadline-bounded'); else { fails++; console.log('  \u2717 close() unbounded'); }
   n++; if(/isTransient/.test(src) && /retrying once/.test(src)) console.log('  \u2713 single retry on fast transient failure'); else { fails++; console.log('  \u2717 no transient retry'); }
   n++; if(/!\/authentication\|token validation\|unauthorized\/i\.test\(m\)/.test(src)) console.log('  \u2713 auth failures are NOT retried'); else { fails++; console.log('  \u2717 auth failures may be retried'); } }
+
+console.log('[8] v7.65 realistic budgets + trimmed payload');
+{ n++; if(/wantFresh \? 150000 : 75000, 'query'/.test(src)) console.log('  \u2713 query budget ~5x measured time'); else { fails++; console.log('  \u2717 query budget not raised'); }
+  n++; if(/fields: \['created_at_date','media_urls'\]/.test(src)) console.log('  \u2713 only the fields actually used are requested'); else { fails++; console.log('  \u2717 unused fields still requested'); }
+  n++; if(/limit: 15/.test(src)) console.log('  \u2713 limit trimmed to 15'); else { fails++; console.log('  \u2717 limit not trimmed'); } }
 
 console.log(`\n${n} assertions, ${fails} failed`);
 process.exit(fails?1:0);
