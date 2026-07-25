@@ -629,21 +629,62 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
           ? 'Twitter/X scraping is unavailable — the @xpoz/xpoz package is not installed on the server.'
           : 'Twitter/X scraping is unavailable — the Xpoz SDK failed to load: '+raw.slice(0,200) });
       }
+      // v7.64: the SDK's timeoutMs ONLY bounds its polling loop (waitForResult); the underlying
+      // transport call (client.callTool) is awaited with no AbortSignal, so a backend that accepts
+      // the connection but never answers hangs it indefinitely — which is exactly what happened
+      // (the 30s budget never fired; the browser's 60s cap did). Xpoz's own CLI works around this
+      // with a wall-clock timeout, so we do the same: race every SDK call against a real deadline.
+      const withDeadline = (p, ms, label) => {
+        let t;
+        return Promise.race([
+          Promise.resolve(p).finally(()=>clearTimeout(t)),
+          new Promise((_,rej)=>{ t=setTimeout(()=>rej(new Error('DEADLINE:'+label+' exceeded '+ms+'ms')), ms); }),
+        ]);
+      };
+      // v7.64: mcp.xpoz.ai is INTERMITTENT — observed a 502 Bad Gateway after 15s immediately
+      // followed by three clean 200s in under a second. Those failures are transient AND fast, so
+      // one cheap retry recovers most of them. Only retried when the error looks like a transport
+      // blip and the first attempt failed quickly (never on auth failures, and never after we've
+      // already burned the time budget, so the worst case stays inside the client's cap).
+      const isTransient = (m)=>/502|503|504|Bad Gateway|ECONNRESET|socket hang up|fetch failed|Streamable HTTP error|EAI_AGAIN|ETIMEDOUT/i.test(m)
+                              && !/authentication|token validation|unauthorized/i.test(m);
       let client;
       // v7.63: forceLatest triggers a LIVE fetch on Xpoz's side and was timing out past 60s. The
       // index path returns in a few seconds (verified via the CLI, which has no --force-latest by
       // default) and already has these accounts, so index-first is the right default. `&fresh=1`
       // opts into the slow live path for an account the index doesn't know yet.
       const wantFresh = /^(1|true|yes)$/i.test(String(req.query.fresh||''));
-      try{
-        client = new XpozClient({ apiKey: XPOZ_API_KEY, timeoutMs: wantFresh ? 120000 : 30000 });
-        await client.connect();
+      // One attempt = fresh client + connect + query. Retried once on a fast transient failure.
+      const attempt = async () => {
+        client = new XpozClient({ apiKey: XPOZ_API_KEY, timeoutMs: wantFresh ? 110000 : 25000 });
+        const tConnect = Date.now();
+        await withDeadline(client.connect(), 12000, 'connect');
+        console.log('Xpoz connect ok in '+(Date.now()-tConnect)+'ms (@'+twHandle+', fresh='+wantFresh+')');
         // Field names go over the wire as-is (the SDK does no case conversion), and snake_case is
         // what the backend advertises — asking for only these keeps the response small and fast.
-        const resp = await client.twitter.getPostsByAuthor(twHandle, {
+        const tQuery = Date.now();
+        const out = await withDeadline(client.twitter.getPostsByAuthor(twHandle, {
           responseType: 'fast', limit: 25, forceLatest: wantFresh,
           fields: ['id','created_at_date','media_urls','possibly_sensitive'],
-        });
+        }), wantFresh ? 115000 : 30000, 'query');
+        console.log('Xpoz query ok in '+(Date.now()-tQuery)+'ms (@'+twHandle+')');
+        return out;
+      };
+      const closeQuietly = async () => { if(client){ try{ await withDeadline(client.close(), 4000, 'close'); }catch(e){} client=null; } };
+      try{
+        let resp;
+        const t0 = Date.now();
+        try{
+          resp = await attempt();
+        }catch(firstErr){
+          const fm = String((firstErr && firstErr.message) || firstErr);
+          const fastFail = (Date.now() - t0) < 10000;
+          if(!(isTransient(fm) && fastFail)) throw firstErr;
+          console.warn('Xpoz transient failure ('+fm.slice(0,120)+') — retrying once');
+          await closeQuietly();
+          await new Promise(r=>setTimeout(r, 1500));
+          resp = await attempt();
+        }
         const rows = (resp && resp.data) ? resp.data : (Array.isArray(resp) ? resp : []);
         // Newest first, so a scrape reflects current photos rather than arbitrary index order.
         rows.sort((a,b)=>String((b&&(b.createdAtDate||b.created_at_date))||'').localeCompare(String((a&&(a.createdAtDate||a.created_at_date))||'')));
@@ -667,18 +708,24 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
         // actionable instead of a wall of JSON, and cap the fallback so nothing huge reaches the client.
         const raw = (e && e.message) ? e.message : String(e);
         let msg;
-        if(/authentication|token validation|unauthorized|invalid.*key/i.test(raw)) msg='the Xpoz API key was rejected — check XPOZ_API_KEY on the server.';
+        if(/^DEADLINE:connect/.test(raw)) msg='could not establish a connection to Xpoz within 12s (the provider accepted the connection but never answered).';
+        else if(/^DEADLINE:query/.test(raw)) msg = wantFresh
+          ? 'the live fetch exceeded its time budget. Try again, or scrape without Force refresh.'
+          : 'Xpoz did not return results within 30s. It may be busy — try again shortly, or use Force refresh.';
+        else if(/authentication|token validation|unauthorized|invalid.*key/i.test(raw)) msg='the Xpoz API key was rejected — check XPOZ_API_KEY on the server.';
         else if(/timeout|timed out|ETIMEDOUT/i.test(raw)) msg = wantFresh
           ? 'the live fetch timed out (that path is slow). Try again, or scrape without Force refresh.'
           : 'the provider timed out. Try again in a moment.';
         else if(/quota|credit|rate limit|429|payment|billing/i.test(raw)) msg='the Xpoz account is out of credits or rate limited.';
         else if(/not found|no such user|unknown user/i.test(raw)) msg='that handle was not found on Twitter/X.';
+        else if(/502|503|504|Bad Gateway|Service Unavailable/i.test(raw)) msg='Xpoz\u2019s service is temporarily unavailable (it returned a gateway error twice). This is intermittent on their end \u2014 try again in a moment.';
         else if(/ENOTFOUND|ECONNREFUSED|network|fetch failed/i.test(raw)) msg='could not reach the Xpoz service.';
         else msg = raw.slice(0,200);
         console.warn('Twitter/X scrape failed for @'+twHandle+':', raw.slice(0,500));
         return res.status(502).json({ error:'Twitter/X scrape failed — '+msg });
       }finally{
-        if(client){ try{ await client.close(); }catch(e){} }
+        // close() goes through the same transport, so bound it too — never let cleanup hang the response.
+        await closeQuietly();
       }
     }
     const u = await assertPublicHttpUrl(input);

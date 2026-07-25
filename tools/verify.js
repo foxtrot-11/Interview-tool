@@ -735,6 +735,8 @@ has("if(job.kind==='regenthumb') setTimeout(()=>{ try{ pumpBgJobs(); }catch(e){}
 has('const CAP=250;', 'batch capped per click');
 has('bgJobs = bgJobs.filter(j=>j!==job); renderBgJobs();', 'finished batch rows auto-cleared');
 
+/* v7.64: wall-clock deadlines */
+has('v7.64:', 'v7.64 deploy marker present');
 /* v7.63: scrape progress + index-first */
 has('v7.63:', 'v7.63 deploy marker present');
 has('function startScrapeProgress(', 'scrape progress controller present');

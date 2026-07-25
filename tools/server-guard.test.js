@@ -73,7 +73,15 @@ console.log('[5] v7.61 Xpoz/Twitter integration is safely wired');
 console.log('[6] v7.63 indexed-first (forceLatest is opt-in, not default)');
 { n++; if(/forceLatest: wantFresh/.test(src)) console.log('  \u2713 forceLatest driven by the fresh flag'); else { fails++; console.log('  \u2717 forceLatest not flag-driven'); }
   n++; if(!/forceLatest: true/.test(src)) console.log('  \u2713 forceLatest not hardcoded true (was causing >60s timeouts)'); else { fails++; console.log('  \u2717 forceLatest hardcoded true'); }
-  n++; if(/timeoutMs: wantFresh \? 120000 : 30000/.test(src)) console.log('  \u2713 timeout budget differs per path'); else { fails++; console.log('  \u2717 timeout budget not path-aware'); } }
+  n++; if(/timeoutMs: wantFresh \? 110000 : 25000/.test(src)) console.log('  \u2713 timeout budget differs per path'); else { fails++; console.log('  \u2717 timeout budget not path-aware'); } }
+
+console.log('[7] v7.64 wall-clock deadlines + transient retry (SDK timeoutMs does NOT bound the transport)');
+{ n++; if(/const withDeadline = /.test(src)) console.log('  \u2713 wall-clock deadline helper present'); else { fails++; console.log('  \u2717 no deadline helper'); }
+  n++; if(/withDeadline\(client\.connect\(\)/.test(src)) console.log('  \u2713 connect() is deadline-bounded'); else { fails++; console.log('  \u2717 connect() unbounded'); }
+  n++; if(/withDeadline\(client\.twitter\.getPostsByAuthor/.test(src)) console.log('  \u2713 query is deadline-bounded'); else { fails++; console.log('  \u2717 query unbounded'); }
+  n++; if(/withDeadline\(client\.close\(\)/.test(src)) console.log('  \u2713 close() is deadline-bounded'); else { fails++; console.log('  \u2717 close() unbounded'); }
+  n++; if(/isTransient/.test(src) && /retrying once/.test(src)) console.log('  \u2713 single retry on fast transient failure'); else { fails++; console.log('  \u2717 no transient retry'); }
+  n++; if(/!\/authentication\|token validation\|unauthorized\/i\.test\(m\)/.test(src)) console.log('  \u2713 auth failures are NOT retried'); else { fails++; console.log('  \u2717 auth failures may be retried'); } }
 
 console.log(`\n${n} assertions, ${fails} failed`);
 process.exit(fails?1:0);
