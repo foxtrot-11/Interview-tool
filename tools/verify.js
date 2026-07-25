@@ -272,7 +272,7 @@ has('suppressDirty=true;   // v7.27', 'guard engaged on load');
 /* v7.28 asserts */
 has('v7.28:', 'v7.28 deploy marker present');
 has("fv.insertBefore(blk, notes && notes.nextSibling", 'shoot tags lifted to top of editor');
-has('async function scrapePhotos(ctx)', 'scrape entry present');
+has('async function scrapePhotos(ctx, fresh)', 'scrape entry present (v7.63: fresh flag)');
 has('async function scrapeImport()', 'scrape import present');
 has("fetch('/scrape-images?url='", 'calls scrape endpoint');
 has("fetch('/proxy-image?url='", 'downloads via image proxy');
@@ -735,6 +735,13 @@ has("if(job.kind==='regenthumb') setTimeout(()=>{ try{ pumpBgJobs(); }catch(e){}
 has('const CAP=250;', 'batch capped per click');
 has('bgJobs = bgJobs.filter(j=>j!==job); renderBgJobs();', 'finished batch rows auto-cleared');
 
+/* v7.63: scrape progress + index-first */
+has('v7.63:', 'v7.63 deploy marker present');
+has('function startScrapeProgress(', 'scrape progress controller present');
+has('scrape-prog-track', 'indeterminate progress bar present');
+has('new AbortController()', 'scrape has a hard client-side timeout');
+has("scrapePhotos(ctx, true)", 'force-refresh retry offered');
+has("source==='twitter'?'From Twitter/X. '", 'scrape grid labels twitter source');
 /* v7.62: ESM load fix */
 has('v7.62:', 'v7.62 deploy marker present');
 /* v7.61: Twitter/X scraping (client side) */

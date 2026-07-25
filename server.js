@@ -630,13 +630,18 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
           : 'Twitter/X scraping is unavailable — the Xpoz SDK failed to load: '+raw.slice(0,200) });
       }
       let client;
+      // v7.63: forceLatest triggers a LIVE fetch on Xpoz's side and was timing out past 60s. The
+      // index path returns in a few seconds (verified via the CLI, which has no --force-latest by
+      // default) and already has these accounts, so index-first is the right default. `&fresh=1`
+      // opts into the slow live path for an account the index doesn't know yet.
+      const wantFresh = /^(1|true|yes)$/i.test(String(req.query.fresh||''));
       try{
-        client = new XpozClient({ apiKey: XPOZ_API_KEY, timeoutMs: 60000 });
+        client = new XpozClient({ apiKey: XPOZ_API_KEY, timeoutMs: wantFresh ? 120000 : 30000 });
         await client.connect();
         // Field names go over the wire as-is (the SDK does no case conversion), and snake_case is
         // what the backend advertises — asking for only these keeps the response small and fast.
         const resp = await client.twitter.getPostsByAuthor(twHandle, {
-          responseType: 'fast', limit: 25, forceLatest: true,
+          responseType: 'fast', limit: 25, forceLatest: wantFresh,
           fields: ['id','created_at_date','media_urls','possibly_sensitive'],
         });
         const rows = (resp && resp.data) ? resp.data : (Array.isArray(resp) ? resp : []);
@@ -655,15 +660,17 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
           }
           if(imgs.length>=10) break;
         }
-        if(!imgs.length) return res.status(404).json({ error:'No photos found for @'+twHandle+' — the account may have no image posts, be protected, or not be indexed yet.' });
-        return res.json({ source:'twitter', actor: twHandle, images: imgs });
+        if(!imgs.length) return res.status(404).json({ error:'No photos found for @'+twHandle+(wantFresh?'':' in the index — retry with Force refresh to pull live (slower).')+(wantFresh?' — the account may have no image posts, be protected, or not exist.':'') });
+        return res.json({ source:'twitter', actor: twHandle, images: imgs, fresh: wantFresh });
       }catch(e){
         // The SDK surfaces raw MCP transport payloads; translate the common cases so the UI toast is
         // actionable instead of a wall of JSON, and cap the fallback so nothing huge reaches the client.
         const raw = (e && e.message) ? e.message : String(e);
         let msg;
         if(/authentication|token validation|unauthorized|invalid.*key/i.test(raw)) msg='the Xpoz API key was rejected — check XPOZ_API_KEY on the server.';
-        else if(/timeout|timed out|ETIMEDOUT/i.test(raw)) msg='the provider timed out. Try again in a moment.';
+        else if(/timeout|timed out|ETIMEDOUT/i.test(raw)) msg = wantFresh
+          ? 'the live fetch timed out (that path is slow). Try again, or scrape without Force refresh.'
+          : 'the provider timed out. Try again in a moment.';
         else if(/quota|credit|rate limit|429|payment|billing/i.test(raw)) msg='the Xpoz account is out of credits or rate limited.';
         else if(/not found|no such user|unknown user/i.test(raw)) msg='that handle was not found on Twitter/X.';
         else if(/ENOTFOUND|ECONNREFUSED|network|fetch failed/i.test(raw)) msg='could not reach the Xpoz service.';

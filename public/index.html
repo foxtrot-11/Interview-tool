@@ -31,6 +31,14 @@
   .logo{font-family:var(--font-display);font-weight:800;font-size:14px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);flex-shrink:0}
   .logo-img{height:26px;width:auto;display:block}
   .scrape-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  /* v7.63: scrape progress. The bar is INDETERMINATE on purpose — the provider gives no progress
+     signal, so an animated sweep + a real elapsed counter is honest where a fake % would not be. */
+  .scrape-prog{flex:1 1 100%;display:none;margin-top:2px}
+  .scrape-prog.on{display:block}
+  .scrape-prog-track{height:4px;border-radius:3px;background:var(--surface2);overflow:hidden;position:relative}
+  .scrape-prog-track::after{content:'';position:absolute;left:0;top:0;height:100%;width:35%;border-radius:3px;background:var(--accent,#3AA2E0);animation:scrapeSweep 1.1s ease-in-out infinite}
+  @keyframes scrapeSweep{0%{left:-35%}100%{left:100%}}
+  .scrape-prog-text{margin-top:5px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);letter-spacing:.04em}
   .scrape-input{flex:1;min-width:240px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px}
   .scrape-input:focus{border-color:var(--accent);outline:none}
   .fv-scrape-btn{background:var(--surface2);border:1px solid #f5c518;color:#f5c518;border-radius:6px;padding:8px 16px;font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
@@ -5109,7 +5117,36 @@ let scrapeResults=[];
 // headshot/extra upload slots for that view (SCRAPE_TYPES). [headshotSlot, extraSlot]
 const SCRAPE_TYPES={fv:['fv-headshot','fv-extra'], iv:['iv-headshot','iv-extra'], new:['headshot','extra']};
 let scrapeCtx='fv';
-async function scrapePhotos(ctx){
+// v7.63: progress feedback for scraping. A scrape is ONE request with no progress signal from the
+// provider, so this shows an indeterminate bar plus a real elapsed-second counter and staged text —
+// no invented percentages. Returns a stop() to tear it down.
+function startScrapeProgress(ctx, fresh){
+  const btn=document.getElementById('scrape-btn-'+ctx);
+  const row=btn?btn.closest('.scrape-row'):null;
+  if(!row) return ()=>{};
+  let box=row.querySelector('.scrape-prog');
+  if(!box){
+    box=document.createElement('div');
+    box.className='scrape-prog';
+    box.innerHTML='<div class="scrape-prog-track"></div><div class="scrape-prog-text"></div>';
+    row.appendChild(box);
+  }
+  const txt=box.querySelector('.scrape-prog-text');
+  box.classList.add('on');
+  const t0=Date.now();
+  const stage=(s)=>{
+    if(s<3)  return 'Contacting provider…';
+    if(s<8)  return 'Fetching recent posts…';
+    if(s<20) return 'Collecting photos…';
+    if(s<40) return 'Still working — the provider is slow right now…';
+    return fresh ? 'Live fetch can take a couple of minutes…' : 'Taking unusually long — it may time out.';
+  };
+  const tick=()=>{ const s=Math.round((Date.now()-t0)/1000); txt.textContent=stage(s)+'  '+s+'s'; };
+  tick();
+  const iv=setInterval(tick,1000);
+  return ()=>{ clearInterval(iv); box.classList.remove('on'); txt.textContent=''; };
+}
+async function scrapePhotos(ctx, fresh){
   ctx = SCRAPE_TYPES[ctx] ? ctx : 'fv';
   scrapeCtx = ctx;
   let url=(document.getElementById('scrape-url-'+ctx).value||'').trim();
@@ -5130,9 +5167,15 @@ async function scrapePhotos(ctx){
     }
   }
   if(!url){ showToast('Paste a URL, or add a Bluesky or Twitter/X link to the record first','error'); return; }
-  const btn=document.getElementById('scrape-btn-'+ctx); btn.disabled=true; const lbl=btn.textContent; btn.textContent='Scraping…';
+  const btn=document.getElementById('scrape-btn-'+ctx); btn.disabled=true; const lbl=btn.textContent; btn.textContent=fresh?'Live fetch…':'Scraping…';
+  const stopProg=startScrapeProgress(ctx, !!fresh);
+  // Hard client-side cap so a hung provider can't leave the button spinning forever. Sits above the
+  // server's own budget (30s indexed / 120s live) so the server's clearer error usually wins.
+  const ac=new AbortController();
+  const capMs=fresh?150000:60000;
+  const capTimer=setTimeout(()=>ac.abort(), capMs);
   try{
-    const r=await fetch('/scrape-images?url='+encodeURIComponent(url),{headers:{'X-App-Auth':APP_PW}});
+    const r=await fetch('/scrape-images?url='+encodeURIComponent(url)+(fresh?'&fresh=1':''),{headers:{'X-App-Auth':APP_PW}, signal:ac.signal});
     const j=await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
     scrapeResults=(j.images||[]).filter(x=>x&&x.url);
@@ -5141,12 +5184,20 @@ async function scrapePhotos(ctx){
     document.getElementById('scrape-status').textContent='';
     document.getElementById('scrape-import-btn').disabled=false;
     document.getElementById('scrape-modal').classList.add('open');
-  }catch(e){ showToast('Scrape failed: '+(e.message||e),'error'); }
-  finally{ btn.disabled=false; btn.textContent=lbl; }
+  }catch(e){
+    const msg = (e && e.name==='AbortError') ? 'Timed out after '+Math.round(capMs/1000)+'s — the provider did not respond.' : ('Scrape failed: '+(e.message||e));
+    showToast(msg,'error');
+    // v7.63: the indexed path is fast but may not know a brand-new account. Offer the slow live
+    // fetch rather than leaving the user stuck (asked, not automatic — it can take minutes).
+    if(!fresh && /Force refresh/i.test(String(e.message||''))){
+      setTimeout(()=>{ if(confirm('Try a live fetch instead?\n\nThis pulls straight from Twitter/X rather than the provider\u2019s index. It is much slower (up to a couple of minutes) but finds accounts that are not indexed yet.')) scrapePhotos(ctx, true); }, 50);
+    }
+  }
+  finally{ clearTimeout(capTimer); stopProg(); btn.disabled=false; btn.textContent=lbl; }
 }
 function renderScrapeGrid(source){
   document.getElementById('scrape-note').textContent =
-    (source==='bluesky'?'From Bluesky. ':'From the page. ')+'Tick the ones to keep; optionally mark one as the headshot. Use “Select none” to start from scratch.';
+    (source==='bluesky'?'From Bluesky. ':(source==='twitter'?'From Twitter/X. ':'From the page. '))+'Tick the ones to keep; optionally mark one as the headshot. Use “Select none” to start from scratch.';
   document.getElementById('scrape-grid').innerHTML = scrapeResults.map((im,i)=>`
     <div class="scrape-cell" id="scrape-cell-${i}">
       <img src="${escapeHtml(im.thumb||im.url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="document.getElementById('scrape-cell-${i}').classList.add('broken')">
@@ -7123,6 +7174,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.63: (Twitter scrape: fast path + progress feedback) server.js + client. TIMEOUT FIX: v7.61 set forceLatest:true, which makes Xpoz do a LIVE fetch and was blowing past 60s. The INDEXED path returns in seconds and already covers these accounts (the CLI test that worked used no --force-latest), so indexed is now the default; the live path is opt-in via &fresh=1 with a 120s budget vs 30s for indexed. When the index has nothing, the error now says so and the client OFFERS a live retry (asked, never automatic — it can take minutes). PROGRESS FEEDBACK: hitting Scrape used to just sit there. There is now an indeterminate progress bar plus a real elapsed-second counter and staged text under the button ("Contacting provider..." -> "Fetching recent posts..." -> "Collecting photos..." -> "Still working..."). The bar is deliberately indeterminate: a single request with no provider progress signal cannot honestly show a percentage, so it shows a sweep and the true elapsed time instead. Also added a hard client-side abort (60s indexed / 150s live) so a hung provider can't leave the button spinning forever, and the picker header now says "From Twitter/X." instead of falling back to "From the page.".
    v7.62: (fix v7.61 — Twitter scraping was dead on arrival) server.js + package.json. ROOT CAUSE: @xpoz/xpoz's CommonJS build synchronously require()s @modelcontextprotocol/sdk, which is ESM-only ("type":"module"). require() of an ESM package throws ERR_REQUIRE_ESM on Node 18/20 and only works on Node >=22.12 — so the v7.61 load succeeded in the dev container (Node 22) and failed on Render, and because the catch block assumed any failure meant "package not installed", the real cause was masked. FIX: load the SDK with dynamic import() instead of require() — import() works from CommonJS on every supported Node version and resolves the package's ESM entry. Also: the loader now reports the ACTUAL error (and logs it server-side), distinguishing genuinely-missing (ERR_MODULE_NOT_FOUND) from any other load failure, so this class of problem is diagnosable instead of guessy. Also raised engines.node to >=20.18.1, the true floor for the dependency tree (undici v7 requires it; the old >=18 was wrong). No functional change to the scraping logic itself — the harvesting/parsing/resolution helpers from v7.61 are untouched.
    v7.61: (Twitter/X photo scraping via Xpoz) NOT client-only — server.js + package.json changed. The "Scrape photos" button now works on x.com / twitter.com profile links, not just Bluesky. Server: new parseTwitterHandle (x.com/twitter.com URL, /status/ URL, or bare @handle; reserved paths like /i/ and /search rejected), plus a twitter branch in /scrape-images that calls the Xpoz TypeScript SDK (getPostsByAuthor, responseType fast, limit 25, forceLatest, newest-first) and returns the same {url,thumb} shape the Bluesky path returns, so the existing picker UI is unchanged. THREE NON-OBVIOUS THINGS, each verified against the SDK source and live CDN: (1) media_urls is DECLARED string[] but ARRIVES AS A STRING — the MCP wire format packs the list into one quoted cell with backslash-escaped inner quotes and the SDK's coerce() only strips the outer pair, so a naive .forEach would throw or iterate characters; normalizeMediaUrls accepts array | JSON string | escaped-joined string | single URL. (2) pbs.twimg.com serves a DOWNSCALED file when no size is given (121KB bare vs 245KB at name=large for the same asset), so twimgSized pins name=large for the download and name=small (46KB) for picker thumbnails. (3) media_urls mixes photos with playable video (video.twimg.com/.mp4/.m3u8) — isTwitterImageUrl keeps stills and video poster frames, drops video and profile avatars. The SDK is require()'d LAZILY inside the handler, so a missing/broken dependency degrades to a 503 with a clear message instead of preventing server boot; XPOZ_API_KEY is optional and read from the environment only (never committed) — when unset, Twitter scraping reports 503 and Bluesky/page scraping keep working. Client: the scrape box now falls back to the saved Bluesky link and THEN the saved Twitter/X link (lien_internet), so most records need no pasting.
    v7.60: (throttle the thumbnail batch) Client-only. The v7.59 backfill ran jobs back-to-back with no pause; on a large run that could brush Monday's API rate limits and bloat the jobs widget. Guards added, to the BATCH (regenthumb) jobs only — interactive recrop/save/change-headshot still pump instantly: (1) a ~1.2s pause between batch jobs (BG_BATCH_THROTTLE_MS) so a big run stays well under Monday/Render limits; (2) finished batch rows are auto-removed from the widget (and their per-item toast suppressed) so the widget stays lean during a long run; (3) a 250-per-click cap on how many are queued at once — the button reappears with the remaining count when they finish, so you just click again. The queue was already global one-at-a-time (never concurrent), so this is about pacing/limits, not concurrency.

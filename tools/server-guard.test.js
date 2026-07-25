@@ -70,5 +70,10 @@ console.log('[5] v7.61 Xpoz/Twitter integration is safely wired');
   n++; if(/XPOZ_API_KEY is not set/.test(src)) console.log('  ✓ degrades with a clear message when unconfigured'); else { fails++; console.log('  ✗ no unconfigured-state message'); }
   n++; if(/client\.close\(\)/.test(src)) console.log('  ✓ client closed in finally (no leaked MCP connection)'); else { fails++; console.log('  ✗ client not closed'); } }
 
+console.log('[6] v7.63 indexed-first (forceLatest is opt-in, not default)');
+{ n++; if(/forceLatest: wantFresh/.test(src)) console.log('  \u2713 forceLatest driven by the fresh flag'); else { fails++; console.log('  \u2717 forceLatest not flag-driven'); }
+  n++; if(!/forceLatest: true/.test(src)) console.log('  \u2713 forceLatest not hardcoded true (was causing >60s timeouts)'); else { fails++; console.log('  \u2717 forceLatest hardcoded true'); }
+  n++; if(/timeoutMs: wantFresh \? 120000 : 30000/.test(src)) console.log('  \u2713 timeout budget differs per path'); else { fails++; console.log('  \u2717 timeout budget not path-aware'); } }
+
 console.log(`\n${n} assertions, ${fails} failed`);
 process.exit(fails?1:0);
