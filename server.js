@@ -611,11 +611,24 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
     const twHandle = parseTwitterHandle(input);
     if(twHandle){
       if(!XPOZ_API_KEY) return res.status(503).json({ error:'Twitter/X scraping is not configured on this server (XPOZ_API_KEY is not set).' });
-      // Loaded lazily and defensively: if the dependency is missing or broken, this endpoint
-      // degrades to a clear message instead of taking the whole server down at boot.
+      // Loaded lazily and defensively so a dependency problem degrades to a clear message instead of
+      // taking the whole server down at boot.
+      // v7.62: MUST be dynamic import(), not require(). @xpoz/xpoz's CJS build synchronously
+      // require()s @modelcontextprotocol/sdk, which is ESM-only ("type":"module") — so require()
+      // throws ERR_REQUIRE_ESM on Node 18/20 and only happens to work on Node >=22.12. import()
+      // works from CommonJS on every supported Node version. Also: report the ACTUAL error, because
+      // v7.61 assumed any failure here meant "not installed" and masked the real cause.
       let XpozClient;
-      try{ ({ XpozClient } = require('@xpoz/xpoz')); }
-      catch(e){ return res.status(503).json({ error:'Twitter/X scraping is unavailable (the @xpoz/xpoz package is not installed).' }); }
+      try{
+        ({ XpozClient } = await import('@xpoz/xpoz'));
+      }catch(e){
+        const raw=(e&&(e.code||e.message))?String(e.code||'')+' '+String(e.message||''):String(e);
+        console.error('Xpoz SDK load failed:', raw);
+        const missing=/ERR_MODULE_NOT_FOUND|Cannot find (module|package)/i.test(raw);
+        return res.status(503).json({ error: missing
+          ? 'Twitter/X scraping is unavailable — the @xpoz/xpoz package is not installed on the server.'
+          : 'Twitter/X scraping is unavailable — the Xpoz SDK failed to load: '+raw.slice(0,200) });
+      }
       let client;
       try{
         client = new XpozClient({ apiKey: XPOZ_API_KEY, timeoutMs: 60000 });

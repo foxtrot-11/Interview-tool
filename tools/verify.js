@@ -735,6 +735,8 @@ has("if(job.kind==='regenthumb') setTimeout(()=>{ try{ pumpBgJobs(); }catch(e){}
 has('const CAP=250;', 'batch capped per click');
 has('bgJobs = bgJobs.filter(j=>j!==job); renderBgJobs();', 'finished batch rows auto-cleared');
 
+/* v7.62: ESM load fix */
+has('v7.62:', 'v7.62 deploy marker present');
 /* v7.61: Twitter/X scraping (client side) */
 has('v7.61:', 'v7.61 deploy marker present');
 has("['f-dup__of_facebook','f-lien_internet']", 'fv scrape falls back to Bluesky then Twitter/X');
