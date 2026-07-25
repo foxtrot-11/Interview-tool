@@ -1021,7 +1021,7 @@
     <div id="fv-upload-section" style="display:none;margin-bottom:20px">
       <div class="scrape-row">
         <button type="button" class="fv-scrape-btn" id="scrape-btn-fv" onclick="scrapePhotos('fv')">🔎 Scrape photos</button>
-        <input type="url" id="scrape-url-fv" class="scrape-input" placeholder="Leave blank to use the saved Bluesky link, or paste a URL…">
+        <input type="url" id="scrape-url-fv" class="scrape-input" placeholder="Leave blank to use the saved Bluesky / Twitter-X link, or paste a URL…">
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap">
         <div style="flex:1;min-width:240px">
@@ -1343,7 +1343,7 @@
         <!-- PHOTO UPLOAD IN INTERVIEW -->
         <div class="scrape-row" style="margin-top:24px">
           <button type="button" class="fv-scrape-btn" id="scrape-btn-iv" onclick="scrapePhotos('iv')">🔎 Scrape photos</button>
-          <input type="url" id="scrape-url-iv" class="scrape-input" placeholder="Leave blank to use the saved Bluesky link, or paste a URL…">
+          <input type="url" id="scrape-url-iv" class="scrape-input" placeholder="Leave blank to use the saved Bluesky / Twitter-X link, or paste a URL…">
         </div>
         <div class="iv-upload-section">
           <div class="iv-upload-label">Replace Headshot → Monday</div>
@@ -1408,7 +1408,7 @@
       <div class="new-model-banner"><strong>New Model</strong>Fill in what you have. On save, this will be created in monday.com with status 2-POTENTIAL.</div>
       <div class="scrape-row" style="margin-bottom:16px">
         <button type="button" class="fv-scrape-btn" id="scrape-btn-new" onclick="scrapePhotos('new')">🔎 Scrape photos</button>
-        <input type="url" id="scrape-url-new" class="scrape-input" placeholder="Paste a Bluesky profile or a webpage with photos, then Scrape…">
+        <input type="url" id="scrape-url-new" class="scrape-input" placeholder="Paste a Bluesky or Twitter/X profile, or a webpage with photos…">
       </div>
       <div class="section active">
         <div class="section-header"><div class="section-title">New Model</div></div>
@@ -5119,12 +5119,17 @@ async function scrapePhotos(ctx){
   // written-in value would bleed into the next model. Use it transparently for this call only.
   let usingSaved = false;
   if(!url){
-    const blueskyFieldId = ctx==='fv' ? 'f-dup__of_facebook' : (ctx==='iv' ? 'ive-dup__of_facebook' : null);
-    const savedEl = blueskyFieldId ? document.getElementById(blueskyFieldId) : null;
-    const saved = savedEl ? (savedEl.value||'').trim() : '';
-    if(saved){ url = saved; usingSaved = true; }
+    // v7.61: try Bluesky first (richer public API), then fall back to the saved Twitter/X link —
+    // nearly every record has a Twitter/X handle even when the Bluesky field is empty.
+    const savedFields = ctx==='fv' ? ['f-dup__of_facebook','f-lien_internet']
+                      : (ctx==='iv' ? ['ive-dup__of_facebook','ive-lien_internet'] : []);
+    for(const fid of savedFields){
+      const el = document.getElementById(fid);
+      const saved = el ? (el.value||'').trim() : '';
+      if(saved){ url = saved; usingSaved = true; break; }
+    }
   }
-  if(!url){ showToast('Paste a URL, or add a Bluesky link to the record first','error'); return; }
+  if(!url){ showToast('Paste a URL, or add a Bluesky or Twitter/X link to the record first','error'); return; }
   const btn=document.getElementById('scrape-btn-'+ctx); btn.disabled=true; const lbl=btn.textContent; btn.textContent='Scraping…';
   try{
     const r=await fetch('/scrape-images?url='+encodeURIComponent(url),{headers:{'X-App-Auth':APP_PW}});
@@ -7118,6 +7123,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.61: (Twitter/X photo scraping via Xpoz) NOT client-only — server.js + package.json changed. The "Scrape photos" button now works on x.com / twitter.com profile links, not just Bluesky. Server: new parseTwitterHandle (x.com/twitter.com URL, /status/ URL, or bare @handle; reserved paths like /i/ and /search rejected), plus a twitter branch in /scrape-images that calls the Xpoz TypeScript SDK (getPostsByAuthor, responseType fast, limit 25, forceLatest, newest-first) and returns the same {url,thumb} shape the Bluesky path returns, so the existing picker UI is unchanged. THREE NON-OBVIOUS THINGS, each verified against the SDK source and live CDN: (1) media_urls is DECLARED string[] but ARRIVES AS A STRING — the MCP wire format packs the list into one quoted cell with backslash-escaped inner quotes and the SDK's coerce() only strips the outer pair, so a naive .forEach would throw or iterate characters; normalizeMediaUrls accepts array | JSON string | escaped-joined string | single URL. (2) pbs.twimg.com serves a DOWNSCALED file when no size is given (121KB bare vs 245KB at name=large for the same asset), so twimgSized pins name=large for the download and name=small (46KB) for picker thumbnails. (3) media_urls mixes photos with playable video (video.twimg.com/.mp4/.m3u8) — isTwitterImageUrl keeps stills and video poster frames, drops video and profile avatars. The SDK is require()'d LAZILY inside the handler, so a missing/broken dependency degrades to a 503 with a clear message instead of preventing server boot; XPOZ_API_KEY is optional and read from the environment only (never committed) — when unset, Twitter scraping reports 503 and Bluesky/page scraping keep working. Client: the scrape box now falls back to the saved Bluesky link and THEN the saved Twitter/X link (lien_internet), so most records need no pasting.
    v7.60: (throttle the thumbnail batch) Client-only. The v7.59 backfill ran jobs back-to-back with no pause; on a large run that could brush Monday's API rate limits and bloat the jobs widget. Guards added, to the BATCH (regenthumb) jobs only — interactive recrop/save/change-headshot still pump instantly: (1) a ~1.2s pause between batch jobs (BG_BATCH_THROTTLE_MS) so a big run stays well under Monday/Render limits; (2) finished batch rows are auto-removed from the widget (and their per-item toast suppressed) so the widget stays lean during a long run; (3) a 250-per-click cap on how many are queued at once — the button reappears with the remaining count when they finish, so you just click again. The queue was already global one-at-a-time (never concurrent), so this is about pacing/limits, not concurrency.
    v7.59: (batch thumbnail backfill) Client-only. Headshots changed before v7.58 had their small grid thumbnail (head med-thumb) cleared but not regenerated, so the grid loads full-res for them. New "⟳ Fix N missing thumbnails" button in the ALL MODELS toolbar (shown only when N>0): scans the store for models with a headshot but no med-thumb (m.head && !m.medHead, excluding retired/delete/evernote/duplicate), and on confirm enqueues one background "Thumbnail" job per model. Each job fetches the headshot bytes same-origin via /asset-bytes (no CORS), downscales, and uploads the thumb (setHeadMedThumb) — the full headshot asset is untouched (no rearrange). Runs through the existing queue (one at a time, cancelable while queued, widget progress); the button count drops as jobs finish. Prod-only (writes). Reuses the v7.58 completion refresh to update each tile.
    v7.58: (P1+P2 cleanup — first release that also touches server.js) NOT client-only. Dead code removed: applyHeadshotSwap + pendingHeadshotAssetId + the is-pending render/CSS branch (unreachable since v7.56 routed rechoose through recrop), refreshHeadEverywhere (zero callers), and the inert #iv/#fv-upload-progress overlay DOM (unused since the v7.44 background queue). Performance: (a) .am-tile gets content-visibility:auto + contain-intrinsic-size so off-screen grid tiles skip layout/paint — big win at ~950 tiles; (b) new O(1) modelById() index replaces 15 linear kanbanItems.find scans (rebuilt in loadKanban; array is never spliced so it stays valid; self-heals on miss); (c) recrop now regenerates the head med-thumb from the crop file instead of clearing it, so the grid keeps fast thumbnails after a recrop. Robustness: the 13 idempotent change_*column_value writes now use gqlRetry (create_item/create_subitem/delete_item deliberately stay on plain gql — retrying a non-idempotent write could double-create). Security: server.js /upload and /move-asset now validate columnId/targetColumnId against ^[a-z0-9_]+$ before interpolating into the GraphQL string (closes a minor server-side injection). No behavior changes for the user. Note: sbBuildPlan kept its inline lookup to stay pure/testable.

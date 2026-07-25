@@ -364,7 +364,7 @@ has('await Promise.allSettled(medThumbJobs)', 'extras thumbs run in parallel (v7
 has('Promise.allSettled(nmMedThumbJobs)', 'new-model extras thumbs run in parallel (Finding 3)');
 { const n2=(src.match(/clearExtraMedThumbs\(/g)||[]).length;
   (n2>=5 ? ok : bad)(`clearExtraMedThumbs still guards the flows that DO churn extras (${n2} calls; v7.40 dropped the 2 replace flows to the fast path)`, `only ${n2}`); }
-has("ctx==='fv' ? 'f-dup__of_facebook'", 'scrape falls back to saved Bluesky link when URL empty');
+has("['f-dup__of_facebook','f-lien_internet']", 'scrape falls back to saved Bluesky then Twitter/X link');
 { const btn=src.indexOf('id="scrape-btn-fv"'), inp=src.indexOf('id="scrape-url-fv"');
   (btn>0 && inp>0 && btn<inp ? ok : bad)('scrape button now left of URL field (fv)', 'button not before input'); }
 
@@ -734,6 +734,12 @@ has('BG_BATCH_THROTTLE_MS = 1200', 'batch throttle constant present');
 has("if(job.kind==='regenthumb') setTimeout(()=>{ try{ pumpBgJobs(); }catch(e){} }, BG_BATCH_THROTTLE_MS)", 'batch jobs paced; interactive jobs pump immediately');
 has('const CAP=250;', 'batch capped per click');
 has('bgJobs = bgJobs.filter(j=>j!==job); renderBgJobs();', 'finished batch rows auto-cleared');
+
+/* v7.61: Twitter/X scraping (client side) */
+has('v7.61:', 'v7.61 deploy marker present');
+has("['f-dup__of_facebook','f-lien_internet']", 'fv scrape falls back to Bluesky then Twitter/X');
+has("['ive-dup__of_facebook','ive-lien_internet']", 'iv scrape falls back to Bluesky then Twitter/X');
+has('Bluesky or Twitter/X link to the record first', 'empty-URL toast mentions both platforms');
 
 console.log(`\n${checks} checks, ${fails} failed`);
 process.exit(fails ? 1 : 0);

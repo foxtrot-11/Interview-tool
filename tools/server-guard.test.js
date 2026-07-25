@@ -59,5 +59,14 @@ console.log('[4] v7.58 columnId injection guards present');
 { n++; if(/\/\^\[a-z0-9_\]\+\$\/i\.test\(String\(columnId\)\)/.test(src)) console.log('  ✓ /upload validates columnId'); else { fails++; console.log('  ✗ /upload columnId guard missing'); }
   n++; if(/\/\^\[a-z0-9_\]\+\$\/i\.test\(String\(targetColumnId\)\)/.test(src)) console.log('  ✓ /move-asset validates targetColumnId'); else { fails++; console.log('  ✗ /move-asset targetColumnId guard missing'); } }
 
+console.log('[5] v7.61 Xpoz/Twitter integration is safely wired');
+{ n++; if(/const XPOZ_API_KEY = process\.env\.XPOZ_API_KEY/.test(src)) console.log('  ✓ key read from environment only'); else { fails++; console.log('  ✗ key not read from env'); }
+  // A hardcoded Xpoz key (xpz_... or TRIAL...) must never appear in the source.
+  n++; if(!/['"](?:xpz_|TRIAL)[A-Za-z0-9_\-]{8,}['"]/.test(src)) console.log('  ✓ no hardcoded Xpoz key committed'); else { fails++; console.log('  ✗ hardcoded Xpoz key found in source'); }
+  n++; if(/try\s*\{\s*\(\{ XpozClient \} = require\('@xpoz\/xpoz'\)\); \}/.test(src)) console.log('  ✓ SDK required lazily inside a try (cannot break boot)'); else { fails++; console.log('  ✗ SDK not lazily required'); }
+  n++; if(!/^const .*require\('@xpoz\/xpoz'\)/m.test(src)) console.log('  ✓ SDK not required at module top level'); else { fails++; console.log('  ✗ SDK required at top level'); }
+  n++; if(/XPOZ_API_KEY is not set/.test(src)) console.log('  ✓ degrades with a clear message when unconfigured'); else { fails++; console.log('  ✗ no unconfigured-state message'); }
+  n++; if(/client\.close\(\)/.test(src)) console.log('  ✓ client closed in finally (no leaked MCP connection)'); else { fails++; console.log('  ✗ client not closed'); } }
+
 console.log(`\n${n} assertions, ${fails} failed`);
 process.exit(fails?1:0);

@@ -58,6 +58,13 @@ const APP_PASSWORD = process.env.APP_PASSWORD;
 if (!APP_PASSWORD) {
   console.warn('WARNING: APP_PASSWORD is not set — all data endpoints will reject requests until it is configured.');
 }
+// v7.61: Xpoz key for Twitter/X photo scraping. OPTIONAL — everything else works without it; only
+// the twitter branch of /scrape-images needs it, and that branch reports a clear 503 when unset.
+// Set it in the host's environment (Render env vars) — never commit a key.
+const XPOZ_API_KEY = process.env.XPOZ_API_KEY;
+if (!XPOZ_API_KEY) {
+  console.warn('NOTE: XPOZ_API_KEY is not set — Twitter/X photo scraping is disabled (Bluesky and page scraping still work).');
+}
 function safeEqual(a, b) {
   const ab = Buffer.from(String(a));
   const bb = Buffer.from(String(b));
@@ -480,6 +487,62 @@ function parseBlueskyActor(input){
     return null;
   }
 }
+// ── Twitter/X (via Xpoz) ────────────────────────────────────────────────────
+// Twitter/X handle out of an x.com / twitter.com URL or a bare @handle; null if not Twitter.
+// Reserved paths (i/, home, search, ...) are rejected so a non-profile link doesn't become a handle.
+const TW_RESERVED = new Set(['i','home','search','explore','notifications','messages','settings','intent','share','hashtag','compose','login','signup','tos','privacy']);
+function parseTwitterHandle(input){
+  const s = String(input||'').trim();
+  try{
+    const u = new URL(s);
+    if(!/(^|\.)(twitter\.com|x\.com)$/i.test(u.hostname)) return null;
+    const seg = u.pathname.split('/').filter(Boolean);
+    if(!seg.length) return null;
+    const h = decodeURIComponent(seg[0]).replace(/^@/,'');
+    if(TW_RESERVED.has(h.toLowerCase())) return null;
+    return /^[A-Za-z0-9_]{1,15}$/.test(h) ? h : null;
+  }catch(e){
+    const h = s.replace(/^@/,'');
+    return /^[A-Za-z0-9_]{1,15}$/.test(h) ? h : null;
+  }
+}
+// Xpoz's media_urls is DECLARED as string[] but arrives as a STRING: the MCP wire format packs a
+// row's list into one quoted cell with backslash-escaped inner quotes, and the SDK's coerce() only
+// strips the outer pair — so you get `urlA\",\"urlB\",\"urlC`, not an array. (Verified against the
+// SDK's splitToonRow/coerce and the live CLI output.) Accept every shape: real array, JSON string,
+// escaped-quote-joined string, or a single URL — by extracting http(s) runs. Never throws.
+function normalizeMediaUrls(v){
+  const out=[]; const seen=new Set();
+  const harvest=(s)=>{
+    const str=String(s==null?'':s);
+    const m=str.match(/https?:\/\/[^\s"'\\,\]}]+/g);
+    if(m) for(const u of m){ if(!seen.has(u)){ seen.add(u); out.push(u); } }
+  };
+  if(Array.isArray(v)) v.forEach(harvest); else harvest(v);
+  return out;
+}
+// Keep still images (photos + video poster frames); drop playable video and profile avatars.
+function isTwitterImageUrl(u){
+  if(!/^https?:\/\//i.test(u)) return false;
+  if(/\.(mp4|m3u8|ts|mov|webm)(\?|$)/i.test(u)) return false;
+  if(/(^|\/\/)video\.twimg\.com/i.test(u)) return false;
+  if(/\/profile_images\//i.test(u)) return false;
+  return /pbs\.twimg\.com/i.test(u) || /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(u);
+}
+// Twitter serves a DOWNSCALED image when no size is given (verified: 121KB bare vs 245KB at
+// name=large for the same asset), which would mean cropping headshots out of half-res files.
+// Pin the size explicitly. `name=small` is used for the picker thumbnails.
+function twimgSized(u, size){
+  try{
+    const x=new URL(u);
+    if(!/pbs\.twimg\.com$/i.test(x.hostname)) return u;
+    const ext=(x.pathname.match(/\.(jpg|jpeg|png|webp)$/i)||[])[1];
+    if(ext){ x.pathname=x.pathname.replace(/\.(jpg|jpeg|png|webp)$/i,''); x.searchParams.set('format', ext.toLowerCase()==='jpeg'?'jpg':ext.toLowerCase()); }
+    x.searchParams.set('name', size);
+    return x.href;
+  }catch(e){ return u; }
+}
+
 // Up to `cap` absolute image URLs from static HTML (og:image first, then <img> src/srcset), junk filtered.
 function extractImageUrls(html, baseUrl, cap){
   cap = cap||10; const out=[]; const seen=new Set();
@@ -542,6 +605,61 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
         if(imgs.length>=10) break;
       }
       return res.json({ source:'bluesky', actor, images: imgs.slice(0,10) });
+    }
+    // v7.61: Twitter/X via Xpoz. X serves logged-out visitors a JS login wall with no real images,
+    // so the generic og:image path below finds nothing — this needs a data provider.
+    const twHandle = parseTwitterHandle(input);
+    if(twHandle){
+      if(!XPOZ_API_KEY) return res.status(503).json({ error:'Twitter/X scraping is not configured on this server (XPOZ_API_KEY is not set).' });
+      // Loaded lazily and defensively: if the dependency is missing or broken, this endpoint
+      // degrades to a clear message instead of taking the whole server down at boot.
+      let XpozClient;
+      try{ ({ XpozClient } = require('@xpoz/xpoz')); }
+      catch(e){ return res.status(503).json({ error:'Twitter/X scraping is unavailable (the @xpoz/xpoz package is not installed).' }); }
+      let client;
+      try{
+        client = new XpozClient({ apiKey: XPOZ_API_KEY, timeoutMs: 60000 });
+        await client.connect();
+        // Field names go over the wire as-is (the SDK does no case conversion), and snake_case is
+        // what the backend advertises — asking for only these keeps the response small and fast.
+        const resp = await client.twitter.getPostsByAuthor(twHandle, {
+          responseType: 'fast', limit: 25, forceLatest: true,
+          fields: ['id','created_at_date','media_urls','possibly_sensitive'],
+        });
+        const rows = (resp && resp.data) ? resp.data : (Array.isArray(resp) ? resp : []);
+        // Newest first, so a scrape reflects current photos rather than arbitrary index order.
+        rows.sort((a,b)=>String((b&&(b.createdAtDate||b.created_at_date))||'').localeCompare(String((a&&(a.createdAtDate||a.created_at_date))||'')));
+        const imgs=[]; const seen=new Set();
+        for(const row of rows){
+          const raw = row ? (row.mediaUrls!=null ? row.mediaUrls : row.media_urls) : null;
+          for(const cand of normalizeMediaUrls(raw)){
+            if(!isTwitterImageUrl(cand)) continue;
+            const full = twimgSized(cand,'large');
+            if(seen.has(full)) continue;
+            seen.add(full);
+            imgs.push({ url: full, thumb: twimgSized(cand,'small') });
+            if(imgs.length>=10) break;
+          }
+          if(imgs.length>=10) break;
+        }
+        if(!imgs.length) return res.status(404).json({ error:'No photos found for @'+twHandle+' — the account may have no image posts, be protected, or not be indexed yet.' });
+        return res.json({ source:'twitter', actor: twHandle, images: imgs });
+      }catch(e){
+        // The SDK surfaces raw MCP transport payloads; translate the common cases so the UI toast is
+        // actionable instead of a wall of JSON, and cap the fallback so nothing huge reaches the client.
+        const raw = (e && e.message) ? e.message : String(e);
+        let msg;
+        if(/authentication|token validation|unauthorized|invalid.*key/i.test(raw)) msg='the Xpoz API key was rejected — check XPOZ_API_KEY on the server.';
+        else if(/timeout|timed out|ETIMEDOUT/i.test(raw)) msg='the provider timed out. Try again in a moment.';
+        else if(/quota|credit|rate limit|429|payment|billing/i.test(raw)) msg='the Xpoz account is out of credits or rate limited.';
+        else if(/not found|no such user|unknown user/i.test(raw)) msg='that handle was not found on Twitter/X.';
+        else if(/ENOTFOUND|ECONNREFUSED|network|fetch failed/i.test(raw)) msg='could not reach the Xpoz service.';
+        else msg = raw.slice(0,200);
+        console.warn('Twitter/X scrape failed for @'+twHandle+':', raw.slice(0,500));
+        return res.status(502).json({ error:'Twitter/X scrape failed — '+msg });
+      }finally{
+        if(client){ try{ await client.close(); }catch(e){} }
+      }
     }
     const u = await assertPublicHttpUrl(input);
     const r = await safeFetch(u.href, { headers:{ 'User-Agent':'Mozilla/5.0 (compatible; CarnalTool/1.0)', 'Accept':'text/html' } });
