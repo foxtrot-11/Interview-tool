@@ -30,6 +30,27 @@
   header{flex-shrink:0;height:56px;background:rgba(13,13,15,0.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;z-index:100;position:relative}
   .logo{font-family:var(--font-display);font-weight:800;font-size:14px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);flex-shrink:0}
   .logo-img{height:26px;width:auto;display:block}
+  /* v7.67: Name QA */
+  .nq-cat{margin-bottom:22px}
+  .nq-cat-head{display:flex;align-items:center;gap:9px;margin-bottom:2px}
+  .nq-cat-title{font-family:var(--font-display);font-size:15px;font-weight:700}
+  .nq-cat-count{font-family:var(--font-mono);font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1px 8px;color:var(--text-muted)}
+  .nq-cat-blurb{font-size:11px;color:var(--text-dim);margin-bottom:9px}
+  .nq-row{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 13px;margin-bottom:9px}
+  .nq-row-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:5px}
+  .nq-item{font-family:var(--font-mono);font-size:12px;color:var(--accent,#3AA2E0);text-decoration:none}
+  .nq-item:hover{text-decoration:underline}
+  .nq-col{font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim)}
+  .nq-token{font-size:12px;color:var(--text);margin-bottom:7px}
+  .nq-token b{color:#f5c518}
+  .nq-suggs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+  .nq-sugg{font-family:var(--font-mono);font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid var(--accent,#3AA2E0);background:transparent;color:var(--accent,#3AA2E0);cursor:pointer}
+  .nq-sugg:hover{background:rgba(58,162,224,.14)}
+  .nq-score{opacity:.65}
+  .nq-nosugg{font-size:11px;color:var(--text-dim);font-style:italic}
+  .nq-field-label{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);margin-bottom:3px}
+  .nq-input{width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:12px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)}
+  .nq-orig{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-top:4px}
   .scrape-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
   /* v7.63: scrape progress. The bar is INDETERMINATE on purpose — the provider gives no progress
      signal, so an animated sweep + a real elapsed counter is honest where a fake % would not be. */
@@ -914,6 +935,7 @@
     </div>
     <button class="mode-btn kanban-btn" data-mode="kanban" onclick="setMode('kanban')">KANBAN</button>
     <button class="mode-btn dup-btn" data-mode="dup" onclick="setMode('dup')">DUPLICATES</button>
+    <button class="mode-btn dup-btn" data-mode="nameqa" onclick="setMode('nameqa')">NAME QA</button>
     <button class="mode-btn batch-btn" data-mode="batch" onclick="setMode('batch')">EVERNOTE BATCH IMPORT</button>
     <button class="mode-btn sb-btn" data-mode="sb" onclick="setMode('sb')">CASTING SANDBOX</button>
   </div>
@@ -940,6 +962,7 @@
     </optgroup>
     <option value="kanban">Kanban</option>
     <option value="dup">Duplicates</option>
+    <option value="nameqa">Name QA</option>
     <option value="batch">Evernote Batch Import</option>
     <option value="sb">Casting Sandbox</option>
   </select>
@@ -1564,6 +1587,24 @@
     </div>
 
     <!-- CASTING SANDBOX (v7.17): visual drag-to-arrange per shoot tag; share via #sb= link; port with per-column types -->
+    <div id="nameqa-view" style="display:none">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
+        <div style="font-family:var(--font-display);font-size:20px;font-weight:700">Name QA</div>
+        <button class="dup-refresh-btn" id="nq-scan-btn" onclick="nqRunScan()">⌕ Scan Content Tracker</button>
+        <label style="font-size:11px;color:var(--text-muted)">Depth
+          <select id="nq-depth" class="scrape-input" style="width:auto;padding:4px 8px;margin-left:6px">
+            <option value="2">~500 rows (fast)</option>
+            <option value="4">~1000 rows</option>
+            <option value="8">~2000 rows</option>
+            <option value="12">Everything (slow)</option>
+          </select>
+        </label>
+        <span style="font-size:11px;color:var(--text-muted)" id="nq-status"></span>
+      </div>
+      <div class="unsaved-text" style="margin-bottom:12px">Read-only audit. Compares Content Tracker character fields against Model DB names and the 12 per-site alias columns. Nothing is written — applying corrections lands in the next release.</div>
+      <div class="dup-toolbar"><input type="text" id="nq-search" class="dup-search-input" placeholder="Filter by name or item…" oninput="nqRender()" autocomplete="off"></div>
+      <div id="nq-results"></div>
+    </div>
     <div id="sb-view" style="display:none">
       <div class="sb-layout">
       <aside class="sb-side">
@@ -1774,6 +1815,7 @@
 // Board IDs default to the production boards but are overwritten at startup by
 // values fetched from /config — so staging can point at a test board with no code change.
 let MAIN_BOARD_ID  = '3636652411';
+let CONTENT_TRACKER_BOARD_ID = '1818869745';   // v7.67: Name QA target; overridden by /config on staging
 let BATCH_BOARD_ID = '18416230588';
 let BOARD_ID = MAIN_BOARD_ID;        // active board — switched by the EVERNOTE tab
 
@@ -4457,6 +4499,7 @@ async function init(){
       const cfg = await fetch('/config').then(r=>r.json());
       if(cfg && cfg.mainBoardId){ MAIN_BOARD_ID = cfg.mainBoardId; BOARD_ID = MAIN_BOARD_ID; }
       if(cfg && cfg.batchBoardId){ BATCH_BOARD_ID = cfg.batchBoardId; }
+      if(cfg && cfg.contentTrackerBoardId){ CONTENT_TRACKER_BOARD_ID = cfg.contentTrackerBoardId; }
     }catch(e){ console.warn('config fetch failed, using defaults', e); }
     injectMetricKbFields();   // metric twin columns depend on which board /config selected
     await fetchBoardDropdownOptions();
@@ -4737,6 +4780,18 @@ async function setMode(mode){
     show('am-view');
     if(kbLoadedOnce && kanbanItems.length){ renderAllModels(); } else { loadKanban(); }
     return;
+  }
+  if(mode==='nameqa'){
+    hide('selector-bar');
+    hide('candidate-strip');
+    hide('empty-state');
+    hide('full-view');
+    hide('interview-view');
+    hide('new-model-view');
+    buildSidebarNav('blank');
+    document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
+    show('nameqa-view');
+    return;   // read-only audit: the scan is human-triggered, never automatic
   }
   if(mode==='dup'){
     hide('selector-bar');
@@ -5138,15 +5193,271 @@ function startScrapeProgress(ctx, fresh){
     if(s<3)  return 'Contacting provider…';
     if(s<8)  return 'Fetching recent posts…';
     if(s<20) return 'Collecting photos…';
-    if(s<40) return 'Still working — the provider is slow right now…';
-    if(s<70) return fresh ? 'Live fetch can take a couple of minutes…' : 'Provider is slow — still waiting…';
-    return fresh ? 'Live fetch can take a couple of minutes…' : 'Almost at the limit — it may time out.';
+    if(s<45) return 'Xpoz queued the query — waiting on their job…';
+    if(s<90) return 'Their queue is busy. This can take a couple of minutes — safe to leave open.';
+    return fresh ? 'Live fetch still running…' : 'Still waiting on Xpoz — it may time out.';
   };
   const tick=()=>{ const s=Math.round((Date.now()-t0)/1000); txt.textContent=stage(s)+'  '+s+'s'; };
   tick();
   const iv=setInterval(tick,1000);
   return ()=>{ clearInterval(iv); box.classList.remove('on'); txt.textContent=''; };
 }
+/* ── NAME QA (v7.67) ─────────────────────────────────────────────────────────
+   Audits free-text character-name fields on Content Tracker against the Model DB.
+   Read-only in this release. Design constraints from the user:
+     - nothing automatic; a human triggers the scan and approves every change
+     - do NOT reconstruct or rejoin anything; just report what didn't match and
+       offer candidates, with a free-text box for the cases we get wrong
+   Paren handling is deliberately dumb: a segment is CLEAN if the whole string,
+   the text before the parens, OR the text inside the parens matches a known name.
+   That covers "Father Snow (Adam Snow)" (inner is the model) and
+   "Legrand Wolf (bottom)" (outer is the model) without deciding which is which. */
+const NQ_CT_CHAR_COLS = [
+  { id:'character_s__1__bottom_', label:'Character(s) 1 (bottom)' },
+  { id:'character_s__2__top_',    label:'Character(s) 2 (top)' },
+];
+// Model DB columns holding legitimate per-site alternate spellings. All count as correct.
+const NQ_ALIAS_COLS = ['bfs_name','texte_mkn8y1ce','fsb_name','gct_name','gbs_name','msb_name',
+  'sbs_name','texte__1','ttp_name','tct_name','bbk_name','bbs_name'];
+// Values that are not names at all.
+const NQ_IGNORE = new Set(['','n/a','na','tbd','none','solo','-','?','leave blank','new','tba','various']);
+
+function nqNormalize(s){ return String(s==null?'':s).replace(/\s+/g,' ').trim().toLowerCase(); }
+// Split a field into name-ish segments. Delimiters are preserved so the original
+// formatting can be shown back to the human unchanged.
+function nqSplitSegments(value){
+  const out=[]; const src=String(value==null?'':value);
+  const re=/\s*(,|&|\/|\+|\band\b)\s*/gi;
+  let last=0, m;
+  while((m=re.exec(src))!==null){
+    out.push({ text: src.slice(last, m.index), delim: m[0] });
+    last = m.index + m[0].length;
+  }
+  out.push({ text: src.slice(last), delim: '' });
+  return out;
+}
+// The three things we're willing to test a segment against. No cleverness beyond this.
+function nqSegmentParts(seg){
+  const t=String(seg==null?'':seg).trim();
+  const parts=[t];
+  const m=t.match(/^([^()]*)\(([^()]*)\)\s*$/);
+  if(m){ parts.push(m[1].trim()); parts.push(m[2].trim()); }
+  // strip [alumni]-style annotations for matching purposes only
+  const stripped=t.replace(/\[[^\]]*\]/g,'').trim();
+  if(stripped && stripped!==t) parts.push(stripped);
+  return parts.filter(p=>p.length>0);
+}
+function nqIsIgnorable(seg){
+  const n=nqNormalize(seg).replace(/[.]+$/,'');
+  if(NQ_IGNORE.has(n)) return true;
+  if(!/[a-z]/i.test(n)) return true;          // punctuation-only
+  return false;
+}
+function nqIsMalformed(seg){
+  const t=String(seg||'');
+  let depth=0;
+  for(const ch of t){ if(ch==='(') depth++; else if(ch===')') depth--; if(depth<0) return true; }
+  return depth!==0;
+}
+// Damerau-Levenshtein (optimal string alignment): counts a swap of two ADJACENT characters as ONE
+// edit, not two. That matters a lot here — transposition is the most common human typo and plain
+// Levenshtein under-scores it. Real example from Content Tracker: "Sean Xaiver" vs "Sean Xavier"
+// scores 0.82 under plain Levenshtein (lands in the ambiguous band) but 0.91 here (clear typo).
+function nqLev(a,b){
+  if(a===b) return 0;
+  const m=a.length, n=b.length;
+  if(!m) return n; if(!n) return m;
+  const d=[]; for(let i=0;i<=m;i++){ d[i]=new Array(n+1); d[i][0]=i; }
+  for(let j=0;j<=n;j++) d[0][j]=j;
+  for(let i=1;i<=m;i++){
+    for(let j=1;j<=n;j++){
+      const cost = a[i-1]===b[j-1] ? 0 : 1;
+      d[i][j]=Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+cost);
+      if(i>1 && j>1 && a[i-1]===b[j-2] && a[i-2]===b[j-1]) d[i][j]=Math.min(d[i][j], d[i-2][j-2]+1);
+    }
+  }
+  return d[m][n];
+}
+function nqSimilarity(a,b){
+  a=nqNormalize(a); b=nqNormalize(b);
+  if(!a||!b) return 0;
+  if(a===b) return 1;
+  return 1 - (nqLev(a,b) / Math.max(a.length, b.length));
+}
+// Top candidates for a token. Length pre-filter keeps this cheap against ~12k aliases.
+function nqSuggest(token, aliasEntries, max){
+  const t=nqNormalize(token); if(!t) return [];
+  const out=[];
+  for(const e of aliasEntries){
+    if(Math.abs(e.norm.length - t.length) > 4) continue;
+    const score=nqSimilarity(t, e.norm);
+    if(score>=0.75) out.push({ name:e.canonical, via:e.alias, score });
+  }
+  out.sort((x,y)=>y.score-x.score);
+  const seen=new Set(); const dedup=[];
+  for(const o of out){ if(seen.has(o.name)) continue; seen.add(o.name); dedup.push(o); if(dedup.length>=(max||3)) break; }
+  return dedup;
+}
+// Category is for triage/sorting only — it never changes what gets written.
+function nqCategorize(seg, best){
+  if(nqIsMalformed(seg)) return 'malformed';
+  if(/\(\s*new\s*\)\s*$/i.test(String(seg).trim())) return 'marked_new';
+  if(best && best.score>=0.90) return 'likely_typo';
+  if(best && best.score>=0.75) return 'ambiguous';
+  return 'unknown';
+}
+/* Scan one field value. Returns the segments with per-segment status so the UI can
+   show exactly which part of a messy string is unrecognised. */
+function nqScanValue(value, index){
+  const segs=nqSplitSegments(value);
+  const rows=[]; let flagged=0, caseOnly=0;
+  for(const s of segs){
+    const raw=s.text;
+    if(!raw.trim() || nqIsIgnorable(raw)){ rows.push({raw, delim:s.delim, status:'ignored'}); continue; }
+    const parts=nqSegmentParts(raw);
+    let hit=null, exactCase=false;
+    for(const p of parts){
+      const e=index.byNorm.get(nqNormalize(p));
+      if(e){ hit=e; exactCase = (p.trim()===e.canonical); break; }
+    }
+    if(hit){
+      if(!exactCase){ caseOnly++; rows.push({raw, delim:s.delim, status:'format', canonical:hit.canonical}); }
+      else rows.push({raw, delim:s.delim, status:'ok', canonical:hit.canonical});
+      continue;
+    }
+    const probe=parts[parts.length-1]||raw;
+    const sugg=nqSuggest(probe, index.entries, 3);
+    flagged++;
+    rows.push({raw, delim:s.delim, status:'flag', category:nqCategorize(raw, sugg[0]), suggestions:sugg});
+  }
+  return { segments:rows, flagged, caseOnly };
+}
+
+/* ── NAME QA: scan + render (v7.67, read-only) ───────────────────────────── */
+let nqIndex=null, nqRows=[], nqScanning=false;
+const NQ_CATS=[
+  ['likely_typo','Likely typo','Close to a known name — usually a straight fix.'],
+  ['ambiguous','Ambiguous','Close, but could genuinely be a different person. Check each one.'],
+  ['marked_new','Marked (new)','Flagged as a new performer. Probably not in the Model DB yet.'],
+  ['malformed','Malformed','Unbalanced brackets or clearly broken text. Needs a human.'],
+  ['unknown','No match','Nothing close enough to suggest. Could be new, or badly mangled.'],
+];
+function nqSetStatus(t){ const e=document.getElementById('nq-status'); if(e) e.textContent=t||''; }
+// Canonical index = Model DB primary name + the 12 per-site alias columns. Fetched on demand so
+// this never slows the app's normal boot.
+async function nqBuildIndex(onProgress){
+  const cols=JSON.stringify(NQ_ALIAS_COLS);
+  const index={ byNorm:new Map(), entries:[], models:0 };
+  let cursor=null, pages=0;
+  do{
+    const cp = cursor ? `cursor:"${cursor}"` : 'limit:500';
+    const d = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name column_values(ids:${cols}){id text}}}}}`);
+    const page = ((d.boards||[])[0]||{}).items_page || {};
+    for(const it of (page.items||[])){
+      const canonical=String(it.name||'').trim();
+      if(!canonical) continue;
+      index.models++;
+      const add=(alias)=>{
+        const a=String(alias||'').trim(); if(!a) return;
+        const norm=nqNormalize(a); if(!norm || index.byNorm.has(norm)) return;
+        const e={canonical, alias:a, norm};
+        index.byNorm.set(norm, e); index.entries.push(e);
+      };
+      add(canonical);
+      for(const cv of (it.column_values||[])) add(cv.text);
+    }
+    cursor=page.cursor; pages++;
+    if(onProgress) onProgress(index.models);
+  } while(cursor && pages<12);
+  return index;
+}
+async function nqRunScan(){
+  if(nqScanning) return;
+  nqScanning=true; nqRows=[];
+  const btn=document.getElementById('nq-scan-btn'); if(btn){ btn.disabled=true; btn.textContent='Scanning…'; }
+  document.getElementById('nq-results').innerHTML='';
+  try{
+    nqSetStatus('Building canonical name index from the Model DB…');
+    nqIndex = await nqBuildIndex(nm=>nqSetStatus('Indexing Model DB… '+nm+' models'));
+    nqSetStatus('Indexed '+nqIndex.models+' models / '+nqIndex.entries.length+' accepted spellings. Reading Content Tracker…');
+    const colIds=JSON.stringify(NQ_CT_CHAR_COLS.map(c=>c.id));
+    let cursor=null, pages=0, scanned=0;
+    const maxPages=Number(document.getElementById('nq-depth').value||2);
+    do{
+      const cp = cursor ? `cursor:"${cursor}"` : 'limit:250';
+      const d = await gqlRetry(`{boards(ids:[${CONTENT_TRACKER_BOARD_ID}]){items_page(${cp}){cursor items{id name group{title} column_values(ids:${colIds}){id text}}}}}`);
+      const page = ((d.boards||[])[0]||{}).items_page || {};
+      for(const it of (page.items||[])){
+        scanned++;
+        for(const col of NQ_CT_CHAR_COLS){
+          const cv=(it.column_values||[]).find(c=>c.id===col.id);
+          const val=cv?String(cv.text||''):'';
+          if(!val.trim()) continue;
+          const res=nqScanValue(val, nqIndex);
+          if(res.flagged>0){
+            for(const seg of res.segments){
+              if(seg.status!=='flag') continue;
+              nqRows.push({ itemId:it.id, itemName:it.name, group:(it.group||{}).title||'',
+                colId:col.id, colLabel:col.label, original:val,
+                token:seg.raw.trim(), category:seg.category, suggestions:seg.suggestions||[],
+                corrected:val, approved:false });
+            }
+          }
+        }
+      }
+      cursor=page.cursor; pages++;
+      nqSetStatus('Scanned '+scanned+' Content Tracker rows — '+nqRows.length+' items to review…');
+    } while(cursor && pages<maxPages);
+    nqSetStatus('Scanned '+scanned+' rows. '+nqRows.length+' flagged across '+new Set(nqRows.map(r=>r.itemId)).size+' items.');
+    nqRender();
+  }catch(e){
+    nqSetStatus('Scan failed: '+(e.message||e));
+  }finally{
+    nqScanning=false;
+    if(btn){ btn.disabled=false; btn.textContent='⌕ Scan Content Tracker'; }
+  }
+}
+function nqRender(){
+  const host=document.getElementById('nq-results'); if(!host) return;
+  if(!nqRows.length){ host.innerHTML='<div class="am-empty">Nothing flagged. Either everything matches, or run a deeper scan.</div>'; return; }
+  const q=nqNormalize(document.getElementById('nq-search').value||'');
+  let html='';
+  for(const [key,title,blurb] of NQ_CATS){
+    let rows=nqRows.map((r,i)=>({r,i})).filter(x=>x.r.category===key);
+    if(q) rows=rows.filter(x=>nqNormalize(x.r.token).includes(q)||nqNormalize(x.r.itemName).includes(q));
+    if(!rows.length) continue;
+    html+=`<div class="nq-cat"><div class="nq-cat-head"><span class="nq-cat-title">${escapeHtml(title)}</span><span class="nq-cat-count">${rows.length}</span></div><div class="nq-cat-blurb">${escapeHtml(blurb)}</div>`;
+    for(const {r,i} of rows){
+      const sugg=(r.suggestions||[]).map(sg=>
+        `<button type="button" class="nq-sugg" onclick="nqUseSuggestion(${i}, ${JSON.stringify(sg.name).replace(/"/g,'&quot;')})">${escapeHtml(sg.name)} <span class="nq-score">${Math.round(sg.score*100)}%</span></button>`
+      ).join('');
+      html+=`<div class="nq-row">
+        <div class="nq-row-head">
+          <a href="https://carnalmedia-team.monday.com/boards/${escapeHtml(String(CONTENT_TRACKER_BOARD_ID))}/pulses/${escapeHtml(String(r.itemId))}" target="_blank" rel="noopener" class="nq-item">${escapeHtml(r.itemName)}</a>
+          <span class="nq-col">${escapeHtml(r.colLabel)}</span>
+        </div>
+        <div class="nq-token">Unrecognised: <b>${escapeHtml(r.token)}</b></div>
+        <div class="nq-suggs">${sugg||'<span class="nq-nosugg">no candidates — type a value if you know it</span>'}</div>
+        <label class="nq-field-label">Full field value (edit freely — this is exactly what would be written)</label>
+        <input class="nq-input" id="nq-in-${i}" value="${escapeHtml(r.corrected)}" oninput="nqEdit(${i}, this.value)">
+        <div class="nq-orig">was: ${escapeHtml(r.original)}</div>
+      </div>`;
+    }
+    html+='</div>';
+  }
+  host.innerHTML = html || '<div class="am-empty">No matches for that search.</div>';
+}
+function nqEdit(i, v){ if(nqRows[i]) nqRows[i].corrected=v; }
+// Suggestions only replace the unrecognised token inside the full value; the human still sees and
+// can edit the whole field. Nothing is applied automatically.
+function nqUseSuggestion(i, name){
+  const r=nqRows[i]; if(!r) return;
+  const box=document.getElementById('nq-in-'+i);
+  const cur=box?box.value:r.corrected;
+  r.corrected = cur.split(r.token).join(name);
+  if(box) box.value=r.corrected;
+}
+
 async function scrapePhotos(ctx, fresh){
   ctx = SCRAPE_TYPES[ctx] ? ctx : 'fv';
   scrapeCtx = ctx;
@@ -5173,7 +5484,7 @@ async function scrapePhotos(ctx, fresh){
   // Hard client-side cap so a hung provider can't leave the button spinning forever. Sits above the
   // server's own budget (30s indexed / 120s live) so the server's clearer error usually wins.
   const ac=new AbortController();
-  const capMs=fresh?185000:105000;   // v7.65: above the server budget (150s live / 75s indexed) so its specific error wins
+  const capMs=fresh?290000:200000;   // v7.66: above the server budget (255s live / 165s indexed) so its specific error wins
   const capTimer=setTimeout(()=>ac.abort(), capMs);
   try{
     const r=await fetch('/scrape-images?url='+encodeURIComponent(url)+(fresh?'&fresh=1':''),{headers:{'X-App-Auth':APP_PW}, signal:ac.signal});
@@ -7175,6 +7486,8 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.67: (NAME QA tab — read-only audit, phase 1) server.js + client. New NAME QA tab (next to DUPLICATES) that audits Content Tracker's two free-text character fields against the Model DB. Human-triggered only: nothing runs on a schedule, nothing is written, and this release has NO write path at all (applying corrections is phase 2). HOW IT MATCHES: builds an index of every accepted spelling — each model's primary name plus the 12 per-site alias columns (bfs_name, fsb_name, gct_name, ...) — then splits each field on , & / + and 'and', preserving delimiters. A segment is CLEAN if the whole string, the text BEFORE parentheses, or the text INSIDE parentheses matches an accepted spelling; that handles 'Father Snow (Adam Snow)' (inner is the model) and 'Legrand Wolf (bottom)' (outer is the model) without the tool having to decide which is which — a rule the original spec got backwards, and which would otherwise have produced hundreds of false positives on the msb/cbs/ttp series. DISTANCE: Damerau-Levenshtein, not plain Levenshtein, because a transposition is the most common human typo and plain Levenshtein counts it as two edits — real example, 'Sean Xaiver' vs 'Sean Xavier' scores 0.82 plain (ambiguous band) but 0.91 here (clearly a typo). CATEGORIES for triage only, never affecting what gets written: likely typo (>=0.90), ambiguous (0.75-0.90), marked (new), malformed (unbalanced brackets), no match (<0.75, no suggestion offered). NOTHING IS RECONSTRUCTED — per the user's direction there is no auto-rejoining or auto-fixing: each flagged token shows up to 3 ranked candidates as click-to-insert chips plus a free-text box holding the entire field value, so a wrong guess is simply typed over. Depth selector (500 / 1000 / 2000 / all rows) keeps a first scan fast on the free tier. Server: CONTENT_TRACKER_BOARD_ID added to ALLOWED_BOARD_IDS, env-overridable and published via /config so staging can point at a test board with no code change.
+   v7.66: (budgets aligned to the vendor's own default) server.js + client. The v7.65 error text finally identified the mechanism: the message shown was the GENERIC timeout branch, not the DEADLINE branch, which means the SDK threw its own OperationTimeoutError from waitForResult — the ASYNC POLLING path. Reading the SDK: POLL_INTERVAL_MS is 5s and DEFAULT_TIMEOUT_MS is 300000, i.e. Xpoz's own SDK allows FIVE MINUTES because these queries are queued as background jobs that get polled, not answered inline. Every budget I set (30s, then 75s) was far below what the vendor itself expects, so we were aborting work that was still progressing — the same query completes in ~13s from a desktop when their queue is idle, and evidently much slower when it is not. Budgets now: indexed timeoutMs 150s with a 165s wall-clock deadline, live 240s/255s, client caps 200s/290s. Errors now distinguish an async-job timeout ("Xpoz accepted the query but its background job did not finish in time") from a transport hang, since those have completely different causes. Progress text is honest about the wait ("Xpoz queued the query", "safe to leave open") instead of implying imminent failure.
    v7.65: (realistic time budgets — the query was never broken, my deadline was too short) server.js + client. EVIDENCE: an A/B run of the exact same call through the CLI with the real key returned in 9.5s (--response-type fast) and 13.0s (default), both succeeding — so the query shape, the fields, the limit and the fast flag were all fine, and my leading hypothesis (that responseType:'fast' was the culprit) was WRONG. The actual problem was that v7.64 gave the indexed query a 30s budget; that is barely 2x a fast desktop's time, and Render's free tier runs at 0.1 CPU, so it overran. Budgets are now indexed connect 20s + query 75s (~5x the measured time) and live query 150s, with the client cap raised above them (105s / 185s) so the server's specific message still wins. Also trimmed the request: 'id' and 'possibly_sensitive' were requested but NEVER read, so only created_at_date (sort) and media_urls (the images) are fetched now, and limit dropped 25 -> 15 since 10 images is the hard cap — roughly 40% less to transfer and parse, which matters most on the slow free-tier CPU. Progress text no longer warns "it may time out" until the budget is actually close.
    v7.64: (the real cause of the timeouts) server.js only. TWO FINDINGS. (1) THE SDK CANNOT TIME OUT: XpozClient's timeoutMs only bounds its internal polling loop (waitForResult); the actual transport call is `await this.client.callTool(...)` with NO AbortSignal, so a backend that accepts the connection and never answers hangs forever. That is why the v7.63 30s budget never fired and the browser's 60s cap did. Xpoz's own CLI documents this and works around it with a wall-clock timeout; we now do the same, racing connect (12s), the query (30s indexed / 115s live) and even close (4s) against real deadlines, with the error naming WHICH stage expired. (2) THE PROVIDER IS INTERMITTENT: mcp.xpoz.ai returned 502 Bad Gateway after 15s and then three clean 200s in under a second, measured back to back. Those blips fail FAST, so one cheap retry recovers most of them: a single retry now fires only when the error looks like a transport blip AND the first attempt failed in under 10s (never on auth failures, never after the budget is spent, so the worst case stays inside the client cap). Gateway errors that survive the retry now say "Xpoz's service is temporarily unavailable... try again in a moment" instead of leaking raw MCP transport text. Net effect: a hung or flaky provider produces a fast, accurate, actionable message instead of a 60s spinner, and most transient failures never reach the user at all.
    v7.63: (Twitter scrape: fast path + progress feedback) server.js + client. TIMEOUT FIX: v7.61 set forceLatest:true, which makes Xpoz do a LIVE fetch and was blowing past 60s. The INDEXED path returns in seconds and already covers these accounts (the CLI test that worked used no --force-latest), so indexed is now the default; the live path is opt-in via &fresh=1 with a 120s budget vs 30s for indexed. When the index has nothing, the error now says so and the client OFFERS a live retry (asked, never automatic — it can take minutes). PROGRESS FEEDBACK: hitting Scrape used to just sit there. There is now an indeterminate progress bar plus a real elapsed-second counter and staged text under the button ("Contacting provider..." -> "Fetching recent posts..." -> "Collecting photos..." -> "Still working..."). The bar is deliberately indeterminate: a single request with no provider progress signal cannot honestly show a percentage, so it shows a sweep and the true elapsed time instead. Also added a hard client-side abort (60s indexed / 150s live) so a hung provider can't leave the button spinning forever, and the picker header now says "From Twitter/X." instead of falling back to "From the page.".

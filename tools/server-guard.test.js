@@ -21,6 +21,7 @@ const harness = [
   grabLine(/const CASTING_BOARD_ID =[^\n]+/),
   grabLine(/const CASTING_SUBITEM_BOARD_ID =[^\n]+/),
   grabLine(/const SANDBOX_SAVES_BOARD_ID =[^\n]+/),
+  grabLine(/const CONTENT_TRACKER_BOARD_ID =[^\n]+/),
   grabLine(/const ALLOWED_BOARD_IDS =[^\n]+/),
   grabLine(/const ALLOWED_QUERY_ROOTS =[^\n]+/),
   grabLine(/const ALLOWED_MUTATION_ROOTS = new Set\(\[[\s\S]*?\]\);/),
@@ -73,7 +74,7 @@ console.log('[5] v7.61 Xpoz/Twitter integration is safely wired');
 console.log('[6] v7.63 indexed-first (forceLatest is opt-in, not default)');
 { n++; if(/forceLatest: wantFresh/.test(src)) console.log('  \u2713 forceLatest driven by the fresh flag'); else { fails++; console.log('  \u2717 forceLatest not flag-driven'); }
   n++; if(!/forceLatest: true/.test(src)) console.log('  \u2713 forceLatest not hardcoded true (was causing >60s timeouts)'); else { fails++; console.log('  \u2717 forceLatest hardcoded true'); }
-  n++; if(/timeoutMs: wantFresh \? 145000 : 70000/.test(src)) console.log('  \u2713 timeout budget differs per path'); else { fails++; console.log('  \u2717 timeout budget not path-aware'); } }
+  n++; if(/timeoutMs: wantFresh \? 240000 : 150000/.test(src)) console.log('  \u2713 timeout budget differs per path'); else { fails++; console.log('  \u2717 timeout budget not path-aware'); } }
 
 console.log('[7] v7.64 wall-clock deadlines + transient retry (SDK timeoutMs does NOT bound the transport)');
 { n++; if(/const withDeadline = /.test(src)) console.log('  \u2713 wall-clock deadline helper present'); else { fails++; console.log('  \u2717 no deadline helper'); }
@@ -84,9 +85,17 @@ console.log('[7] v7.64 wall-clock deadlines + transient retry (SDK timeoutMs doe
   n++; if(/!\/authentication\|token validation\|unauthorized\/i\.test\(m\)/.test(src)) console.log('  \u2713 auth failures are NOT retried'); else { fails++; console.log('  \u2717 auth failures may be retried'); } }
 
 console.log('[8] v7.65 realistic budgets + trimmed payload');
-{ n++; if(/wantFresh \? 150000 : 75000, 'query'/.test(src)) console.log('  \u2713 query budget ~5x measured time'); else { fails++; console.log('  \u2717 query budget not raised'); }
+{ n++; if(/wantFresh \? 255000 : 165000, 'query'/.test(src)) console.log('  \u2713 query budget ~5x measured time'); else { fails++; console.log('  \u2717 query budget not raised'); }
   n++; if(/fields: \['created_at_date','media_urls'\]/.test(src)) console.log('  \u2713 only the fields actually used are requested'); else { fails++; console.log('  \u2717 unused fields still requested'); }
   n++; if(/limit: 15/.test(src)) console.log('  \u2713 limit trimmed to 15'); else { fails++; console.log('  \u2717 limit not trimmed'); } }
+
+console.log('[9] v7.66 async-operation timeout is distinguished from a transport hang');
+{ n++; if(/Operation \.\* timed out after/.test(src)) console.log('  \u2713 async-job timeout has its own message'); else { fails++; console.log('  \u2717 async-job timeout not distinguished'); } }
+
+console.log('[10] v7.67 Content Tracker is allow-listed and env-overridable');
+{ n++; if(/CONTENT_TRACKER_BOARD_ID = process\.env\.CONTENT_TRACKER_BOARD_ID/.test(src)) console.log('  \u2713 CT board id is env-overridable (staging can point elsewhere)'); else { fails++; console.log('  \u2717 CT board id not env-overridable'); }
+  n++; if(/ALLOWED_BOARD_IDS = new Set\(\[[^\]]*CONTENT_TRACKER_BOARD_ID/.test(src)) console.log('  \u2713 CT added to the board allow-list'); else { fails++; console.log('  \u2717 CT not in allow-list'); }
+  n++; if(/contentTrackerBoardId: CONTENT_TRACKER_BOARD_ID/.test(src)) console.log('  \u2713 CT id exposed to the client via /config'); else { fails++; console.log('  \u2717 CT id not exposed via /config'); } }
 
 console.log(`\n${n} assertions, ${fails} failed`);
 process.exit(fails?1:0);

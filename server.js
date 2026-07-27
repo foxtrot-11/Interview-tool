@@ -111,6 +111,9 @@ const authLimiter = rateLimit({
 // so production behaves identically whether or not the vars are set.
 const MAIN_BOARD_ID  = process.env.MAIN_BOARD_ID  || '3636652411';
 const BATCH_BOARD_ID = process.env.BATCH_BOARD_ID || '18416230588';
+// v7.67: Content Tracker, for the NAME QA audit. Env-overridable so staging can point at the test
+// copy. READ-ONLY in this release — the tab has no write path yet.
+const CONTENT_TRACKER_BOARD_ID = process.env.CONTENT_TRACKER_BOARD_ID || '1818869745';
 // v7.14: the Port-to-Casting feature reads the CASTING PRIORITY STACK and links models
 // into its subitem board. These two IDs are the same in every environment (there is no
 // staging casting board), so they are allow-listed unconditionally. Note the MODEL NAME
@@ -121,7 +124,7 @@ const CASTING_SUBITEM_BOARD_ID = '8533133826';
 // column). Same id in every environment (saves are app data, not per-environment), so unconditional.
 // Only needs reads (boards/items) + create_item, both already in the root allow-lists.
 const SANDBOX_SAVES_BOARD_ID = '18420711215';
-const ALLOWED_BOARD_IDS = new Set([MAIN_BOARD_ID, BATCH_BOARD_ID, CASTING_BOARD_ID, CASTING_SUBITEM_BOARD_ID, SANDBOX_SAVES_BOARD_ID]); // whichever boards this environment uses + casting stack + sandbox saves
+const ALLOWED_BOARD_IDS = new Set([MAIN_BOARD_ID, BATCH_BOARD_ID, CASTING_BOARD_ID, CASTING_SUBITEM_BOARD_ID, SANDBOX_SAVES_BOARD_ID, CONTENT_TRACKER_BOARD_ID]); // whichever boards this environment uses + casting stack + sandbox saves
 const ALLOWED_QUERY_ROOTS = new Set(['boards', 'items', 'assets']);
 const ALLOWED_MUTATION_ROOTS = new Set([
   'change_multiple_column_values',
@@ -222,7 +225,7 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 // board IDs from here on startup. Production returns the real IDs; staging returns
 // the test board. No secrets here — just board IDs.
 app.get('/config', (_req, res) => {
-  res.json({ mainBoardId: MAIN_BOARD_ID, batchBoardId: BATCH_BOARD_ID });
+  res.json({ mainBoardId: MAIN_BOARD_ID, batchBoardId: BATCH_BOARD_ID, contentTrackerBoardId: CONTENT_TRACKER_BOARD_ID });
 });
 
 // Relay GraphQL queries/mutations to monday, attaching the token server-side.
@@ -656,7 +659,7 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
       const wantFresh = /^(1|true|yes)$/i.test(String(req.query.fresh||''));
       // One attempt = fresh client + connect + query. Retried once on a fast transient failure.
       const attempt = async () => {
-        client = new XpozClient({ apiKey: XPOZ_API_KEY, timeoutMs: wantFresh ? 145000 : 70000 });
+        client = new XpozClient({ apiKey: XPOZ_API_KEY, timeoutMs: wantFresh ? 240000 : 150000 });
         const tConnect = Date.now();
         await withDeadline(client.connect(), 20000, 'connect');
         console.log('Xpoz connect ok in '+(Date.now()-tConnect)+'ms (@'+twHandle+', fresh='+wantFresh+')');
@@ -666,7 +669,7 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
         const out = await withDeadline(client.twitter.getPostsByAuthor(twHandle, {
           responseType: 'fast', limit: 15, forceLatest: wantFresh,
           fields: ['created_at_date','media_urls'],
-        }), wantFresh ? 150000 : 75000, 'query');
+        }), wantFresh ? 255000 : 165000, 'query');
         console.log('Xpoz query ok in '+(Date.now()-tQuery)+'ms (@'+twHandle+')');
         return out;
       };
@@ -708,10 +711,11 @@ app.get('/scrape-images', dataLimiter, requireAuth, async (req, res) => {
         // actionable instead of a wall of JSON, and cap the fallback so nothing huge reaches the client.
         const raw = (e && e.message) ? e.message : String(e);
         let msg;
-        if(/^DEADLINE:connect/.test(raw)) msg='could not establish a connection to Xpoz within 20s (the provider accepted the connection but never answered).';
+        if(/Operation .* timed out after/i.test(raw)) msg='Xpoz accepted the query but its background job did not finish in time ('+raw.replace(/^.*timed out after\s*/i,'').slice(0,12)+'). Their queue is busy — the same query returns in ~13s when it is not. Try again shortly.';
+        else if(/^DEADLINE:connect/.test(raw)) msg='could not establish a connection to Xpoz within 20s (the provider accepted the connection but never answered).';
         else if(/^DEADLINE:query/.test(raw)) msg = wantFresh
           ? 'the live fetch exceeded its time budget. Try again, or scrape without Force refresh.'
-          : 'Xpoz did not return results within 75s. Their service is intermittent — try again in a moment.';
+          : 'Xpoz did not return results within 165s. Their service is intermittent — try again in a moment.';
         else if(/authentication|token validation|unauthorized|invalid.*key/i.test(raw)) msg='the Xpoz API key was rejected — check XPOZ_API_KEY on the server.';
         else if(/timeout|timed out|ETIMEDOUT/i.test(raw)) msg = wantFresh
           ? 'the live fetch timed out (that path is slow). Try again, or scrape without Force refresh.'

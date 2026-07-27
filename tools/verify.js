@@ -735,9 +735,21 @@ has("if(job.kind==='regenthumb') setTimeout(()=>{ try{ pumpBgJobs(); }catch(e){}
 has('const CAP=250;', 'batch capped per click');
 has('bgJobs = bgJobs.filter(j=>j!==job); renderBgJobs();', 'finished batch rows auto-cleared');
 
+/* v7.67: Name QA tab (read-only audit) */
+has('v7.67:', 'v7.67 deploy marker present');
+has('id="nameqa-view"', 'name qa view present');
+has("data-mode=\"nameqa\"", 'name qa nav tab present');
+has("mode==='nameqa'", 'setMode handles nameqa');
+has('function nqRunScan(', 'scan is a human-triggered function');
+has('function nqScanValue(', 'scan engine present');
+has('function nqUseSuggestion(', 'suggestions are click-to-apply into an editable field');
+has('let CONTENT_TRACKER_BOARD_ID', 'CT board id is env-overridable via /config');
+lacks('nqApply', 'v7.67 has NO write path (read-only phase)');
+/* v7.66: budgets aligned to vendor default */
+has('v7.66:', 'v7.66 deploy marker present');
+has('capMs=fresh?290000:200000', 'client cap above server budget');
 /* v7.65: realistic budgets */
 has('v7.65:', 'v7.65 deploy marker present');
-has('capMs=fresh?185000:105000', 'client cap sits above the server budget');
 /* v7.64: wall-clock deadlines */
 has('v7.64:', 'v7.64 deploy marker present');
 /* v7.63: scrape progress + index-first */
