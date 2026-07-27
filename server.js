@@ -112,7 +112,8 @@ const authLimiter = rateLimit({
 const MAIN_BOARD_ID  = process.env.MAIN_BOARD_ID  || '3636652411';
 const BATCH_BOARD_ID = process.env.BATCH_BOARD_ID || '18416230588';
 // v7.67: Content Tracker, for the NAME QA audit. Env-overridable so staging can point at the test
-// copy. READ-ONLY in this release — the tab has no write path yet.
+// copy. v7.68 added a real write path (change_simple_column_value, one row at a time, human-
+// triggered) — both mutation roots were already allow-listed below, so no guard change was needed.
 const CONTENT_TRACKER_BOARD_ID = process.env.CONTENT_TRACKER_BOARD_ID || '1818869745';
 // v7.14: the Port-to-Casting feature reads the CASTING PRIORITY STACK and links models
 // into its subitem board. These two IDs are the same in every environment (there is no

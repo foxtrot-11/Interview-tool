@@ -37,20 +37,41 @@
   .nq-cat-count{font-family:var(--font-mono);font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1px 8px;color:var(--text-muted)}
   .nq-cat-blurb{font-size:11px;color:var(--text-dim);margin-bottom:9px}
   .nq-row{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 13px;margin-bottom:9px}
-  .nq-row-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:5px}
+  .nq-row.nq-row-sent{opacity:.6}
+  .nq-current{font-size:14px;color:var(--text);margin-bottom:3px}
+  .nq-current b{color:#f5c518;font-family:var(--font-mono)}
+  .nq-row-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:9px}
   .nq-item{font-family:var(--font-mono);font-size:12px;color:var(--accent,#3AA2E0);text-decoration:none}
   .nq-item:hover{text-decoration:underline}
   .nq-col{font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim)}
-  .nq-token{font-size:12px;color:var(--text);margin-bottom:7px}
-  .nq-token b{color:#f5c518}
-  .nq-suggs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
-  .nq-sugg{font-family:var(--font-mono);font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid var(--accent,#3AA2E0);background:transparent;color:var(--accent,#3AA2E0);cursor:pointer}
-  .nq-sugg:hover{background:rgba(58,162,224,.14)}
+  .nq-cands{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:9px}
+  .nq-cand{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px 6px 6px}
+  .nq-cand-arrow{color:var(--text-dim);font-size:14px}
+  .nq-cand-thumb{width:40px;height:40px;border-radius:5px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+  .nq-cand-thumb:hover{outline:2px solid var(--accent,#3AA2E0)}
+  .nq-cand-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .nq-cand-thumb .nq-mono{font-family:var(--font-mono);font-size:15px;color:var(--text-muted)}
+  .nq-cand-pick{font-family:var(--font-mono);font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid var(--accent,#3AA2E0);background:transparent;color:var(--accent,#3AA2E0);cursor:pointer}
+  .nq-cand-pick:hover{background:rgba(58,162,224,.14)}
+  .nq-cand-pick.nq-picked{background:var(--accent,#3AA2E0);color:#0d0d0f}
   .nq-score{opacity:.65}
-  .nq-nosugg{font-size:11px;color:var(--text-dim);font-style:italic}
+  .nq-nosugg{font-size:11px;color:var(--text-dim);font-style:italic;margin-bottom:9px}
+  .nq-manual{border-top:1px dashed var(--border);padding-top:9px;margin-bottom:7px}
+  .nq-manual-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);margin-bottom:6px}
+  .nq-manual-toggle input[disabled]{cursor:not-allowed}
   .nq-field-label{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);margin-bottom:3px}
   .nq-input{width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:12px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)}
+  .nq-input[disabled]{color:var(--text-dim);background:var(--surface2)}
   .nq-orig{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-top:4px}
+  .nq-send-row{display:flex;align-items:center;gap:10px;margin-top:9px;flex-wrap:wrap}
+  .nq-send-btn{font-family:var(--font-mono);font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid var(--success,#4ade80);background:transparent;color:var(--success,#4ade80);cursor:pointer}
+  .nq-send-btn:hover:not(:disabled){background:rgba(74,222,128,.14)}
+  .nq-send-btn:disabled{opacity:.4;cursor:not-allowed;border-color:var(--border);color:var(--text-dim)}
+  .nq-send-status{font-size:11px;color:var(--text-muted)}
+  .nq-send-status a{color:var(--accent,#3AA2E0)}
+  .nq-badge{font-family:var(--font-mono);font-size:10px;letter-spacing:.04em;text-transform:uppercase;border-radius:10px;padding:2px 8px}
+  .nq-badge-matched{background:rgba(74,222,128,.16);color:var(--success,#4ade80)}
+  .nq-badge-manual{background:rgba(250,204,21,.16);color:var(--warning,#facc15)}
   .scrape-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
   /* v7.63: scrape progress. The bar is INDETERMINATE on purpose — the provider gives no progress
      signal, so an animated sweep + a real elapsed counter is honest where a fake % would not be. */
@@ -1601,7 +1622,7 @@
         </label>
         <span style="font-size:11px;color:var(--text-muted)" id="nq-status"></span>
       </div>
-      <div class="unsaved-text" style="margin-bottom:12px">Read-only audit. Compares Content Tracker character fields against Model DB names and the 12 per-site alias columns. Nothing is written — applying corrections lands in the next release.</div>
+      <div class="unsaved-text" style="margin-bottom:12px">Compares Content Tracker character fields against Model DB names and the 12 per-site alias columns. Suggestions only ever come from a real profile in the Model DB — click a candidate's thumbnail to open its editor and verify before sending. Nothing is written until you press Send to Monday on that row, and every send is logged.</div>
       <div class="dup-toolbar"><input type="text" id="nq-search" class="dup-search-input" placeholder="Filter by name or item…" oninput="nqRender()" autocomplete="off"></div>
       <div id="nq-results"></div>
     </div>
@@ -5202,16 +5223,30 @@ function startScrapeProgress(ctx, fresh){
   const iv=setInterval(tick,1000);
   return ()=>{ clearInterval(iv); box.classList.remove('on'); txt.textContent=''; };
 }
-/* ── NAME QA (v7.67) ─────────────────────────────────────────────────────────
+/* ── NAME QA (v7.67 read-only scan; v7.68 adds the Send-to-Monday write path) ─
    Audits free-text character-name fields on Content Tracker against the Model DB.
-   Read-only in this release. Design constraints from the user:
-     - nothing automatic; a human triggers the scan and approves every change
-     - do NOT reconstruct or rejoin anything; just report what didn't match and
-       offer candidates, with a free-text box for the cases we get wrong
+   Design constraints from the user, still true in v7.68:
+     - nothing automatic; a human triggers the scan and approves every change,
+       one row at a time — there is no bulk-apply button
+     - do NOT reconstruct or rejoin anything; suggestions only ever come from a
+       real Model DB profile, never guessed text. Manual free-text entry exists
+       ONLY for rows with no reference profile at all (malformed or no-match),
+       is disabled by default, and requires an explicit checkbox to enable —
+       and every row sent that way is tagged MANUAL, distinct from a verified
+       profile match, in both the UI and the audit log.
+     - every send writes ONLY to Content Tracker (never the team boards
+       directly — the sync Worker documented in CLAUDE.md §6 re-pushes CT's
+       fields downstream, so writing anywhere else would just get reverted),
+       and is logged as a comment on the shared audit-log pulse (NQ_LOG_ITEM_ID
+       below) so there's a record independent of the CT rows themselves.
    Paren handling is deliberately dumb: a segment is CLEAN if the whole string,
    the text before the parens, OR the text inside the parens matches a known name.
    That covers "Father Snow (Adam Snow)" (inner is the model) and
    "Legrand Wolf (bottom)" (outer is the model) without deciding which is which. */
+// Shared running audit log for every Name QA send, regardless of environment — a single
+// pulse's comment thread, NOT a Content Tracker row. Lives on the automations-doc board
+// (18420756667) so it survives even if the CT row it refers to gets resynced/overwritten.
+const NQ_LOG_ITEM_ID = '12641815147';
 const NQ_CT_CHAR_COLS = [
   { id:'character_s__1__bottom_', label:'Character(s) 1 (bottom)' },
   { id:'character_s__2__top_',    label:'Character(s) 2 (top)' },
@@ -5291,11 +5326,18 @@ function nqSuggest(token, aliasEntries, max){
   for(const e of aliasEntries){
     if(Math.abs(e.norm.length - t.length) > 4) continue;
     const score=nqSimilarity(t, e.norm);
-    if(score>=0.75) out.push({ name:e.canonical, via:e.alias, score });
+    if(score>=0.75) out.push({ name:e.canonical, via:e.alias, score, id:e.id, headAsset:e.headAsset });
   }
   out.sort((x,y)=>y.score-x.score);
+  // Dedup by profile id, not name — two different models can share a spelling, and each
+  // needs to surface as its own candidate (with its own thumbnail) so a human can tell them
+  // apart. Falls back to deduping by name when no id is present (e.g. the unit-test fixture
+  // index, which doesn't model real Model DB ids) — same behavior as before this change.
   const seen=new Set(); const dedup=[];
-  for(const o of out){ if(seen.has(o.name)) continue; seen.add(o.name); dedup.push(o); if(dedup.length>=(max||3)) break; }
+  for(const o of out){
+    const key = o.id!=null ? ('id:'+o.id) : ('name:'+o.name);
+    if(seen.has(key)) continue; seen.add(key); dedup.push(o); if(dedup.length>=(max||3)) break;
+  }
   return dedup;
 }
 // Category is for triage/sorting only — it never changes what gets written.
@@ -5346,25 +5388,46 @@ function nqSetStatus(t){ const e=document.getElementById('nq-status'); if(e) e.t
 // Canonical index = Model DB primary name + the 12 per-site alias columns. Fetched on demand so
 // this never slows the app's normal boot.
 async function nqBuildIndex(onProgress){
-  const cols=JSON.stringify(NQ_ALIAS_COLS);
+  // v7.68: also pull each model's headshot so a flagged row can show a thumbnail per
+  // candidate profile — the "could be a different Alex Smith" check the human needs to do
+  // visually. Small backfilled med-thumb preferred over the full headshot (same precedence
+  // as every other grid in this app — see gridImgAsset()).
+  const medCol = medHeadCol();
+  const fileCols = [medCol, 'files_mkncw5nm'].filter(Boolean);
+  const cols=JSON.stringify(NQ_ALIAS_COLS.concat(fileCols));
   const index={ byNorm:new Map(), entries:[], models:0 };
+  const readFileAsset=(cv,colId)=>{
+    const c=cv[colId]; if(!c || !c.value) return null;
+    try{ const v=JSON.parse(c.value); return (v&&v.files&&v.files.length)?v.files[0].assetId:null; }catch(e){ return null; }
+  };
   let cursor=null, pages=0;
   do{
     const cp = cursor ? `cursor:"${cursor}"` : 'limit:500';
-    const d = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name column_values(ids:${cols}){id text}}}}}`);
+    const d = await gqlRetry(`{boards(ids:[${MAIN_BOARD_ID}]){items_page(${cp}){cursor items{id name column_values(ids:${cols}){id text value}}}}}`);
     const page = ((d.boards||[])[0]||{}).items_page || {};
     for(const it of (page.items||[])){
       const canonical=String(it.name||'').trim();
       if(!canonical) continue;
       index.models++;
+      const cv={}; (it.column_values||[]).forEach(c=>{ cv[c.id]=c; });
+      let headAsset = medCol ? readFileAsset(cv, medCol) : null;
+      if(!headAsset) headAsset = readFileAsset(cv, 'files_mkncw5nm');
+      // v7.68: entries are NOT deduped by normalized name here — two different models can
+      // legitimately share a spelling (the "Alex Smith" case), and Name QA needs to surface
+      // both as separate candidates, each with its own id + thumbnail, not silently collapse
+      // to whichever one happened to be indexed first. `byNorm` (the fast "is this segment
+      // already an exact known spelling" lookup used by nqScanValue) keeps first-wins
+      // semantics unchanged — that path is about a segment matching cleanly, not about
+      // choosing between ambiguous candidates.
       const add=(alias)=>{
         const a=String(alias||'').trim(); if(!a) return;
-        const norm=nqNormalize(a); if(!norm || index.byNorm.has(norm)) return;
-        const e={canonical, alias:a, norm};
-        index.byNorm.set(norm, e); index.entries.push(e);
+        const norm=nqNormalize(a); if(!norm) return;
+        const e={ id:it.id, canonical, alias:a, norm, headAsset };
+        if(!index.byNorm.has(norm)) index.byNorm.set(norm, e);
+        index.entries.push(e);
       };
       add(canonical);
-      for(const cv of (it.column_values||[])) add(cv.text);
+      for(const aliasCol of NQ_ALIAS_COLS){ if(cv[aliasCol]) add(cv[aliasCol].text); }
     }
     cursor=page.cursor; pages++;
     if(onProgress) onProgress(index.models);
@@ -5400,7 +5463,8 @@ async function nqRunScan(){
               nqRows.push({ itemId:it.id, itemName:it.name, group:(it.group||{}).title||'',
                 colId:col.id, colLabel:col.label, original:val,
                 token:seg.raw.trim(), category:seg.category, suggestions:seg.suggestions||[],
-                corrected:val, approved:false });
+                corrected:val, manualOn:false, chosenId:null, chosenName:null,
+                resolutionType:null, sent:false, sentAt:null });
             }
           }
         }
@@ -5408,6 +5472,11 @@ async function nqRunScan(){
       cursor=page.cursor; pages++;
       nqSetStatus('Scanned '+scanned+' Content Tracker rows — '+nqRows.length+' items to review…');
     } while(cursor && pages<maxPages);
+    nqSetStatus('Scanned '+scanned+' rows. '+nqRows.length+' flagged across '+new Set(nqRows.map(r=>r.itemId)).size+' items. Loading thumbnails…');
+    // Pre-fetch every candidate's headshot in one batch so thumbnails are ready before the
+    // human even scrolls to them (same shared cache/fetcher the kanban and dup views use).
+    const headIds=[...new Set(nqRows.flatMap(r=>(r.suggestions||[]).map(sg=>sg.headAsset).filter(Boolean)))];
+    if(headIds.length) await fetchAssetUrls(headIds);
     nqSetStatus('Scanned '+scanned+' rows. '+nqRows.length+' flagged across '+new Set(nqRows.map(r=>r.itemId)).size+' items.');
     nqRender();
   }catch(e){
@@ -5416,6 +5485,21 @@ async function nqRunScan(){
     nqScanning=false;
     if(btn){ btn.disabled=false; btn.textContent='⌕ Scan Content Tracker'; }
   }
+}
+// A row's thumbnail: cached headshot if we have one, otherwise an initial-letter badge —
+// same fallback pattern as kanban cards (kanbanCardHtml).
+function nqCandThumbHtml(sg){
+  const url = sg.headAsset ? kbHeadCache[sg.headAsset] : null;
+  if(url) return `<img loading="lazy" src="${escapeHtml(url)}" alt="">`;
+  const initial=escapeHtml((sg.name||'?').trim().charAt(0).toUpperCase()||'?');
+  return `<span class="nq-mono">${initial}</span>`;
+}
+function nqCanSend(r){
+  if(!r || r.sent) return false;
+  if(!r.corrected || r.corrected===r.original) return false;
+  if(r.resolutionType==='matched') return !!r.chosenId;
+  if(r.resolutionType==='manual') return r.manualOn && r.corrected.trim().length>0;
+  return false;
 }
 function nqRender(){
   const host=document.getElementById('nq-results'); if(!host) return;
@@ -5428,34 +5512,99 @@ function nqRender(){
     if(!rows.length) continue;
     html+=`<div class="nq-cat"><div class="nq-cat-head"><span class="nq-cat-title">${escapeHtml(title)}</span><span class="nq-cat-count">${rows.length}</span></div><div class="nq-cat-blurb">${escapeHtml(blurb)}</div>`;
     for(const {r,i} of rows){
-      const sugg=(r.suggestions||[]).map(sg=>
-        `<button type="button" class="nq-sugg" onclick="nqUseSuggestion(${i}, ${JSON.stringify(sg.name).replace(/"/g,'&quot;')})">${escapeHtml(sg.name)} <span class="nq-score">${Math.round(sg.score*100)}%</span></button>`
-      ).join('');
-      html+=`<div class="nq-row">
+      const hasSuggestions = (r.suggestions||[]).length>0;
+      const cands = (r.suggestions||[]).map((sg,sIdx)=>{
+        const picked = r.resolutionType==='matched' && r.chosenId===sg.id;
+        return `<div class="nq-cand">
+          <span class="nq-cand-arrow">→</span>
+          <div class="nq-cand-thumb" onclick="openKanbanModal('${escapeHtml(String(sg.id))}')" title="Open this profile's editor to verify">${nqCandThumbHtml(sg)}</div>
+          <button type="button" class="nq-cand-pick${picked?' nq-picked':''}" onclick="nqUseSuggestion(${i}, ${sIdx})">${escapeHtml(sg.name)} <span class="nq-score">${Math.round(sg.score*100)}%</span></button>
+        </div>`;
+      }).join('');
+      const badge = r.sent
+        ? `<span class="nq-badge ${r.resolutionType==='manual'?'nq-badge-manual':'nq-badge-matched'}">${r.resolutionType==='manual'?'Manual':'Matched'}</span>`
+        : '';
+      const manualDisabled = hasSuggestions; // manual is ONLY for rows with no reference profile at all
+      const sendStatus = r.sent
+        ? `✓ Sent — <a href="https://carnalmedia-team.monday.com/boards/${escapeHtml(String(CONTENT_TRACKER_BOARD_ID))}/pulses/${escapeHtml(String(r.itemId))}" target="_blank" rel="noopener">pulse ${escapeHtml(String(r.itemId))}</a>`
+        : '';
+      html+=`<div class="nq-row${r.sent?' nq-row-sent':''}">
+        <div class="nq-current">Current: <b>${escapeHtml(r.token)}</b> ${badge}</div>
         <div class="nq-row-head">
           <a href="https://carnalmedia-team.monday.com/boards/${escapeHtml(String(CONTENT_TRACKER_BOARD_ID))}/pulses/${escapeHtml(String(r.itemId))}" target="_blank" rel="noopener" class="nq-item">${escapeHtml(r.itemName)}</a>
           <span class="nq-col">${escapeHtml(r.colLabel)}</span>
         </div>
-        <div class="nq-token">Unrecognised: <b>${escapeHtml(r.token)}</b></div>
-        <div class="nq-suggs">${sugg||'<span class="nq-nosugg">no candidates — type a value if you know it</span>'}</div>
-        <label class="nq-field-label">Full field value (edit freely — this is exactly what would be written)</label>
-        <input class="nq-input" id="nq-in-${i}" value="${escapeHtml(r.corrected)}" oninput="nqEdit(${i}, this.value)">
+        ${cands || '<div class="nq-nosugg">No matching profile in the Model DB — check the box below to enter one manually.</div>'}
+        <div class="nq-manual">
+          <label class="nq-manual-toggle">
+            <input type="checkbox" id="nq-man-${i}" ${manualDisabled?'disabled':''} ${r.manualOn?'checked':''} onchange="nqToggleManual(${i}, this.checked)">
+            Enable manual entry ${manualDisabled?'(only available when no profile matches above)':'— no reference profile exists for this one'}
+          </label>
+          <label class="nq-field-label">Full field value${r.resolutionType==='matched'?' (set from the profile you picked above)':''}</label>
+          <input class="nq-input" id="nq-in-${i}" value="${escapeHtml(r.corrected)}" ${(r.manualOn && !r.sent)?'':'disabled'} oninput="nqEdit(${i}, this.value)">
+        </div>
         <div class="nq-orig">was: ${escapeHtml(r.original)}</div>
+        <div class="nq-send-row">
+          <button type="button" class="nq-send-btn" id="nq-send-btn-${i}" ${nqCanSend(r)?'':'disabled'} onclick="nqSendToMonday(${i})">Send to Monday</button>
+          <span class="nq-send-status" id="nq-send-status-${i}">${sendStatus}</span>
+        </div>
       </div>`;
     }
     html+='</div>';
   }
   host.innerHTML = html || '<div class="am-empty">No matches for that search.</div>';
 }
-function nqEdit(i, v){ if(nqRows[i]) nqRows[i].corrected=v; }
-// Suggestions only replace the unrecognised token inside the full value; the human still sees and
-// can edit the whole field. Nothing is applied automatically.
-function nqUseSuggestion(i, name){
+function nqEdit(i, v){
   const r=nqRows[i]; if(!r) return;
+  r.corrected=v;
+  // Free typing after picking a suggestion means the human is overriding it by hand — don't
+  // leave a stale "Matched" badge/id pointing at a profile that no longer matches the text.
+  if(r.resolutionType==='matched'){ r.resolutionType = r.manualOn ? 'manual' : null; r.chosenId=null; r.chosenName=null; }
+  const btn=document.getElementById('nq-send-btn-'+i); if(btn) btn.disabled=!nqCanSend(r);
+}
+function nqToggleManual(i, checked){
+  const r=nqRows[i]; if(!r) return;
+  r.manualOn = checked;
+  r.resolutionType = checked ? 'manual' : null;
+  nqRender();
+}
+// Picking a candidate replaces the unrecognised token inside the full field value with that
+// EXACT profile's name — never free text — and records which profile id was chosen so the
+// audit log and the write-back both know precisely which model this was verified against.
+function nqUseSuggestion(i, sIdx){
+  const r=nqRows[i]; if(!r) return;
+  const sg=(r.suggestions||[])[sIdx]; if(!sg) return;
   const box=document.getElementById('nq-in-'+i);
   const cur=box?box.value:r.corrected;
-  r.corrected = cur.split(r.token).join(name);
-  if(box) box.value=r.corrected;
+  r.corrected = cur.split(r.token).join(sg.name);
+  r.resolutionType='matched'; r.chosenId=sg.id; r.chosenName=sg.name; r.manualOn=false;
+  nqRender();
+}
+// Writes the corrected value to Content Tracker ONLY (never the team boards — see the header
+// comment on why), then best-effort logs original → new on the shared audit pulse. The log
+// call is wrapped separately so a failed comment never hides that the real write succeeded.
+async function nqSendToMonday(i){
+  const r=nqRows[i]; if(!r || !nqCanSend(r)) return;
+  const btn=document.getElementById('nq-send-btn-'+i);
+  const statusEl=document.getElementById('nq-send-status-'+i);
+  if(btn) btn.disabled=true;
+  if(statusEl) statusEl.textContent='Sending…';
+  try{
+    await gqlRetry(
+      `mutation($i:ID!,$b:ID!,$c:String!,$v:String!){change_simple_column_value(item_id:$i,board_id:$b,column_id:$c,value:$v){id}}`,
+      { i:r.itemId, b:CONTENT_TRACKER_BOARD_ID, c:r.colId, v:r.corrected }
+    );
+    r.sent=true; r.sentAt=new Date().toISOString();
+    if(statusEl) statusEl.innerHTML = `✓ Sent — <a href="https://carnalmedia-team.monday.com/boards/${escapeHtml(String(CONTENT_TRACKER_BOARD_ID))}/pulses/${escapeHtml(String(r.itemId))}" target="_blank" rel="noopener">pulse ${escapeHtml(String(r.itemId))}</a>`;
+    const kind = r.resolutionType==='manual' ? 'MANUAL — no matching profile' : `MATCHED — ${r.chosenName||'?'} (${r.chosenId||'?'})`;
+    const body = `NAME QA: CT item ${r.itemId} "${r.itemName}" — ${r.colLabel}\nOriginal: ${r.original}\nChanged to: ${r.corrected}\n[${kind}] — ${r.sentAt}`;
+    try{ await gqlRetry(`mutation($i:ID!,$b:String!){create_update(item_id:$i,body:$b){id}}`, { i:NQ_LOG_ITEM_ID, b:body }); }
+    catch(e){ if(statusEl) statusEl.innerHTML += ` <span style="color:var(--warning,#facc15)">(write OK, but the audit-log comment failed: ${escapeHtml(e.message||String(e))})</span>`; }
+    nqRender();
+  }catch(e){
+    if(statusEl) statusEl.textContent='Failed: '+(e.message||e);
+    if(btn) btn.disabled=false;
+  }
 }
 
 async function scrapePhotos(ctx, fresh){

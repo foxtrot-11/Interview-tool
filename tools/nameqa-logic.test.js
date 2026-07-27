@@ -98,5 +98,29 @@ eq(nqCategorize('x', { score: 0.95 }), 'likely_typo', '>=0.90 -> likely typo');
 eq(nqCategorize('x', { score: 0.80 }), 'ambiguous', '0.75-0.90 -> ambiguous');
 eq(nqCategorize('x', null), 'unknown', 'no candidate -> unknown');
 
+console.log('[9] v7.68: same-name, different-profile candidates surface separately (the "Alex Smith" case)');
+{ // Two different models can legitimately share an exact spelling. nqSuggest must keep both
+  // as distinct candidates (deduped by id, not by name) so a human can tell them apart by
+  // thumbnail before sending — collapsing to one silently picks a profile for them.
+  const dupIndex = { byNorm: new Map(), entries: [] };
+  const pushEntry = (id, canonical, headAsset) => {
+    const e = { id, canonical, alias: canonical, norm: nqNormalize(canonical), headAsset };
+    if (!dupIndex.byNorm.has(e.norm)) dupIndex.byNorm.set(e.norm, e);
+    dupIndex.entries.push(e);
+  };
+  pushEntry('1001', 'Alex Smith', 'asset-a');
+  pushEntry('2002', 'Alex Smith', 'asset-b'); // same spelling, different profile
+  const out = nqSuggest('Alex Smyth', dupIndex.entries, 3);
+  eq(out.length, 2, 'both Alex Smith profiles surface, not collapsed into one');
+  eq(new Set(out.map(o => o.id)).size, 2, 'each candidate keeps its own profile id');
+  eq(out.every(o => o.name === 'Alex Smith'), true, 'both still read as the correct known name');
+  eq(out.map(o => o.headAsset).sort(), ['asset-a', 'asset-b'], 'each candidate carries its own headshot asset for the thumbnail check');
+}
+{ // Back-compat: fixtures without ids (like the CANON index above) still dedup by name, same
+  // as before this change — a single index entry per name shouldn't produce duplicate chips.
+  const noIdOut = nqSuggest('Sean Xaiver', index.entries, 3);
+  eq(noIdOut.length, 1, 'no-id fixture index still dedups to one candidate per name');
+}
+
 console.log(`\n${n} assertions, ${fails} failed`);
 process.exit(fails ? 1 : 0);
