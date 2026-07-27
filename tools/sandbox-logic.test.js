@@ -119,13 +119,15 @@ eq(spN.actions.map(a => [a.model.name, a.mode, a.pay, a.dates]),
 console.log('[7] v7.29 notes codec round-trip (sbNormalizeNotes)');
 const notesEval = new Function(extractFn('sbNormalizeNotes') + '\nreturn {sbNormalizeNotes};');
 const { sbNormalizeNotes } = notesEval();
-eq(sbNormalizeNotes({ '700': { pay: '$500', dates: 'Sep 1' } }), { '700': { pay: '$500', dates: 'Sep 1' } },
+eq(sbNormalizeNotes({ '700': { pay: '$500', dates: 'Sep 1' } }), { '700': { pay: '$500', dates: 'Sep 1', startAirport: '', endAirport: '' } },
   'well-formed notes preserved');
-eq(sbNormalizeNotes({ '700': { pay: '', dates: '' }, '701': { pay: 'x', dates: '' } }), { '701': { pay: 'x', dates: '' } },
-  'entries with both fields blank are dropped');
+eq(sbNormalizeNotes({ '700': { pay: '', dates: '' }, '701': { pay: 'x', dates: '' } }), { '701': { pay: 'x', dates: '', startAirport: '', endAirport: '' } },
+  'entries with all fields blank are dropped');
 eq(sbNormalizeNotes(null), {}, 'null → empty object, not a crash');
-eq(sbNormalizeNotes({ '700': { pay: 42, dates: null } }), { '700': { pay: '42', dates: '' } },
+eq(sbNormalizeNotes({ '700': { pay: 42, dates: null } }), { '700': { pay: '42', dates: '', startAirport: '', endAirport: '' } },
   'coerces non-string values to trimmed strings');
+eq(sbNormalizeNotes({ '702': { startAirport: 'LAX', endAirport: 'JFK' } }), { '702': { pay: '', dates: '', startAirport: 'LAX', endAirport: 'JFK' } },
+  'v7.49 airport-only note is preserved');
 
 console.log(`\n${n} assertions, ${fails} failed`);
 process.exit(fails ? 1 : 0);
