@@ -174,7 +174,15 @@ boards with zero code change. Add new boards to this pattern rather than hardcod
 | └ its subitem board | `8533133826` |
 | Sandbox save-states | `18420711215` |
 | Content Tracker | `1818869745` |
-| Content Tracker (test) | `18421082922` |
+| Content Tracker (test) | `18423979173` |
+
+Content Tracker test board history: `18421082922` was the id originally documented here, but it turned out
+to be an empty placeholder (4 stock columns, 5 dummy items) — not an actual duplicate, unlike the Model DB
+test copy. On 2026-07-27, replaced with a real `duplicate_board` copy (`duplicate_board_with_pulses`) of the
+production Content Tracker board — same column ids (including `character_s__1__bottom_` /
+`character_s__2__top_`), 828 real items. `CONTENT_TRACKER_BOARD_ID` on the staging Render service must point
+at `18423979173`, not the old id. Per the existing open item below, this copy's real performer names should
+be deleted once Name QA testing is done, same as the Model DB copy.
 
 ### Model DB columns
 
@@ -355,6 +363,8 @@ plus a free-text box holding the entire field value.
       status control to `editor-status-*`, centralize the ~46 hardcoded photo column-ID
       literals.
 - [ ] Delete the staging Model DB copy's real performer PII when testing is done.
+- [ ] Delete the Content Tracker staging test copy (`18423979173`, created 2026-07-27 for Name QA
+      testing) once done — it's a real-data duplicate of the production board, same PII concern.
 - [ ] `.DS_Store` and stray untracked scripts (`audit_tags.js`, `tools/backfill-*.js`)
       should be gitignored or committed deliberately.
 
