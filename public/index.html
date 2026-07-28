@@ -5512,7 +5512,6 @@ function nqRender(){
     if(!rows.length) continue;
     html+=`<div class="nq-cat"><div class="nq-cat-head"><span class="nq-cat-title">${escapeHtml(title)}</span><span class="nq-cat-count">${rows.length}</span></div><div class="nq-cat-blurb">${escapeHtml(blurb)}</div>`;
     for(const {r,i} of rows){
-      const hasSuggestions = (r.suggestions||[]).length>0;
       const cands = (r.suggestions||[]).map((sg,sIdx)=>{
         const picked = r.resolutionType==='matched' && r.chosenId===sg.id;
         return `<div class="nq-cand">
@@ -5524,7 +5523,6 @@ function nqRender(){
       const badge = r.sent
         ? `<span class="nq-badge ${r.resolutionType==='manual'?'nq-badge-manual':'nq-badge-matched'}">${r.resolutionType==='manual'?'Manual':'Matched'}</span>`
         : '';
-      const manualDisabled = hasSuggestions; // manual is ONLY for rows with no reference profile at all
       const sendStatus = r.sent
         ? `✓ Sent — <a href="https://carnalmedia-team.monday.com/boards/${escapeHtml(String(CONTENT_TRACKER_BOARD_ID))}/pulses/${escapeHtml(String(r.itemId))}" target="_blank" rel="noopener">pulse ${escapeHtml(String(r.itemId))}</a>`
         : '';
@@ -5537,8 +5535,8 @@ function nqRender(){
         ${cands || '<div class="nq-nosugg">No matching profile in the Model DB — check the box below to enter one manually.</div>'}
         <div class="nq-manual">
           <label class="nq-manual-toggle">
-            <input type="checkbox" id="nq-man-${i}" ${manualDisabled?'disabled':''} ${r.manualOn?'checked':''} onchange="nqToggleManual(${i}, this.checked)">
-            Enable manual entry ${manualDisabled?'(only available when no profile matches above)':'— no reference profile exists for this one'}
+            <input type="checkbox" id="nq-man-${i}" ${r.manualOn?'checked':''} onchange="nqToggleManual(${i}, this.checked)">
+            Enable manual entry (only meant for rows with no matching profile above — don't use it if one exists)
           </label>
           <label class="nq-field-label">Full field value${r.resolutionType==='matched'?' (set from the profile you picked above)':''}</label>
           <input class="nq-input" id="nq-in-${i}" value="${escapeHtml(r.corrected)}" ${(r.manualOn && !r.sent)?'':'disabled'} oninput="nqEdit(${i}, this.value)">
@@ -5562,6 +5560,10 @@ function nqEdit(i, v){
   if(r.resolutionType==='matched'){ r.resolutionType = r.manualOn ? 'manual' : null; r.chosenId=null; r.chosenName=null; }
   const btn=document.getElementById('nq-send-btn-'+i); if(btn) btn.disabled=!nqCanSend(r);
 }
+// v7.68.1: the checkbox is always clickable now, even when candidate profiles exist above —
+// some rows need a manual override anyway (e.g. every suggestion is close but wrong). The
+// "only meant for rows with no matching profile" disclaimer text stays as a steer, not a
+// hard block enforced by disabling the input.
 function nqToggleManual(i, checked){
   const r=nqRows[i]; if(!r) return;
   r.manualOn = checked;
