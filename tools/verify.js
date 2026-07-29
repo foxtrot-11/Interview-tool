@@ -622,6 +622,32 @@ has('order.indexOf(a)-order.indexOf(b)', 'read-only tag popover reuses the picke
 // (D2) v7.69 — content-visibility:auto applies implicit PAINT CONTAINMENT, which clips the tag
 // popovers even with overflow:visible. The open tile must lift it or both popovers render invisible.
 has('.am-tile.picker-open{overflow:visible;z-index:40;content-visibility:visible}', 'open tile lifts content-visibility so tag popovers are not paint-clipped');
+// (D3) v7.70 — sticky grid toolbars, scroll restore, grabbable scrollbar, back-to-top.
+// #form-area is the ONLY scrolling element (html,body{overflow:hidden}), so every one of these
+// must target it. window.scrollY is permanently 0; window.scrollTo() is a silent no-op.
+has('.tb-sticky{position:sticky;top:-24px;z-index:45', 'pinned row offsets past #form-area padding so tiles cannot bleed above it');
+has('margin:-24px -32px 10px;padding:32px 32px 8px', 'negative margin cancels the cover padding, keeping at-rest layout unchanged');
+has('body.is-mobile .tb-sticky{top:-18px;margin:-18px -14px 10px', 'mobile offsets match the mobile #form-area padding');
+has("parseFloat(getComputedStyle(fa).paddingTop)", 'save-bar offset derives padding from live computed style, not a second constant');
+has('class="am-toolbar-row tb-sticky"', 'All Models controls row carries the sticky class');
+has('am-toolbar am-toolbar-titleonly', 'title row split into its own wrapper so the controls row can be a direct child of #am-view');
+has('.grid-save-bar{position:sticky;top:var(--tb-sticky-h,0px)', 'save bar offset tracks the pinned row height');
+has('function tbSyncStickyOffset(', 'sticky offset is measured, not hardcoded');
+has("style.setProperty('--tb-sticky-h'", 'measured row height published as a CSS variable');
+has('function gridRememberScroll(', 'grid scroll position captured on editor open');
+has('function gridRestoreScroll(', 'grid scroll position restored on back-to-grid');
+has('gridScrollMemory[gridScope]', 'scroll memory keyed by grid scope so tabs cannot cross-restore');
+has('gridRememberScroll();   // v7.70: capture BEFORE hiding the grid', 'capture happens before the grid is hidden');
+has('gridRestoreScroll();   // v7.70', 'backToApprovedGrid restores scroll after re-render');
+has('sbReturnScroll = faEl()?.scrollTop || 0', 'sandbox capture reads #form-area, not window.scrollY');
+has('.form-area::-webkit-scrollbar{width:12px}', 'form-area scrollbar is grabbable (was 4px)');
+has('.form-area::-webkit-scrollbar-thumb:hover', 'scrollbar thumb has a hover affordance');
+has('scrollbar-color:var(--border-active,#3AA2E0) transparent', 'Firefox scrollbar styled too');
+has('function faToggleTopBtn(', 'back-to-top visibility helper present');
+has('function faScrollTop(', 'back-to-top action present');
+has('id="to-top-btn"', 'back-to-top button in the markup');
+has("addEventListener('scroll', faToggleTopBtn", 'back-to-top driven by the #form-area scroll event');
+lacks('window.scrollTo(0, sbReturnScroll', 'the no-op window.scrollTo sandbox restore is gone');
 // (E) sandbox tab not clipped by toolbar style
 has('.sb-btn:not(.mode-btn)', 'toolbar .sb-btn scoped away from the mode tab');
 // (F) airport note fields → subitem port

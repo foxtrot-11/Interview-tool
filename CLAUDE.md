@@ -1,6 +1,6 @@
 # CLAUDE.md — Carnal Media Model Dashboard ("MODEL INTERVIEW v2")
 
-Context file for AI assistants working in this repo. Current release: **v7.69**.
+Context file for AI assistants working in this repo. Current release: **v7.70**.
 
 **Keep this file current as part of every release** — version line, the suite table in §3, the
 rollback-tag example, and any new §7 gotcha. It has drifted before (it sat at v7.67 while `main`
@@ -20,8 +20,8 @@ duplicate review, and (as of v7.67, with a write path since v7.68) name QA.
 |---|---|
 | `public/index.html` | ~570 KB. **All** markup, CSS, and JS inline. This is the app. |
 | `server.js` | CommonJS Express server. Auth gate + hardened monday.com GraphQL proxy + file/photo endpoints. |
-| `tools/*.js` | Test suite (6 files, 740 assertions). Plain Node, no framework. |
-| `CHANGE-LOG-v*.md` | Per-release write-ups (v7.67, v7.69). Longer-form companions to the in-file changelog comment block. |
+| `tools/*.js` | Test suite (6 files, 763 assertions). Plain Node, no framework. |
+| `CHANGE-LOG-v*.md` | Per-release write-ups (v7.67, v7.69, v7.70). Longer-form companions to the in-file changelog comment block. |
 | `package.json` / `package-lock.json` | Deps. Render runs `npm install`. |
 | `render.yaml` | Render service config. |
 | `public/logo-carnal.png` | Logo. |
@@ -87,13 +87,18 @@ Every release, without exception:
 
 | File | Assertions | Covers |
 |---|---|---|
-| `verify.js` | 576 | Substring checks against client source (the broad safety net) |
+| `verify.js` | 599 | Substring checks against client source (the broad safety net) |
 | `scrape-logic.test.js` | 53 | Bluesky/Twitter URL + media parsing (real functions extracted from `server.js`) |
 | `nameqa-logic.test.js` | 41 | Name-matching engine, run against **real** Content Tracker strings |
 | `server-guard.test.js` | 38 | GraphQL allow-list guard, credential hygiene, SDK-loading rules |
 | `sandbox-logic.test.js` | 20 | Casting sandbox planning + note normalization |
 | `dedup-logic.test.js` | 12 | Duplicate grouping |
-| **Total** | **740** | |
+| **Total** | **763** | |
+
+**`verify.js` is substring-only — it cannot catch a layout bug.** v7.70's first implementation
+passed every assertion while being visibly broken in two separate ways. Anything touching
+sticky positioning, scroll, or containment needs exercising in a real browser against a fixture
+carrying the app's actual rules.
 
 `tools/` also holds `backfill-medthumbs.js` and `backfill-extra-medthumbs.js`. **These are not
 tests** — they're one-off scripts that exit non-zero without env/args, so `for t in tools/*.js`
@@ -123,7 +128,7 @@ count. A commit silently containing fewer files than intended has burned a full 
 cycle here (see §7).
 
 **Rollback tags:** `beta-vNN` where `NN = minor − 16`. v7.60 → `beta-v44`; v7.67 → `beta-v51`;
-**v7.69 → `beta-v53`**.
+v7.69 → `beta-v53`; **v7.70 → `beta-v54`**.
 
 **Step 5 is not optional.** v7.68 and v7.68.1 both shipped with no `vN.NN:` entry in the
 `index.html` changelog block, which left `grep -o "v7.68:"` with nothing to match — the deploy
@@ -174,15 +179,31 @@ boards with zero code change. Add new boards to this pattern rather than hardcod
   don't support it at all.
 - **`#form-area` is the only scrolling element.** `html,body{height:100%;overflow:hidden}`, so
   `window.scrollY` is **always 0** and `window.scrollTo()` is a **no-op**. Any scroll
-  save/restore must read and write `document.getElementById('form-area').scrollTop`.
+  save/restore must read and write `document.getElementById('form-area').scrollTop`. This bit
+  once already: the sandbox's v7.42 scroll restore used `window.scrollY`/`window.scrollTo` and
+  therefore never worked at all until v7.70. Helpers: `faEl()`, `gridRememberScroll()`,
+  `gridRestoreScroll()`, `faToggleTopBtn()`, `faScrollTop()`.
+- **Sticky rows use the `.tb-sticky` class (v7.70)** — All Models / 2 / 3 / 4 / 5a, Kanban,
+  Duplicates, Name QA. **Never put it on bare `.am-toolbar`**: the Casting Sandbox reuses that
+  class inside `.sb-side`, which is already sticky with its own `overflow-y:auto`. Two traps,
+  both documented at the CSS rule: a sticky element is confined to its **containing block** (so
+  the row must be a direct child of the tall `*-view` wrapper, not of `.am-toolbar`), and sticky
+  `top:0` pins to the scrollport's **content** box — 24px down, past `#form-area`'s padding —
+  which leaves a strip that tiles scroll through. Hence `top:-24px` + `padding-top:32px` +
+  `margin-top:-24px`. **If `.form-area{padding:...}` changes, those three must move with it.**
 - **Layout, for anything sticky:** `body` → `header` (z 100) → `.selector-bar` (z 90) →
   `.main` (z 1) → `.sidebar` + `#form-area` (the scroll box, `padding:24px 32px`). Every
   `*-view` is a direct child of `#form-area` and is only ever `display:none`'d, never
   destroyed — so input values inside a hidden view survive. `renderAllModels()` does blow away
   `#am-grid.innerHTML` on every call, so restore scroll *after* it returns.
 - **Sticky z-index band inside `#form-area`:** 80 filter/tag popovers · 70 `.shoot-picker` ·
-  60 `.sticky-status-bar` (editors only) · 50 `.iv-notes-sticky` · 40 `.am-tile.picker-open` ·
-  20 `.grid-save-bar` (also `top:0`, and a *later* sibling than the toolbar).
+  60 `.sticky-status-bar` (editors only) · 50 `.iv-notes-sticky` · **45 `.tb-sticky`** ·
+  40 `.am-tile.picker-open` · 20 `.grid-save-bar`. The save bar is *also* sticky to the top and is
+  a **later sibling** than the toolbar, so it needs `top:var(--tb-sticky-h)` to avoid hiding
+  underneath — that variable is published by `tbSyncStickyOffset()` from the row's measured
+  height minus `#form-area`'s computed padding-top. Fixed overlays sit far above this band:
+  `.to-top-btn` 8500, `.kb-modal`/`#bgjobs` 9000, modals 9400–9750, `#toast` 9999,
+  `#lightbox` 99999.
 
 ---
 
@@ -347,6 +368,11 @@ Each of these cost real debugging time. Read before diagnosing anything.
 - **Duplicate Review Engine** (`dup`) — the UX template for audit tools: flag → preview →
   human approves → apply with per-row feedback.
 - **Name QA** (`nameqa`, v7.67) — see §9.
+- **Grid navigation** (v7.70) — every grid toolbar's controls row is pinned via `.tb-sticky`;
+  Back-to-grid restores `#form-area.scrollTop` per `gridScope`; `.form-area` scrollbar is 12px
+  and there's a fixed `#to-top-btn`. Shoot-tag *order* in the tile picker is newest-created
+  first (`gridTagOptions()`, v7.69) — descending monday label id, the only recency signal
+  monday exposes.
 
 ---
 
