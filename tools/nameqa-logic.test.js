@@ -122,5 +122,57 @@ console.log('[9] v7.68: same-name, different-profile candidates surface separate
   eq(noIdOut.length, 1, 'no-id fixture index still dedups to one candidate per name');
 }
 
+/* ── v7.74 (1): GIVEN-NAME GATE ────────────────────────────────────────────────────────────────
+   Whole-string edit distance overstates similarity when two people share a surname. Reported from
+   live data: "Zander Woods" vs "Lance Woods" scored 75% — the same band as a genuine typo — purely
+   on " Woods", while the real typo "Zander Woodz" scored 92%. The two were barely distinguishable.
+   The gate must fire ONLY on a different given name; real typos land in given names too. */
+console.log('[10] v7.74: given-name gate');
+{
+  const pct = (a,b) => Math.round(nqSimilarity(a,b)*100);
+  // penalised — different person who happens to share a surname
+  eq(pct('Zander Woods','Lance Woods') < 50, true, 'shared surname + different given name scores LOW (was 75%)');
+  eq(pct('Zander Woods','Lance Woods') < pct('Zander Woods','Zander Woodz'), true,
+     'the real typo now outranks the different-person match by a wide margin');
+  // NOT penalised — these are the typos the tool exists to catch
+  eq(pct('Zander Woods','Zander Woodz'), 92, 'surname typo unchanged at 92%');
+  eq(pct('Sean Xaiver','Sean Xavier'), 91, 'Sean Xaiver unchanged at 91%');
+  eq(pct('Cyurs Stark','Cyrus Stark'), 91, 'GIVEN-NAME transposition still 91% — the gate must not catch this');
+  eq(pct('Jace Jaxon','Jace Jaxson'), 91, 'Jace Jaxon unchanged at 91%');
+  eq(nqSimilarity('Adam Snow','Adam Snow'), 1, 'identical still 1');
+  // single-token names are never gated (no given/surname structure to reason about)
+  eq(nqSimilarity('Leandro','Leandra') > 0.8, true, 'single-token names are not gated');
+  // the gate drops it below the 0.75 suggestion floor, so it stops being offered at all
+  eq(nqSuggest('Zander Woods', [{norm:'lance woods', canonical:'Lance Woods', alias:'Lance Woods', id:'L1'}], 3).length, 0,
+     'a different-person surname match is no longer offered as a candidate');
+}
+
+/* ── v7.74 (2): COMPOSITE SUBSTITUTION ─────────────────────────────────────────────────────────
+   A Content Tracker value is often "CharacterName (PerformerName)". nqSegmentParts returns
+   [whole, before-parens, inside-parens] and the probe is the LAST one, so the match is made against
+   the parenthetical. Before v7.74 nqUseSuggestion replaced the WHOLE segment, collapsing
+   "Boy Jace (Jace Jaxon)" to "Jace Jaxson" and destroying the character name. It must replace only
+   the probe. This asserts the scan records the probe AND that substituting it rebuilds correctly. */
+console.log('[11] v7.74: composite name substitution');
+{
+  // the probe the scan will carry through to nqUseSuggestion
+  const probeOf = seg => { const p = nqSegmentParts(seg); return p[p.length-1]; };
+  eq(probeOf('Boy Jace (Jace Jaxon)'), 'Jace Jaxon', 'probe is the parenthetical, not the whole segment');
+  eq(probeOf('Sean Xaiver'), 'Sean Xaiver', 'probe falls back to the whole token when there are no parens');
+  // the substitution nqUseSuggestion performs
+  const sub = (cur, probe, name) => cur.split(probe).join(name);
+  eq(sub('Boy Jace (Jace Jaxon)', probeOf('Boy Jace (Jace Jaxon)'), 'Jace Jaxson'),
+     'Boy Jace (Jace Jaxson)', 'composite keeps the character name — the reported bug');
+  eq(sub('Sean Xaiver', probeOf('Sean Xaiver'), 'Sean Xavier'),
+     'Sean Xavier', 'plain name still replaced wholesale');
+  eq(sub('Father Snow (Adam Snow)', probeOf('Father Snow (Adam Snow)'), 'Adam Snow'),
+     'Father Snow (Adam Snow)', 'an already-correct composite is left intact');
+  // the scan must actually record `probe` on the flagged row, or the fix cannot reach the UI
+  const scan = nqScanValue('Boy Jace (Jace Jaxon)', index);
+  const flag = scan.segments.find(s => s.status === 'flag');
+  eq(!!flag, true, 'the composite is flagged');
+  eq(flag && flag.probe, 'Jace Jaxon', 'the flagged row carries the probe through to the UI');
+}
+
 console.log(`\n${n} assertions, ${fails} failed`);
 process.exit(fails ? 1 : 0);
