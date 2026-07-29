@@ -1,6 +1,77 @@
 # CLAUDE.md — Carnal Media Model Dashboard ("MODEL INTERVIEW v2")
 
-Context file for AI assistants working in this repo. Current release: **v7.70**.
+Context file for AI assistants working in this repo. Current release: **v7.69** on production
+(v7.70 was rolled back — see §0.1).
+
+---
+
+## 0. STOP — permission boundary. Read this before touching git.
+
+**You may push to `staging`. You may not push to `main`. Ever.**
+
+Not "after the tests pass". Not "after the marker greps clean". Not "it's a small fix". Not "the
+user said push". `main` auto-deploys to production, which a small team uses for live work.
+**Promotion to production is the owner's decision, and the owner makes it after loading staging in
+a browser themselves.**
+
+Your job ends at: push to staging → report what you changed and the numbers you measured → hand
+over a test checklist → **stop and wait.**
+
+The owner promotes with:
+
+```bash
+ALLOW_MAIN_PUSH=1 git push origin staging:main
+```
+
+That override exists for the owner. **You never use it, and you never suggest running it as
+something you'd do.** `.githooks/pre-push` blocks pushes to `main` without it, and
+`git push --no-verify` bypasses that hook — so the hook is a guardrail, not permission logic. The
+rule above is the actual constraint.
+
+Also yours-only: `git tag` / tag pushes for `beta-vNN`, any `--force`, and rollbacks.
+
+### 0.1 Why this rule exists (do not rationalize around it)
+
+On 2026-07-29, v7.70 shipped a **broken stylesheet to production while a coworker was mid-task.**
+Two CSS comment edits left prose sitting after the closing `*/`. The CSS parser read that prose as
+a selector and discarded every rule after it: the app rendered completely unstyled, hidden modals
+visible, views stacked on each other.
+
+It reached production because the assistant:
+
+1. Ran a `<script>` parse check that **never looked at the CSS**, and
+2. Treated `curl … | grep -o "v7.70:"` as verification. **That grep only proves the file
+   uploaded.** It says nothing about whether the app works.
+3. Promoted `staging:main` on the strength of that grep — in the same session it had written
+   "verify.js is substring-only, it cannot catch a layout bug" into this very file.
+
+Every automated check was green while the app was unusable. That is the whole point: **green
+checks are necessary and not sufficient.** A human's eyes on staging are the only gate that
+actually holds.
+
+### 0.2 What "verified" means
+
+| Not verification | Verification |
+|---|---|
+| `curl \| grep "vN.NN:"` | A human loaded staging and said it's good |
+| Full suite green | Browser-measured evidence (`document.styleSheets[…].cssRules.length`, computed styles of changed elements) |
+| `node tools/preflight.js` passing | For layout/CSS/scroll work: before-and-after numbers, in a real browser |
+
+For any CSS, sticky-positioning, scroll or containment change, report actual measurements — rule
+counts, computed styles, `elementFromPoint` results — not "it should work".
+
+### 0.3 Before any push
+
+```bash
+node tools/preflight.js
+```
+
+Must exit 0. Runs the JS parse check, **CSS integrity** (orphaned/unterminated comments, brace
+balance, prose-in-stylesheet, rule-count sanity), `<div>` balance, `server.js --check`, the
+version-marker/CHANGE-LOG pairing, and all six suites. The pre-push hook runs it too, so a broken
+build can't reach even staging.
+
+One-time per clone: `git config core.hooksPath .githooks`
 
 **Keep this file current as part of every release** — version line, the suite table in §3, the
 rollback-tag example, and any new §7 gotcha. It has drifted before (it sat at v7.67 while `main`
@@ -20,7 +91,9 @@ duplicate review, and (as of v7.67, with a write path since v7.68) name QA.
 |---|---|
 | `public/index.html` | ~570 KB. **All** markup, CSS, and JS inline. This is the app. |
 | `server.js` | CommonJS Express server. Auth gate + hardened monday.com GraphQL proxy + file/photo endpoints. |
-| `tools/*.js` | Test suite (6 files, 763 assertions). Plain Node, no framework. |
+| `tools/preflight.js` | **Run before every push.** The release checklist as code — see §0.3. Must exit 0. |
+| `.githooks/pre-push` | Blocks pushes to `main` without `ALLOW_MAIN_PUSH=1`; runs preflight. Enable: `git config core.hooksPath .githooks` |
+| `tools/*.js` | Test suite (6 files, 769 assertions). Plain Node, no framework. |
 | `CHANGE-LOG-v*.md` | Per-release write-ups (v7.67, v7.69, v7.70). Longer-form companions to the in-file changelog comment block. |
 | `package.json` / `package-lock.json` | Deps. Render runs `npm install`. |
 | `render.yaml` | Render service config. |
@@ -65,6 +138,17 @@ Changing it is a dashboard edit, not a release.
 
 ## 3. Release process (follow this exactly)
 
+> **Steps 1–6 are yours. Step 7 stops at staging. The owner does step 8.** See §0.
+
+**Fast path — this replaces steps 2/3/4/5 below and cannot be half-done:**
+
+```bash
+node tools/preflight.js
+```
+
+The prose version is kept for reference, but `preflight.js` is the thing that must pass. It exists
+because this checklist was skimmed and shipped a broken stylesheet (§0.1).
+
 Every release, without exception:
 
 1. **Clean workspace per version** — copy the previous version's tree, never edit in place.
@@ -81,24 +165,31 @@ Every release, without exception:
    `index.html`. This doubles as the deploy verification grep target.
 6. **Package and VERIFY the zip by extracting it.** Do not trust that `zip` picked up
    what you listed — it has silently produced a one-file archive here before.
-7. **Deploy staging → verify → promote to main → tag.**
+7. **Push to staging. Then STOP.** Report the change, the measurements, and a test checklist.
+   ~~"promote to main → tag"~~ — **this line used to read "Deploy staging → verify → promote to
+   main → tag" and that phrasing is what got read as authorization.** It is not. Steps 8+ are the
+   owner's, performed after the owner has looked at staging in a browser. See §0.
+8. *(owner only)* Load staging, confirm it works, then
+   `ALLOW_MAIN_PUSH=1 git push origin staging:main`, then tag `beta-vNN`.
 
 ### Current suite
 
 | File | Assertions | Covers |
 |---|---|---|
-| `verify.js` | 599 | Substring checks against client source (the broad safety net) |
+| `verify.js` | 605 | Substring checks + **CSS structural integrity** (§2b) against client source |
 | `scrape-logic.test.js` | 53 | Bluesky/Twitter URL + media parsing (real functions extracted from `server.js`) |
 | `nameqa-logic.test.js` | 41 | Name-matching engine, run against **real** Content Tracker strings |
 | `server-guard.test.js` | 38 | GraphQL allow-list guard, credential hygiene, SDK-loading rules |
 | `sandbox-logic.test.js` | 20 | Casting sandbox planning + note normalization |
 | `dedup-logic.test.js` | 12 | Duplicate grouping |
-| **Total** | **763** | |
+| **Total** | **769** | |
 
-**`verify.js` is substring-only — it cannot catch a layout bug.** v7.70's first implementation
-passed every assertion while being visibly broken in two separate ways. Anything touching
-sticky positioning, scroll, or containment needs exercising in a real browser against a fixture
-carrying the app's actual rules.
+**`verify.js` is substring matching — it cannot see a layout bug, and a substring assert can pass
+on text that is in the wrong place.** Both v7.70 failures prove it: the sticky row was pinned
+inside an 80px box (every assert green, feature useless), and the CSS comment break left the
+asserted text present but outside its comment (every assert green, app unstyled). Anything
+touching CSS, sticky positioning, scroll or containment must be exercised in a real browser and
+reported with numbers.
 
 `tools/` also holds `backfill-medthumbs.js` and `backfill-extra-medthumbs.js`. **These are not
 tests** — they're one-off scripts that exit non-zero without env/args, so `for t in tools/*.js`
@@ -106,29 +197,46 @@ looks like two failures. Iterate `tools/*.test.js tools/verify.js` instead.
 
 ### Deploy commands
 
+*No `#` comments inside these blocks — the operator's zsh lacks `interactive_comments` and they
+error on paste (§7.8).*
+
+**Staging — assistant may run this:**
+
 ```bash
-# staging
-cd ~/AI/interview-tool && git checkout staging && git pull && \
-unzip -o ~/Downloads/interview-tool-vN.zip -d /tmp/vN && \
-cp /tmp/vN/public/index.html public/index.html && \
-cp /tmp/vN/server.js server.js && \
+cd ~/AI/interview-tool && git checkout staging && git pull && node tools/preflight.js && \
 git add -A && git commit -m "vN.NN: ..." && git push origin staging && git show --stat HEAD
 ```
+
+**Then confirm the deploy LANDED — this is not verification:**
+
 ```bash
-curl -s https://interview-tool-staging.onrender.com/ | grep -o "vN.NN:" && echo STAGING-OK
+curl -s https://interview-tool-staging.onrender.com/ | grep -o "vN.NN:" && echo MARKER-PRESENT
+```
+
+That prints `MARKER-PRESENT`, deliberately **not** `STAGING-OK`. It proves the file uploaded and
+nothing more. It was previously labelled `STAGING-OK`, which is how a broken stylesheet got waved
+through to production (§0.1). Staging is OK when a **human says so**.
+
+**Promote — OWNER ONLY. The assistant does not run this and does not offer to:**
+
+```bash
+ALLOW_MAIN_PUSH=1 git push origin staging:main
 ```
 ```bash
-# promote
-git checkout main && git pull && git merge origin/staging --ff-only && git push origin main && \
 git tag -a beta-vNN -m "production vN.NN" && git push origin beta-vNN
 ```
 
 **Always** end the commit step with `git show --stat HEAD` and confirm the expected file
 count. A commit silently containing fewer files than intended has burned a full deploy
-cycle here (see §7).
+cycle here (see §7). `git add -A` also sweeps up untracked strays — check the list.
+
+**Rollback:** `ALLOW_MAIN_PUSH=1 git push --force origin <good-sha>:main`, then confirm production
+serves the expected marker and that `document.styleSheets` rule count is healthy in a browser.
 
 **Rollback tags:** `beta-vNN` where `NN = minor − 16`. v7.60 → `beta-v44`; v7.67 → `beta-v51`;
-v7.69 → `beta-v53`; **v7.70 → `beta-v54`**.
+**v7.69 → `beta-v53` ← current production.**
+**`beta-v54` (v7.70) IS A BROKEN RELEASE — never roll forward to it.** It ships the unstyled-app
+CSS bug from §0.1. The fix exists but has not been re-verified on staging by a human.
 
 **Step 5 is not optional.** v7.68 and v7.68.1 both shipped with no `vN.NN:` entry in the
 `index.html` changelog block, which left `grep -o "v7.68:"` with nothing to match — the deploy
@@ -312,6 +420,13 @@ Consequences:
 
 Each of these cost real debugging time. Read before diagnosing anything.
 
+-1. **A misplaced CSS comment terminator silently destroys the whole stylesheet.** Text left after
+   a closing `*/` (or before the next rule) is parsed as a **selector**, and the parser then
+   swallows every rule that follows it. Symptom: the app renders with no styling at all, hidden
+   modals visible, views stacked. It is NOT a JS error and produces no console error. This shipped
+   to production as v7.70 (§0.1). `node tools/preflight.js` now catches it — orphaned/unterminated
+   comments, brace balance, prose-in-stylesheet, and a rule-count floor. **When editing CSS
+   comments, re-run preflight**, and remember the `<script>` parse check does not read CSS at all.
 0. **`content-visibility:auto` silently clips absolutely-positioned children.** `.am-tile`
    carries it for grid perf across ~950 tiles, and it applies **implicit paint containment** —
    which clips popovers to the tile's box **no matter what `overflow` says**. This defeated

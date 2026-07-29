@@ -208,11 +208,11 @@
      overflow-y:auto — nesting a sticky in there would pin it to the wrong scroll box.
      z-index 45: above .am-tile.picker-open (40) so tag popovers on tiles can't cover the toolbar,
      below the .shoot-picker / .am-fpop layer (70/80) and below the editor-only
-     .sticky-status-bar (60), which never coexists with a grid. */
+     .sticky-status-bar (60), which never coexists with a grid.
      A sticky element is CONFINED TO ITS CONTAINING BLOCK, so the row must be a direct child of the
      tall view wrapper (#am-view / #kanban-view / #dup-view / #nameqa-view). Nested inside the
-     ~80px .am-toolbar flex box it unpinned again after ~80px of scroll — measured, not theorised. */
-     THE OFFSETS ARE NOT ARBITRARY. A sticky `top:0` pins to the scrollport's CONTENT box, i.e.
+     ~80px .am-toolbar flex box it unpinned again after ~80px of scroll — measured, not theorised.
+     THE OFFSETS ARE NOT ARBITRARY. A sticky top:0 pins to the scrollport's CONTENT box, i.e.
      24px down (#form-area's padding-top) — which leaves a 24px strip above the toolbar that grid
      tiles scroll through in plain view. Measured: 42 sampled x-positions showed a tile in that
      strip. So the row is pinned at top:-24px (flush to the visible top) with padding-top raised by

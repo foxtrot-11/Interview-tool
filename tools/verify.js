@@ -103,6 +103,75 @@ lits.forEach((L, n) => {
   catch (e) { bad(`gql #${n + 1} (line ${line}) graphql parse`, String(e.message).split('\n')[0] + '  →  ' + q.slice(0, 90)); }
 });
 
+/* ── 2b. CSS STRUCTURAL INTEGRITY (added v7.70.1) ──────────────────────────
+   WHY THIS EXISTS: v7.70 shipped a broken stylesheet to production. An edit left prose sitting
+   between a comment's closing star-slash and the next rule, so the CSS parser treated that prose
+   as a selector and swallowed the rules after it — the entire app rendered unstyled, with hidden
+   modals visible and views stacked on top of each other.
+   Nothing caught it. The <script> parse check only looks at JS. Every substring assert below still
+   passed, because the text WAS present — just not inside a comment. This block closes that gap:
+   an orphaned or unterminated comment, or unbalanced braces, now fails the suite. */
+console.log('[2b] CSS structural integrity');
+{
+  const sIdx = src.indexOf('<style>'), eIdx = src.indexOf('</style>');
+  if (sIdx < 0 || eIdx < 0) bad('CSS block located', 'no <style> block found');
+  else {
+    ok('CSS block located');
+    const css = src.slice(sIdx + 7, eIdx);
+    const cssLineOf = off => src.slice(0, sIdx + 7 + off).split('\n').length;
+    let i = 0, open = 0, orphans = [], firstOpen = -1;
+    while (i < css.length) {
+      if (css.startsWith('/*', i)) { if (open === 0) firstOpen = i; open++; i += 2; continue; }
+      if (css.startsWith('*/', i)) { if (open === 0) orphans.push(cssLineOf(i)); else open--; i += 2; continue; }
+      i++;
+    }
+    orphans.length
+      ? bad('no orphaned CSS comment terminators', `stray */ at file line(s) ${orphans.join(', ')} — prose is leaking into the stylesheet`)
+      : ok('no orphaned CSS comment terminators');
+    open
+      ? bad('all CSS comments terminated', `${open} unterminated /* (first at file line ${cssLineOf(firstOpen)})`)
+      : ok('all CSS comments terminated');
+
+    // Brace balance, ignoring comment bodies and quoted strings.
+    let depth = 0, minDepth = 0, inC = false, q = null;
+    for (let j = 0; j < css.length; j++) {
+      const c = css[j];
+      if (inC) { if (css.startsWith('*/', j)) { inC = false; j++; } continue; }
+      if (q) { if (c === '\\') { j++; continue; } if (c === q) q = null; continue; }
+      if (css.startsWith('/*', j)) { inC = true; j++; continue; }
+      if (c === '"' || c === "'") { q = c; continue; }
+      if (c === '{') depth++;
+      else if (c === '}') { depth--; if (depth < minDepth) minDepth = depth; }
+    }
+    depth === 0 ? ok('CSS braces balanced') : bad('CSS braces balanced', `net depth ${depth}`);
+    minDepth === 0 ? ok('CSS never closes more braces than it opens') : bad('CSS never closes more braces than it opens', `went to ${minDepth}`);
+
+    // Blank out comment BODIES (keeping newlines) so line numbers still line up, then look for
+    // English prose left behind in live CSS. A bare sentence outside a comment is the exact
+    // signature of the v7.70 break, and it is what the parser mistakes for a selector.
+    let stripped = '', k = 0, inCmt = false;
+    while (k < css.length) {
+      if (!inCmt && css.startsWith('/*', k)) { inCmt = true; stripped += '  '; k += 2; continue; }
+      if (inCmt && css.startsWith('*/', k)) { inCmt = false; stripped += '  '; k += 2; continue; }
+      stripped += inCmt ? (css[k] === '\n' ? '\n' : ' ') : css[k];
+      k++;
+    }
+    const baseLine = src.slice(0, sIdx + 7).split('\n').length;
+    const prose = [];
+    stripped.split('\n').forEach((ln, n) => {
+      const t = ln.trim();
+      if (!t) return;
+      if (/[{}:;@]/.test(t)) return;              // any real CSS punctuation → not bare prose
+      if (/^[),.'"\d>+~*-]/.test(t)) return;       // continuation of a selector or value list
+      // 20+ chars of words and spaces with no CSS syntax anywhere = a sentence in the stylesheet
+      if (/^[A-Za-z][A-Za-z ,'’()—-]{20,}$/.test(t)) prose.push(baseLine + n);
+    });
+    prose.length
+      ? bad('no bare prose lines in the stylesheet', `file line(s) ${prose.slice(0, 6).join(', ')} — a comment terminator is probably misplaced`)
+      : ok('no bare prose lines in the stylesheet');
+  }
+}
+
 /* ── 3. v7.16 structural asserts ───────────────────────────────────────── */
 console.log('[3] v7.16 structural asserts');
 const has = (needle, label) => src.includes(needle) ? ok(label) : bad(label, 'missing: ' + needle);
