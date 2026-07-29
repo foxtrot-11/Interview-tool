@@ -320,7 +320,13 @@
   .am-sub{padding:0 9px 8px;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);min-height:15px}
   /* v7.38 / v7.38.1 editable grid */
   .am-tile.am-dirty{border-color:var(--accent,#3AA2E0);box-shadow:inset 3px 0 0 var(--accent,#3AA2E0)}
-  .am-tile.picker-open{overflow:visible;z-index:40}          /* escape clip so the tag picker is visible */
+  /* v7.69: content-visibility:auto on .am-tile (perf for ~950 tiles) applies IMPLICIT PAINT
+     CONTAINMENT, which clips absolutely-positioned children even when overflow is visible. That
+     silently painted away the tag-list popover and the tag picker — overflow:visible alone never
+     worked. content-visibility:visible lifts the containment for the ONE open tile only, so the
+     rest of the grid keeps the perf win. Verified: with auto, elementFromPoint on a popover row
+     returns the tile, not the row; with visible, it returns the row. */
+  .am-tile.picker-open{overflow:visible;z-index:40;content-visibility:visible}
   .am-thumb{border-radius:7px 7px 0 0}                        /* keep rounded top corners when tile overflow is visible */
   .am-field-row{display:flex;align-items:center;gap:8px;padding:2px 9px}
   .am-field-row:first-of-type{padding-top:4px}
@@ -408,6 +414,9 @@
   .shoot-opt.sel{color:var(--accent)}
   .shoot-opt.create{color:#facc15}
   .shoot-opt.dim{color:var(--text-dim);cursor:default}
+  /* v7.69: grouping inside the tile tag picker — applied tags pinned above the rest */
+  .shoot-sep{border-top:1px solid var(--border);margin:4px 0}
+  .shoot-grp{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);padding:5px 6px 2px}
   /* ── Sidebar field search + scrollspy (v7.12) ── */
   .qnav-search-wrap{display:none;position:relative;margin:10px 12px 0}
   .qnav-search{display:block;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 26px 7px 9px;font-size:11px;font-family:var(--font-mono)}
@@ -2416,15 +2425,34 @@ function gridToggleTagPicker(id){
     gridRenderTagList(id);
   }
 }
-function gridTagOptions(){ return (boardDropdownOptions[SHOOT_COL]||[]).map(o=>String(o.label)).sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase())); }
+// v7.69: NEWEST-CREATED TAG FIRST (was alphabetical).
+// monday exposes no creation timestamp for dropdown labels — settings_str carries only {id,name} —
+// so the label id is the recency proxy: monday hands ids out incrementally, so a higher id was
+// created later. This is accurate for the current board (id 16 "test9" / 15 "BFS 2026 #2" are the
+// newest) and only breaks if a label id is ever deleted and reused. If true creation dates are
+// ever required they'd have to be recorded by us at create time; that's a much bigger change.
+function gridTagOptions(){
+  return (boardDropdownOptions[SHOOT_COL]||[])
+    .slice()                                   // don't reorder the shared store in place
+    .sort((a,b)=>Number(b.id)-Number(a.id))    // descending id === newest first
+    .map(o=>String(o.label));
+}
 function gridRenderTagList(id){
   const list=document.getElementById('amtag-list-'+id); if(!list) return;
   const m=gridModel(id); if(!m) return;
   const sEl=document.getElementById('amtag-search-'+id); const raw=(sEl?sEl.value:'').trim(); const q=raw.toLowerCase();
   const current=new Set(gridShootLabels(m).map(l=>l.toLowerCase()));
-  const opts=gridTagOptions().filter(l=>!q||l.toLowerCase().includes(q));
-  let html=opts.map(l=>`<div class="shoot-opt${current.has(l.toLowerCase())?' sel':''}" onclick="gridToggleTag('${id}','${encodeURIComponent(l)}')">${current.has(l.toLowerCase())?'✓ ':''}${escapeHtml(l)}</div>`).join('');
-  if(raw && !gridTagOptions().some(l=>l.toLowerCase()===q)) html+=`<div class="shoot-opt create" onclick="gridCreateTag('${id}')">+ Create “${escapeHtml(raw)}”</div>`;
+  const all=gridTagOptions();
+  const opts=all.filter(l=>!q||l.toLowerCase().includes(q));
+  // v7.69: tags already on this model pin to the top (so un-applying one is always one click away);
+  // everything else follows underneath, newest-created first.
+  const applied=opts.filter(l=>current.has(l.toLowerCase()));
+  const rest=opts.filter(l=>!current.has(l.toLowerCase()));
+  const row=l=>`<div class="shoot-opt${current.has(l.toLowerCase())?' sel':''}" onclick="gridToggleTag('${id}','${encodeURIComponent(l)}')">${current.has(l.toLowerCase())?'✓ ':''}${escapeHtml(l)}</div>`;
+  let html='';
+  if(applied.length) html+=`<div class="shoot-grp">On this model</div>`+applied.map(row).join('')+`<div class="shoot-sep"></div>`;
+  if(rest.length)    html+=(applied.length?`<div class="shoot-grp">All tags — newest first</div>`:'')+rest.map(row).join('');
+  if(raw && !all.some(l=>l.toLowerCase()===q)) html+=`<div class="shoot-opt create" onclick="gridCreateTag('${id}')">+ Create “${escapeHtml(raw)}”</div>`;
   list.innerHTML=html||'<div class="shoot-opt dim">no tags yet — type to create</div>';
 }
 function gridToggleTag(id, enc){
@@ -2463,7 +2491,11 @@ function gridRefreshChips(id){
 }
 function gridFillTagList(id){
   const m=gridModel(id); const pop=document.getElementById('amtaglist-pop-'+id); if(!m||!pop) return;
-  const labels=gridShootLabels(m).slice().sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+  // v7.69: order the read-only list the same way the picker does — newest-created first — so the two
+  // popovers never disagree. Locally-created (not yet saved) tags aren't in the options list yet;
+  // indexOf gives them -1, which floats them to the top, and they ARE the newest. That's correct.
+  const order=gridTagOptions();
+  const labels=gridShootLabels(m).slice().sort((a,b)=>order.indexOf(a)-order.indexOf(b));
   const list = labels.length
     ? `<div class="am-taglist-head">Shoot tags</div>`+labels.map(l=>`<div class="am-taglist-item">${escapeHtml(l)}</div>`).join('')
     : `<div class="am-taglist-item dim">No shoot tags</div>`;
@@ -7637,6 +7669,9 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.68.1: (Name QA — manual override no longer blocked by its own guardrail) Client-only. The manual free-text checkbox was disabled whenever candidate profiles existed above it, on the theory that a row with candidates doesn't need hand-typing. Real rows disproved that: sometimes every suggestion is close but wrong, and the human still needs to type the right name. The checkbox is now always clickable; the "only meant for rows with no matching profile" text stays as a STEER rather than a hard block enforced by disabling the input. Rows sent this way are still tagged MANUAL in both the UI and the audit log, so a hand-typed value is never mistaken for a verified profile match.  [ENTRY BACKFILLED IN v7.69 — this release shipped without one, so `grep -o "v7.68.1:"` had no deploy-verification target at the time.]
+   v7.68: (Name QA phase 2 — the Send-to-Monday write path) Client-only, builds on the v7.67 read-only scan. Adds the first write path, under the constraints the owner set: nothing automatic, a human approves every change ONE ROW AT A TIME, and there is deliberately NO bulk-apply button. SUGGESTIONS ONLY EVER COME FROM A REAL MODEL DB PROFILE — never guessed or reconstructed text — so a send always resolves to a specific model id, and the audit log and the write-back both know exactly which profile the value was verified against. PER-PROFILE THUMBNAILS: nqBuildIndex now also pulls each model's headshot (small backfilled med-thumb preferred over the full headshot, same precedence as gridImgAsset() everywhere else in this app), because the check a human actually has to make is visual — "is this the same Alex Smith?" — and a name alone can't answer it. Clicking a candidate's thumbnail opens that model's editor to verify before sending. NOT DEDUPED BY NORMALIZED NAME: two different models can legitimately share a spelling, so the candidate index keeps both as separate entries with their own id and thumbnail instead of collapsing to whichever was indexed first; the separate `byNorm` fast-path lookup (used by nqScanValue to decide "is this segment already a known spelling") keeps its original first-wins semantics, since that question is about clean matching, not about choosing between people. MANUAL-OVERRIDE FLAGGING: free-typing after picking a suggestion clears the "Matched" badge and the stored id, so a stale id can never be written alongside hand-edited text. Every send is recorded in a shared running audit log, across environments. Writes go to CONTENT TRACKER ONLY — per the sync Worker's behaviour, anything written straight to the Video/Photo/Writeup/Post boards gets reverted on the next CT change.  [ENTRY BACKFILLED IN v7.69 — see above.]
+   v7.69: (All Models tag editing — the picker was never actually invisible, it was being PAINTED AWAY) Client-only, CSS + two functions. ROOT CAUSE, and it is not what it looks like: .am-tile carries content-visibility:auto (added for perf across ~950 tiles), and content-visibility:auto applies IMPLICIT PAINT CONTAINMENT. Paint containment clips absolutely-positioned descendants to the tile's box REGARDLESS of overflow, so .am-tile.picker-open{overflow:visible} — whose whole purpose was "escape clip so the tag picker is visible" — never did anything at all. Both tile popovers were being built correctly, inserted into the DOM correctly, and then clipped out of existence. VERIFIED, not guessed: on a repro with the exact .am-tile / .am-tile.picker-open rules, document.elementFromPoint over the centre of a popover row returns the TILE, not the row; adding content-visibility:visible to the open tile makes it return the row. Symptoms this explains, both reported as separate bugs: (1) clicking the "N tags" badge appeared to show only the "Shoot tags" heading and never the model's tags; (2) the "+" picker appeared to offer nothing but a text box, forcing tags to be typed by hand even though all 16 board labels were loaded and rendered. FIX: content-visibility:visible on .am-tile.picker-open only — the one open tile — so the other ~950 tiles keep the perf win. SECOND CHANGE, tag ORDER: gridTagOptions() now sorts by DESCENDING monday label id instead of alphabetically, i.e. newest-created tag first. monday exposes no creation timestamp for dropdown labels (settings_str carries only {id,name}), so the id is the recency proxy — ids are handed out incrementally, so a higher id was created later; this is correct for the current board (16 "test9", 15 "BFS 2026 #2" are the newest) and only breaks if an id is ever deleted and reused. True creation dates would have to be recorded by us at create time — deliberately NOT done, far larger scope. Tags already on the model are pinned above a separator ("On this model") so un-applying one stays one click away, with everything else under "All tags — newest first". The read-only badge popover now uses that same ordering so the two popovers can never disagree. Nothing about the write path, the edit buffer, or create_labels_if_missing changed.
    v7.67: (NAME QA tab — read-only audit, phase 1) server.js + client. New NAME QA tab (next to DUPLICATES) that audits Content Tracker's two free-text character fields against the Model DB. Human-triggered only: nothing runs on a schedule, nothing is written, and this release has NO write path at all (applying corrections is phase 2). HOW IT MATCHES: builds an index of every accepted spelling — each model's primary name plus the 12 per-site alias columns (bfs_name, fsb_name, gct_name, ...) — then splits each field on , & / + and 'and', preserving delimiters. A segment is CLEAN if the whole string, the text BEFORE parentheses, or the text INSIDE parentheses matches an accepted spelling; that handles 'Father Snow (Adam Snow)' (inner is the model) and 'Legrand Wolf (bottom)' (outer is the model) without the tool having to decide which is which — a rule the original spec got backwards, and which would otherwise have produced hundreds of false positives on the msb/cbs/ttp series. DISTANCE: Damerau-Levenshtein, not plain Levenshtein, because a transposition is the most common human typo and plain Levenshtein counts it as two edits — real example, 'Sean Xaiver' vs 'Sean Xavier' scores 0.82 plain (ambiguous band) but 0.91 here (clearly a typo). CATEGORIES for triage only, never affecting what gets written: likely typo (>=0.90), ambiguous (0.75-0.90), marked (new), malformed (unbalanced brackets), no match (<0.75, no suggestion offered). NOTHING IS RECONSTRUCTED — per the user's direction there is no auto-rejoining or auto-fixing: each flagged token shows up to 3 ranked candidates as click-to-insert chips plus a free-text box holding the entire field value, so a wrong guess is simply typed over. Depth selector (500 / 1000 / 2000 / all rows) keeps a first scan fast on the free tier. Server: CONTENT_TRACKER_BOARD_ID added to ALLOWED_BOARD_IDS, env-overridable and published via /config so staging can point at a test board with no code change.
    v7.66: (budgets aligned to the vendor's own default) server.js + client. The v7.65 error text finally identified the mechanism: the message shown was the GENERIC timeout branch, not the DEADLINE branch, which means the SDK threw its own OperationTimeoutError from waitForResult — the ASYNC POLLING path. Reading the SDK: POLL_INTERVAL_MS is 5s and DEFAULT_TIMEOUT_MS is 300000, i.e. Xpoz's own SDK allows FIVE MINUTES because these queries are queued as background jobs that get polled, not answered inline. Every budget I set (30s, then 75s) was far below what the vendor itself expects, so we were aborting work that was still progressing — the same query completes in ~13s from a desktop when their queue is idle, and evidently much slower when it is not. Budgets now: indexed timeoutMs 150s with a 165s wall-clock deadline, live 240s/255s, client caps 200s/290s. Errors now distinguish an async-job timeout ("Xpoz accepted the query but its background job did not finish in time") from a transport hang, since those have completely different causes. Progress text is honest about the wait ("Xpoz queued the query", "safe to leave open") instead of implying imminent failure.
    v7.65: (realistic time budgets — the query was never broken, my deadline was too short) server.js + client. EVIDENCE: an A/B run of the exact same call through the CLI with the real key returned in 9.5s (--response-type fast) and 13.0s (default), both succeeding — so the query shape, the fields, the limit and the fast flag were all fine, and my leading hypothesis (that responseType:'fast' was the culprit) was WRONG. The actual problem was that v7.64 gave the indexed query a 30s budget; that is barely 2x a fast desktop's time, and Render's free tier runs at 0.1 CPU, so it overran. Budgets are now indexed connect 20s + query 75s (~5x the measured time) and live query 150s, with the client cap raised above them (105s / 185s) so the server's specific message still wins. Also trimmed the request: 'id' and 'possibly_sensitive' were requested but NEVER read, so only created_at_date (sort) and media_urls (the images) are fetched now, and limit dropped 25 -> 15 since 10 images is the hard cap — roughly 40% less to transfer and parse, which matters most on the slow free-tier CPU. Progress text no longer warns "it may time out" until the budget is actually close.

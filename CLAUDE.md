@@ -1,6 +1,10 @@
 # CLAUDE.md — Carnal Media Model Dashboard ("MODEL INTERVIEW v2")
 
-Context file for AI assistants working in this repo. Current release: **v7.67**.
+Context file for AI assistants working in this repo. Current release: **v7.69**.
+
+**Keep this file current as part of every release** — version line, the suite table in §3, the
+rollback-tag example, and any new §7 gotcha. It has drifted before (it sat at v7.67 while `main`
+was on v7.68.1), and a stale context file actively misleads the next assistant.
 
 ---
 
@@ -8,7 +12,7 @@ Context file for AI assistants working in this repo. Current release: **v7.67**.
 
 A single-page web tool for managing ~950 adult-performer records, backed by monday.com.
 Used by a small internal team for intake, screening, interviews, photo management, casting,
-duplicate review, and (as of v7.67) name QA.
+duplicate review, and (as of v7.67, with a write path since v7.68) name QA.
 
 **It is not a typical SPA.** Nearly the entire client is one file:
 
@@ -16,7 +20,8 @@ duplicate review, and (as of v7.67) name QA.
 |---|---|
 | `public/index.html` | ~570 KB. **All** markup, CSS, and JS inline. This is the app. |
 | `server.js` | CommonJS Express server. Auth gate + hardened monday.com GraphQL proxy + file/photo endpoints. |
-| `tools/*.js` | Test suite (6 files, 731 assertions). Plain Node, no framework. |
+| `tools/*.js` | Test suite (6 files, 740 assertions). Plain Node, no framework. |
+| `CHANGE-LOG-v*.md` | Per-release write-ups (v7.67, v7.69). Longer-form companions to the in-file changelog comment block. |
 | `package.json` / `package-lock.json` | Deps. Render runs `npm install`. |
 | `render.yaml` | Render service config. |
 | `public/logo-carnal.png` | Logo. |
@@ -82,13 +87,17 @@ Every release, without exception:
 
 | File | Assertions | Covers |
 |---|---|---|
-| `verify.js` | 572 | Substring checks against client source (the broad safety net) |
+| `verify.js` | 576 | Substring checks against client source (the broad safety net) |
 | `scrape-logic.test.js` | 53 | Bluesky/Twitter URL + media parsing (real functions extracted from `server.js`) |
+| `nameqa-logic.test.js` | 41 | Name-matching engine, run against **real** Content Tracker strings |
 | `server-guard.test.js` | 38 | GraphQL allow-list guard, credential hygiene, SDK-loading rules |
-| `nameqa-logic.test.js` | 36 | Name-matching engine, run against **real** Content Tracker strings |
 | `sandbox-logic.test.js` | 20 | Casting sandbox planning + note normalization |
 | `dedup-logic.test.js` | 12 | Duplicate grouping |
-| **Total** | **731** | |
+| **Total** | **740** | |
+
+`tools/` also holds `backfill-medthumbs.js` and `backfill-extra-medthumbs.js`. **These are not
+tests** — they're one-off scripts that exit non-zero without env/args, so `for t in tools/*.js`
+looks like two failures. Iterate `tools/*.test.js tools/verify.js` instead.
 
 ### Deploy commands
 
@@ -113,8 +122,13 @@ git tag -a beta-vNN -m "production vN.NN" && git push origin beta-vNN
 count. A commit silently containing fewer files than intended has burned a full deploy
 cycle here (see §7).
 
-**Rollback tags:** `beta-vNN` where `NN = minor − 16`. v7.60 → `beta-v44`; **v7.67 →
-`beta-v51`**.
+**Rollback tags:** `beta-vNN` where `NN = minor − 16`. v7.60 → `beta-v44`; v7.67 → `beta-v51`;
+**v7.69 → `beta-v53`**.
+
+**Step 5 is not optional.** v7.68 and v7.68.1 both shipped with no `vN.NN:` entry in the
+`index.html` changelog block, which left `grep -o "v7.68:"` with nothing to match — the deploy
+verification step silently had no target. Both were backfilled in v7.69. Also write the
+matching `CHANGE-LOG-vN.NN.md`.
 
 ---
 
@@ -158,6 +172,17 @@ boards with zero code change. Add new boards to this pattern rather than hardcod
   `APP_PW` lives in `sessionStorage`. No credentials in `localStorage`.
 - **Never use `localStorage` for anything sensitive**, and note artifacts/canvas previews
   don't support it at all.
+- **`#form-area` is the only scrolling element.** `html,body{height:100%;overflow:hidden}`, so
+  `window.scrollY` is **always 0** and `window.scrollTo()` is a **no-op**. Any scroll
+  save/restore must read and write `document.getElementById('form-area').scrollTop`.
+- **Layout, for anything sticky:** `body` → `header` (z 100) → `.selector-bar` (z 90) →
+  `.main` (z 1) → `.sidebar` + `#form-area` (the scroll box, `padding:24px 32px`). Every
+  `*-view` is a direct child of `#form-area` and is only ever `display:none`'d, never
+  destroyed — so input values inside a hidden view survive. `renderAllModels()` does blow away
+  `#am-grid.innerHTML` on every call, so restore scroll *after* it returns.
+- **Sticky z-index band inside `#form-area`:** 80 filter/tag popovers · 70 `.shoot-picker` ·
+  60 `.sticky-status-bar` (editors only) · 50 `.iv-notes-sticky` · 40 `.am-tile.picker-open` ·
+  20 `.grid-save-bar` (also `top:0`, and a *later* sibling than the toolbar).
 
 ---
 
@@ -196,6 +221,13 @@ be deleted once Name QA testing is done, same as the Model DB copy.
 | Bluesky link | `dup__of_facebook` |
 | Twitter/X link | `lien_internet` |
 | Legal Name | `text_mknceqty` — **private; never treat as a stage-name alias** |
+
+**Dropdown labels carry no creation timestamp.** `settings_str` is
+`{limit_select, labels:[{id, name}], deactivated_labels:[]}` — there is no `created_at`. monday
+hands ids out incrementally, so **descending label id is the only available "newest first"
+signal** (used by `gridTagOptions()` since v7.69). It breaks only if an id is deleted and reused.
+Note the key is `name`, not `label`, hence the `l.name||l.label` fallback everywhere.
+As of 2026-07-29 `dropdown_mkyj8js9` has 16 active labels, ids 1–16, newest being 16 `test9`.
 
 **Status indices** (these are *not* the same as the UI's tab `data-mode` values):
 
@@ -259,6 +291,16 @@ Consequences:
 
 Each of these cost real debugging time. Read before diagnosing anything.
 
+0. **`content-visibility:auto` silently clips absolutely-positioned children.** `.am-tile`
+   carries it for grid perf across ~950 tiles, and it applies **implicit paint containment** —
+   which clips popovers to the tile's box **no matter what `overflow` says**. This defeated
+   `.am-tile.picker-open{overflow:visible}` for several releases: the shoot-tag list and picker
+   were built, inserted, and then painted away, leaving only their top sliver visible. Fixed in
+   v7.69 by adding `content-visibility:visible` to the open tile only.
+   **If a popover inside a tile "isn't rendering," check containment before the JS.** The tell:
+   `document.elementFromPoint()` over the popover returns the *tile*, not the popover row.
+   `getComputedStyle` is misleading here — it reports `overflow:visible` while the clip is still
+   in force.
 1. **Writes only land on the production board.** Staging rejects writes to its own item
    IDs, so photo/status/tag jobs go red/Retry there. That is *expected*, not a bug.
 2. **monday has no per-file delete.** Removing a photo means `/rearrange-photos` clears
@@ -308,10 +350,10 @@ Each of these cost real debugging time. Read before diagnosing anything.
 
 ---
 
-## 9. Name QA (v7.67) — current state
+## 9. Name QA (v7.67 scan, v7.68 write path) — current state
 
 Audits Content Tracker's two free-text character fields against the Model DB.
-**Read-only. Human-triggered. No write path exists yet.**
+**Human-triggered. Since v7.68 it CAN write — one row at a time, never in bulk.**
 
 Engine functions are pure and unit-tested (`tools/nameqa-logic.test.js`):
 `nqNormalize`, `nqSplitSegments`, `nqSegmentParts`, `nqIsIgnorable`, `nqIsMalformed`,
@@ -337,12 +379,28 @@ no suggestion offered).
 and no auto-fixing. Each flagged token offers ≤3 ranked candidates as click-to-insert chips
 plus a free-text box holding the entire field value.
 
-### Phase 2 (not built)
+### Write path (v7.68) — what shipped
 
-- Apply button. Writes **only** to Content Tracker (§6).
-- Throttled, small first batch, then inspect what the sync Worker did downstream.
+- **Per-row `Send to Monday`. There is deliberately no bulk-apply button** — the owner's
+  explicit constraint. Do not add one.
+- **A suggestion always resolves to a real Model DB profile id**, so the write-back and the
+  shared audit log both know exactly which profile a value was verified against. Hand-typed
+  values are tagged `MANUAL` and kept distinct from a verified match.
+- **Candidate thumbnails** (v7.68): `nqBuildIndex` also pulls each model's headshot, med-thumb
+  preferred (same precedence as `gridImgAsset()`), because "is this the same Alex Smith?" is a
+  visual check. The candidate index is **not** deduped by normalized name — two models can share
+  a spelling and both must surface. The separate `byNorm` fast lookup keeps first-wins.
+- v7.68.1: the manual-entry checkbox is always clickable; the "only for rows with no matching
+  profile" text is a steer, not a hard block.
+- Writes go to **Content Tracker only** (§6) — anything written straight to the four team boards
+  is reverted by the sync Worker.
+
+### Still open
+
 - Dismissal persistence — without it every audit re-shows the same legitimately-unlisted
   names. Consider the sandbox save-states board as the storage precedent.
+- Throttling on a bulk run was never exercised, because bulk was never built. If that changes,
+  re-read §6 first: each CT write fans out to 11 fields × 4 boards via the sync Worker.
 
 ---
 
@@ -357,7 +415,7 @@ plus a free-text box holding the entire field value.
       (TwitterAPI.io / GetXAPI) drops the MCP dependency entirely and every parsing helper
       (`normalizeMediaUrls`, `isTwitterImageUrl`, `twimgSized`) carries over unchanged.
 - [ ] Google auth migration (owned by a dev, replacing `APP_PASSWORD`).
-- [ ] Name QA phase 2 (§9).
+- [ ] Name QA dismissal persistence (§9 "Still open").
 - [ ] P3 cleanup from `CODE-REVIEW-handoff.md`: strip ~157 `v7.NN:` archaeology comments,
       de-duplicate the in-file changelog vs the `CHANGE-LOG-*.md` files, rename the editor
       status control to `editor-status-*`, centralize the ~46 hardcoded photo column-ID

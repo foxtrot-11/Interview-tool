@@ -613,8 +613,15 @@ has("d.corner==='bl'", 'corner-aware resize keeps opposite corner fixed');
 // (C) tag count read-only vs picker (live branch)
 has('function gridTagCountClick(', 'grid count uses live read-only/picker branch');
 has('gridTagCountClick(', 'count button wired to gridTagCountClick');
-// (D) alphabetical tags
-has('.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()))', 'grid tag options sorted alphabetically');
+// (D) tag order — v7.69 replaced alphabetical with newest-created-first. monday gives no created-at
+// for dropdown labels, so descending label id is the recency proxy. Applied tags pin above the rest.
+has('.sort((a,b)=>Number(b.id)-Number(a.id))', 'grid tag options sorted newest-created first (descending label id)');
+has('const applied=opts.filter(l=>current.has(l.toLowerCase()))', 'applied tags partitioned out of the picker list');
+has('const rest=opts.filter(l=>!current.has(l.toLowerCase()))', 'unapplied tags listed after the applied ones');
+has('order.indexOf(a)-order.indexOf(b)', 'read-only tag popover reuses the picker ordering');
+// (D2) v7.69 — content-visibility:auto applies implicit PAINT CONTAINMENT, which clips the tag
+// popovers even with overflow:visible. The open tile must lift it or both popovers render invisible.
+has('.am-tile.picker-open{overflow:visible;z-index:40;content-visibility:visible}', 'open tile lifts content-visibility so tag popovers are not paint-clipped');
 // (E) sandbox tab not clipped by toolbar style
 has('.sb-btn:not(.mode-btn)', 'toolbar .sb-btn scoped away from the mode tab');
 // (F) airport note fields → subitem port
