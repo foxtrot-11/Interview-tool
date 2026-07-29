@@ -330,7 +330,38 @@ lacks("const names = new Set(group.items.map(it=>it.name.trim().toLowerCase()));
 /* v7.26 asserts (ignore + keep-one) */
 has('v7.26:', 'v7.26 deploy marker present');
 has('async function ignoreGroup(gid)', 'persistent ignore present');
-has('async function executeKeepOnly(gid)', 'keep-one-delete-rest present');
+// v7.73 added a `confirmed` parameter so a hand-paired group can route through the two human gates.
+has('async function executeKeepOnly(gid, confirmed)', 'keep-one-delete-rest present, gate-aware');
+has('async function executeMerge(gid, confirmed)', 'merge is gate-aware');
+// (F2) v7.73 — hand-paired duplicates. The name guard is the LAST automated check before a delete,
+// so assert that it still applies to DETECTED groups and is only bypassed for a manual pair that
+// has cleared both human gates.
+has('if(group.manual){\n    if(!confirmed){ dupManualConfirmOpen(gid,\'merge\'); return; }\n  } else {', 'merge: manual pairs route to the confirm modal, detected groups keep the name guard');
+has("if(!confirmed){ dupManualConfirmOpen(gid,'keeponly'); return; }", 'keep-one: same two-gate routing');
+has("if(!g.confirmed){ alert('Tick “these two records are the same person” first", 'gate 1: same-person checkbox is required');
+has('if(String(id)!==String(keeperId)){', 'gate 2: clicking the wrong name is refused');
+has('id="dup-manual-confirm"', 'same-person checkbox rendered');
+has('Click the name of the record that will <b>SURVIVE</b>', 'confirmation asks you to click the surviving name');
+has('[HAND-PAIRED OVERRIDE]', 'the override is written into the Monday deletion comment');
+has('function dupManualSync(', 'manual pair builder present');
+has('function dupPickOpen(', 'model picker for the pair slots');
+has('function dupGroupCardHtml(', 'group card factored so the manual group reuses it');
+has('if(group.manual) return;   // v7.73', 'manual group excluded from the filtered list');
+has('if(_manualKeep) dupGroups.unshift(_manualKeep);', 'an in-progress pair survives Refresh');
+has('board:String(MAIN_BOARD_ID)', 'manual pair items carry a board id for the write');
+lacks("dupManualConfirmOpen(gid,'merge'); return; }\n  }\n  const names", 'the name guard is not silently skipped for detected groups');
+// The name guard is the LAST automated check before a source record is DELETED, and until v7.73 it
+// had no assertion at all. It must survive in BOTH destructive paths — executeMerge and
+// executeKeepOnly — so count the occurrences rather than just proving one exists.
+{
+  const guard = "if(names.size!==1){ alert('Safety stop: names differ ('+[...names].join(', ')+'). Aborted.'); return; }";
+  const n = src.split(guard).length - 1;
+  n === 2
+    ? ok('name safety-stop present in BOTH destructive paths (merge + keep-one)')
+    : bad('name safety-stop present in BOTH destructive paths (merge + keep-one)', `found ${n}, expected 2`);
+}
+has('const names = new Set(group.items.map(it=>dupNameKey(it.name)));', 'merge derives the guard from dupNameKey, the same key grouping uses');
+has('const names=new Set(group.items.map(it=>dupNameKey(it.name)));', 'keep-one derives the guard from dupNameKey too');
 has("const DUP_IGNORE_NAME='__DUP_IGNORE__';", 'ignore list item name');
 has('function dupSig(group)', 'id-set signature present');
 has('.filter(g => !dupIgnoreSet.has(dupSig(g)))', 'ignored groups filtered from scan');

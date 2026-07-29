@@ -155,6 +155,50 @@
   .dup-loading{text-align:center;padding:40px;color:var(--text-muted);font-size:12px;letter-spacing:0.15em;text-transform:uppercase}
   .dup-spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
   .dup-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px}
+  /* ── v7.73: hand-paired duplicates ── */
+  .dup-manual{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;background:var(--surface2)}
+  .dup-manual-head{font-family:var(--font-display);font-weight:800;font-size:14px;letter-spacing:.04em;margin-bottom:12px}
+  .dup-manual-head span{display:block;font-family:var(--font-mono);font-size:11px;font-weight:400;letter-spacing:0;color:var(--text-muted);margin-top:3px;line-height:1.5}
+  .dup-manual-slots{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .dup-mslot{position:relative;width:190px;min-height:150px;border:1px dashed var(--border);border-radius:9px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px;text-align:center;color:var(--text);font-family:inherit}
+  .dup-mslot.empty{cursor:pointer}
+  .dup-mslot.empty:hover{border-color:var(--accent,#3AA2E0);background:rgba(58,162,224,.06)}
+  .dup-mslot-plus{font-size:26px;color:var(--accent,#3AA2E0);line-height:1}
+  .dup-mslot-hint{font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+  .dup-mslot.filled{border-style:solid;border-color:var(--border-active,#52525b)}
+  .dup-mslot-thumb{width:84px;height:84px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center}
+  .dup-mslot-thumb img{width:100%;height:100%;object-fit:cover}
+  .dup-mslot-name{font-size:12px;font-weight:700;line-height:1.3;word-break:break-word}
+  .dup-mslot-meta{font-size:10px;color:var(--text-dim);font-family:var(--font-mono)}
+  .dup-mslot-swap{background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--text-muted);font-size:10px;padding:3px 8px;cursor:pointer;font-family:var(--font-mono)}
+  .dup-mslot-swap:hover{border-color:var(--accent,#3AA2E0);color:var(--text)}
+  .dup-mslot-vs{font-family:var(--font-mono);font-size:18px;color:var(--text-dim);font-weight:700}
+  .dup-group-manual{border-color:var(--accent,#3AA2E0)}
+  /* the same-person gate, above the action row so it's read before the merge button is reached */
+  .dup-confirm-bar{display:flex;align-items:flex-start;gap:9px;margin:0 0 10px;padding:10px 12px;border:1px solid #f5c518;border-radius:8px;background:rgba(245,197,24,.07);font-size:12px;line-height:1.5;cursor:pointer}
+  .dup-confirm-bar input{margin-top:2px;flex:none;width:16px;height:16px;cursor:pointer}
+  /* picker */
+  .dup-pick{position:fixed;z-index:9660;left:50%;top:14vh;transform:translateX(-50%);width:min(94vw,460px);background:var(--surface2);border:1px solid var(--accent,#3AA2E0);border-radius:10px;box-shadow:0 16px 48px rgba(0,0,0,.55);padding:12px;display:none}
+  .dup-pick.open{display:block}
+  .dup-pick-head{font-size:13px;font-weight:700;margin-bottom:8px}
+  #dup-pick-search{width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:8px 10px;margin-bottom:8px}
+  .dup-pick-list{max-height:46vh;overflow:auto}
+  .dup-pick-item{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;cursor:pointer}
+  .dup-pick-item:hover{background:var(--surface)}
+  .dup-pick-thumb{width:34px;height:34px;border-radius:4px;overflow:hidden;background:var(--surface);flex:none}
+  .dup-pick-thumb img{width:100%;height:100%;object-fit:cover}
+  .dup-pick-name{font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dup-pick-meta{font-size:10px;color:var(--text-dim);font-family:var(--font-mono);white-space:nowrap}
+  .dup-pick-empty{font-size:12px;color:var(--text-dim);padding:12px 8px}
+  .dup-pick-cancel{margin-top:8px;width:100%;background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--text-muted);font-size:12px;padding:8px;cursor:pointer}
+  .dup-pick-cancel:hover{border-color:var(--accent,#3AA2E0);color:var(--text)}
+  /* survive-name confirmation */
+  .dup-confirm-q{font-size:14px;line-height:1.5;margin-bottom:4px}
+  .dup-confirm-sub{font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:14px}
+  .dup-confirm-names{display:flex;gap:10px;flex-wrap:wrap}
+  .dup-confirm-name{flex:1 1 200px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-weight:700;padding:14px 12px;cursor:pointer;font-family:inherit;line-height:1.3;word-break:break-word}
+  .dup-confirm-name:hover{border-color:var(--accent,#3AA2E0)}
+  .dup-confirm-err{font-size:12px;color:#f87171;line-height:1.5;margin-top:12px;min-height:18px}
   /* ── KANBAN ── */
   .mode-btn.active[data-mode="all"]{background:#e8e8f0;color:#111}
   /* v7.52: status dropdown (collapses the per-status tabs) */
@@ -1661,8 +1705,37 @@
         <input type="text" id="dup-search" class="dup-search-input" placeholder="Search duplicates by name…" oninput="renderDupGroups()" onfocus="this.select()" autocomplete="off">
         <button class="dup-loadall-btn" id="dup-loadall-btn" onclick="loadAllGroupDetails()">Load all sequentially</button>
       </div>
+      <!-- v7.73: hand-paired duplicates. Detection groups by exact normalized name, so a real
+           duplicate spelled two different ways never surfaces — but is obvious from the photos. -->
+      <div class="dup-manual" id="dup-manual">
+        <div class="dup-manual-head">Pair two records by hand
+          <span>For duplicates the name matching can't catch — different spellings, wrong names. Merge is gated behind two confirmations.</span>
+        </div>
+        <div class="dup-manual-slots" id="dup-manual-slots"></div>
+      </div>
+      <div id="dup-manual-mount"></div>
       <div id="dup-groups-container">
         <div class="dup-loading">Scanning boards for duplicates...</div>
+      </div>
+    </div>
+
+    <!-- v7.73: model picker for the hand-pair slots -->
+    <div class="dup-pick" id="dup-pick" onclick="event.stopPropagation()">
+      <div class="dup-pick-head">Choose a record</div>
+      <input type="text" id="dup-pick-search" placeholder="Search by name…" autocomplete="off" oninput="dupPickRender()">
+      <div class="dup-pick-list" id="dup-pick-list"></div>
+      <button type="button" class="dup-pick-cancel" onclick="dupPickClose()">Cancel</button>
+    </div>
+
+    <!-- v7.73: survive-name confirmation. Deliberately a CLICK on an existing name, never typing —
+         these names have odd spellings and a typo-prone confirm box is worse than none. -->
+    <div id="dup-confirm-modal" class="unsaved-modal" style="z-index:9650">
+      <div class="unsaved-panel" style="max-width:560px;width:min(94vw,560px)">
+        <div class="unsaved-title">Confirm the merge</div>
+        <div id="dup-confirm-body"></div>
+        <div class="unsaved-actions" style="margin-top:14px">
+          <button class="kb-hs-cancel" onclick="dupManualConfirmClose()">Cancel</button>
+        </div>
       </div>
     </div>
 
@@ -5187,6 +5260,7 @@ async function setMode(mode){
     buildSidebarNav('blank');
     document.getElementById('sidebar-notes-pin')?.classList.remove('visible');
     show('dup-view');
+    dupRenderManual();   // v7.73: draw the hand-pair slots immediately, before the scan finishes
     loadDuplicates();
     return;
   }
@@ -8000,6 +8074,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.73: (Duplicates — pair two records by hand) Client-only. WHY: detection groups by exact normalized name (dupNameKey), so a genuine duplicate whose two records are spelled differently is invisible to the tool — while being obvious to a human looking at the two headshots. A "Pair two records by hand" panel at the top of the DUPLICATES tab now takes two slots; each opens a searchable list of every model (thumbnail + name + id + date, sourced from the shared kanbanItems store, so no extra fetch), and once both are chosen the pair renders as a normal duplicate group with the same cards, the same field-by-field preview and the same merge/keep-one actions. THE REUSE IS THE POINT: computePlan() already took a GROUP OBJECT rather than a detected pair, reading only items[].{id,name,created_at,board} and keeperId — so a synthesised group needs no changes to the planner, the preview, the photo merge, the verifier or the audit log. The group-card markup was factored out of renderDupGroups into dupGroupCardHtml() so both paths render identically; the manual group lives in dupGroups (that's how getDupGroup, previewMerge, executeMerge, loadGroupDetails and selectKeeper find it) but is skipped by the filtered list and rendered into its own always-visible mount, and it is re-inserted after a Refresh so an in-progress review isn't silently discarded. SAFETY, which is the whole design problem: executeMerge DELETES the source record, and its last automated check was that both names normalize identically. A hand-picked pair fails that BY DEFINITION — differing names are the entire reason the feature exists — so for a manual group only, that check is replaced by TWO human gates, and NEITHER involves typing (the owner's explicit constraint: these names have genuinely odd spellings and a typo-prone confirm box is worse than none): (1) a "these two records are the same person, I've compared the photos" checkbox, unticked by default; and (2) a modal that asks you to CLICK THE NAME of the record that will SURVIVE, offering only the two names that already exist on the records — clicking the other one is REFUSED with an explanation that it's the record being deleted. It is a comprehension check, not an OK button. Both gates apply to "Keep one · delete other" as well. The override is written into the Monday deletion comment as [HAND-PAIRED OVERRIDE] with both original names, so the audit trail shows a human forced it rather than the matcher having agreed. THE EXISTING PATH IS UNTOUCHED: detected groups still hit the name guard exactly as before, and it turned out that guard — the single most important check in the app — had NO test at all, so v7.73 adds one that counts its occurrences across BOTH destructive paths and fails if either is removed (verified by deleting one: found 1, expected 2). Manual pairing is MAIN-BOARD ONLY, because kanbanItems is the main board; detected duplicates can still span the Evernote batch board since those carry their own per-item board id. Verified against the real extracted functions, 18 checks: the pair builds from two different names with the gate untocked, nothing executes without confirmation (routes to the modal instead), clicking the doomed record does not merge, clicking the survivor proceeds and records the override, keep-one is gated identically, a record cannot be paired with itself, and Clear removes both the group and the slots.
    v7.72.1: (bugfix — the pinned toolbar was clipping the title row above it) Client-only, CSS only. REPORTED: on All Models the title row was cut in half — "All Models", the "945 of 945 models" count and the Refresh button were all partly hidden behind the pinned controls row. CAUSE, and it was my own workaround from v7.70: a sticky element's `top:0` pins to the scrollport's CONTENT box, and #form-area had `padding:24px 32px`, so every sticky row pinned 24px BELOW the visible top, leaving a 24px strip that grid tiles scrolled through in plain view (42 sampled x-positions showed a tile in it). v7.70 covered that strip by pinning at top:-24px with `padding-top:32px` to fill it and `margin-top:-24px` to cancel the extra padding in normal flow. The content ended up in the right place — which is what I measured and why it looked fine — but the row's BOX now started 24px higher, and it has an opaque background, so it painted straight over the bottom of whatever sat above it. I even had an assert for this ("at rest it still sits below the title row") and dropped it when I changed approach. REAL FIX, no hack: #form-area's padding-TOP moves onto a `::before` spacer (`padding:0 32px 24px` + `.form-area::before{height:24px}`). With padding-top:0 the content box top IS the visible top, so a plain `top:0` pins flush — no strip, no negative margins, nothing overlapping. The 24px of breathing room is now ordinary scrolling content, so it scrolls away instead of being a permanent dead band. `.tb-sticky` drops to `top:0` / `margin:0 -32px 10px` / `padding:8px 32px`; only the HORIZONTAL negative margins remain, and those are load-bearing — they cover the scroll container's left/right gutters so tiles don't show through the sides. KNOCK-ON, checked deliberately: `.sticky-status-bar` (top:0) and `.iv-notes-sticky` (top:50px) in the editors now pin 24px higher too — flush rather than inset — and their 50px relationship to each other is unchanged; measured them pinning at 0 and 50 with a 12px gap, no overlap, both still clickable including Back-to-grid. MEASURED for the fix: title / count / Refresh no longer overlapped by the row and all three hit-testable; row still pinned flush (offset 0) at three scroll depths; zero tiles bleeding above it; row still spans the full width; save bar still lands exactly on the row's bottom; 24px of breathing room preserved at rest and it scrolls away. verify.js now asserts the new padding model AND `lacks()` both retired hacks.
    v7.72: (Casting Sandbox — one-tap promote/demote, and rows reordered TOP/BOTTOM/VERS) Client-only, builds on v7.71. (1) BUMP BUTTON: moving somebody between a role's main row and its alternates row meant dragging, which after v7.71 required scrolling the row SIDEWAYS and the page VERTICALLY at the same time — awkward with a mouse and effectively broken on a phone. Every filled tile now carries a 28px arrow at its top-left: ↑ on a tile in an alternates row promotes it to that role's main row, ↓ on a tile in a main row demotes it to that role's alternates row. It always APPENDS to the next free slot rather than inserting, so nobody already placed is displaced or renumbered above. Direction is decided from where the tile actually is (SB_ALT_REV[cur] || SB_ALT[cur]), not from a flag that could go stale, and the move goes through the existing sbMove() — so this is a shortcut over the one movement code path, not a second one. ROLE IS NEVER CROSSED: a VERS alternate can only ever land in VERS. Verified headlessly against the real extracted functions (13 checks): promote appends to the end and leaves the source zone, demote does the same in reverse, VERS→VERS only, a round trip restores the original role, no id can appear in two zones, and bumping an unknown id is a no-op rather than a crash. (2) THE TILE'S TOP-LEFT WAS ALREADY OCCUPIED by .sb-slotnum, the T1/B2/ALT position label. On a FILLED slot that label now drops to top:40px with a chip background so it stays readable over the headshot; empty slots are untouched (their label is centred by a separate rule). Measured in a browser: 5px clearance between label and button, all four tile buttons independently hit-testable, no two overlapping, empty-slot label still centred. (3) ROW ORDER is now TOP, BOTTOM, VERS for both the primary and the alternates rows. NOT just a cosmetic swap: the alternate numbering at Port used its own hardcoded ['ab','av','at'], so reordering the display alone would have made the subitem numbers written to Monday disagree with what is on screen. SB_MAIN is now the single source of zone order and SB_ALT_ORDER derives from it, so display order and Port numbering cannot drift apart again; verify.js asserts the derivation AND that the old literal is gone. NOTE FOR THE OWNER: because alternates are numbered in display order, an alternate's subitem number at Port changes with this release (TOP alternates are now numbered before BOTTOM and VERS).
    v7.71: (Casting Sandbox — rows instead of columns, and save-in-place) Client-only. TWO CHANGES, both in the sandbox. (1) LAYOUT: BOTTOM / VERS / TOP were three vertical columns (.sb-cols, a 3-up CSS grid of minmax(320px,1fr)). Slots are a fixed 142px wide inside a wrapping flex zone, so at ~320px of column width they wrapped 2-per-row and a shoot with 8 people ran far below the fold — measured, one column of 8 was ~792px tall and there were three of them side by side. Each zone is now ONE horizontal row, a single slot high, scrolling sideways: .sb-rows (flex column) > .sb-rowwrap > .sb-rowhead + .sb-zone.sb-rowzone, where the row zone is flex-wrap:nowrap + overflow-x:auto. Vertical cost per zone is now FIXED regardless of headcount. The three ALTERNATES rows moved out of their parent columns into one collapsible block BELOW all three primary rows — previously alternates sat inside each column, which pushed the primary cast of VERS and TOP even further down. Collapse state persists in localStorage (a view preference, never data). MEASURED IN A BROWSER against a 300-slot fixture carrying the real .sb-slot/.sb-zone/.sb-tile rules: each zone renders 206px tall (one 180px slot + padding) instead of wrapping; all 8 slots of a full row sit on ONE line (1 distinct y-position); the row overflows 1212px into 1061px and scrolls, with the last slot still hit-testable after scrolling; the three primary rows total 792px against an 837px viewport, so the whole primary cast now fits on screen; collapsing alternates saves 712px. THE DRAG-AND-DROP NEEDED ZERO CHANGES — drop targets are identified purely by data-zone + data-index with no geometry, no clientY comparison and no insert-before maths anywhere, which is why rotating the layout is safe; verified the slots still carry both data attributes and tiles are still draggable. The horizontal row scrollbar is styled (10px) for the same reason the v7.70 vertical one was: the 4px default cannot be grabbed. (2) SAVE IN PLACE: sbSaveState() unconditionally called create_item and sbLoadSave() threw the loaded id away, so editing a saved arrangement meant "save a second copy, then delete the old one". The open save's id and name are now tracked (sbCurrentSaveId / sbCurrentSaveName); Step 3 shows "Update <name>" alongside "Save as new", and the open save's chip is highlighted so it is unambiguous what Update overwrites. Update uses change_multiple_column_values on the existing item — the same create-or-update shape dupIgnorePersist already uses against this very board and column — and is gqlRetry-safe because overwriting a column with a fixed value is idempotent; Save-as-new deliberately stays on plain gql because create_item is NOT idempotent and a retry could double-create. Save-as-new then ADOPTS the new item as the open save, so a further edit updates it rather than making a third copy. Overwriting prompts for confirmation because it replaces a shared record for every coworker with no recovery. The tracked id is cleared everywhere the arrangement stops being that save — shoot-tag change, new tag, a #sb= share link, and deletion of the save itself — because a stale id would silently overwrite the wrong arrangement.
@@ -8180,6 +8255,7 @@ function fileEntries(item, colId){
 }
 
 async function loadDuplicates(){
+  const _manualKeep = dupGroups.find(g=>g.manual) || null;   // v7.73: survive a Refresh
   const container = document.getElementById('dup-groups-container');
   const summary   = document.getElementById('dup-summary');
   container.innerHTML = '<div class="dup-loading"><span class="dup-spinner"></span><span id="dup-load-status">Connecting… (first scan can take ~30–60s on a cold start)</span></div>';
@@ -8222,9 +8298,13 @@ async function loadDuplicates(){
         return { gid:'g'+i+'_'+items[0].id, name: gname, placeholder: isPlaceholderName(gname), items, keeperId:null, done:false };
       })
       .filter(g => !dupIgnoreSet.has(dupSig(g)));   // drop pairs a coworker already marked "not a duplicate"
-    if(!dupGroups.length){ container.innerHTML = '<div class="dup-empty">✓ No duplicate name-groups found</div>'; summary.innerHTML=''; return; }
     dupGroups.forEach(g => { if(!g.placeholder) g.keeperId = defaultKeeperId(g); });
+    // v7.73: a Refresh rebuilds dupGroups from scratch — put any in-progress hand-paired group back,
+    // otherwise hitting Refresh silently discards the pair you were part-way through reviewing.
+    if(_manualKeep) dupGroups.unshift(_manualKeep);
+    if(!dupGroups.filter(g=>!g.manual).length){ container.innerHTML = '<div class="dup-empty">✓ No duplicate name-groups found</div>'; summary.innerHTML=''; dupRenderManual(); return; }
     renderDupGroups();
+    dupRenderManual();
   } catch(e){
     container.innerHTML = `<div class="dup-empty log-err">Failed to load: ${escapeHtml(e.message)}</div>`;
     console.error(e);
@@ -8256,6 +8336,148 @@ function classifyType(group){
 }
 
 function getDupGroup(gid){ return dupGroups.find(g=>g.gid===gid); }
+
+/* ══ v7.73: HAND-PAIRED DUPLICATES ═══════════════════════════════════════════════════════════
+   Detection groups by exact normalized name (dupNameKey), so a real duplicate whose two records
+   are spelled differently is invisible to it — but obvious to a human looking at the photos.
+   This lets you nominate the two records yourself.
+
+   SAFETY. executeMerge DELETES the source record, and its last automated check was that both
+   names normalize identically. Hand-picked pairs will always fail that by definition, so for a
+   manual pair it is replaced by TWO human gates, neither of which involves typing (names here have
+   genuinely odd spellings and a typo-prone confirm box would be worse than none):
+     1. a "these are the same person" checkbox, unticked by default, and
+     2. a modal that asks you to CLICK THE NAME of the record that will survive. Clicking the other
+        name is refused with an explanation. It is a comprehension check, not an OK button — and it
+        only ever offers values that already exist on the records.
+   The override is also written into the Monday deletion comment, so the audit trail shows a human
+   forced it rather than the matcher having agreed.
+
+   Sourced from kanbanItems, which is the MAIN board only — manual pairing can't reach the Evernote
+   batch board (detected duplicates still can, because those carry their own per-item `board`). */
+let dupManual={a:null,b:null};
+const DUP_MANUAL_GID='manual';
+
+function dupManualSlotHtml(slot){
+  const id=dupManual[slot];
+  const m=id?modelById(id):null;
+  if(!m) return `<button type="button" class="dup-mslot empty" onclick="dupPickOpen('${slot}')">
+      <span class="dup-mslot-plus">+</span><span class="dup-mslot-hint">Choose record ${slot.toUpperCase()}</span></button>`;
+  const asset=gridImgAsset(m); const url=asset?(kbHeadCache[asset]||''):'';
+  return `<div class="dup-mslot filled">
+      <div class="dup-mslot-thumb">${url?`<img src="${escapeHtml(url)}" alt="">`:`<span class="am-mono">${escapeHtml((m.name[0]||'?').toUpperCase())}</span>`}</div>
+      <div class="dup-mslot-name">${escapeHtml(m.name)}</div>
+      <div class="dup-mslot-meta">id ${m.id}${m.addedLabel?' · '+m.addedLabel:''}</div>
+      <button type="button" class="dup-mslot-swap" onclick="dupPickOpen('${slot}')">Change</button>
+    </div>`;
+}
+function dupRenderManual(){
+  const host=document.getElementById('dup-manual-slots'); if(!host) return;
+  host.innerHTML = dupManualSlotHtml('a') + `<div class="dup-mslot-vs">+</div>` + dupManualSlotHtml('b');
+  const mount=document.getElementById('dup-manual-mount');
+  const g=getDupGroup(DUP_MANUAL_GID);
+  if(!mount) return;
+  if(!g){ mount.innerHTML=''; return; }
+  mount.innerHTML = `<div class="dup-group dup-group-manual" id="dup-group-${DUP_MANUAL_GID}">`+
+    dupGroupCardHtml(g, classifyType(g))+`</div>`;
+  // The same-person gate lives above the actions so it's read before the merge button is reached.
+  const act=mount.querySelector('.dup-actions');
+  if(act){
+    const bar=document.createElement('label');
+    bar.className='dup-confirm-bar';
+    bar.innerHTML=`<input type="checkbox" id="dup-manual-confirm" ${g.confirmed?'checked':''} onchange="dupManualSetConfirmed(this.checked)">`+
+      `<span>These two records are the <b>same person</b>. I've compared the photos above.</span>`;
+    act.parentNode.insertBefore(bar, act);
+  }
+  loadGroupDetails(DUP_MANUAL_GID);   // pull both records' fields + photos straight away
+}
+function dupManualSetConfirmed(v){ const g=getDupGroup(DUP_MANUAL_GID); if(g) g.confirmed=!!v; }
+function dupManualClear(){
+  dupManual={a:null,b:null};
+  dupGroups=dupGroups.filter(g=>!g.manual);
+  dupRenderManual();
+}
+function dupManualSync(){
+  dupGroups=dupGroups.filter(g=>!g.manual);
+  const a=dupManual.a?modelById(dupManual.a):null, b=dupManual.b?modelById(dupManual.b):null;
+  if(a&&b&&String(a.id)!==String(b.id)){
+    const mk=m=>({id:String(m.id), name:m.name, created_at:m.created_at||'', statusIdx:m.statusIdx,
+                  board:String(MAIN_BOARD_ID)});
+    const items=[mk(a),mk(b)].sort((x,y)=>new Date(x.created_at)-new Date(y.created_at));
+    dupGroups.unshift({
+      gid:DUP_MANUAL_GID, name:`${a.name}  +  ${b.name}`, placeholder:false,
+      manual:true, confirmed:false, items, keeperId:items[0].id, done:false
+    });
+  }
+  dupRenderManual();
+}
+// ── searchable picker ─────────────────────────────────────────────────────────────────────────
+let dupPickSlot=null;
+function dupPickOpen(slot){
+  dupPickSlot=slot;
+  const box=document.getElementById('dup-pick'); if(!box) return;
+  box.classList.add('open');
+  const s=document.getElementById('dup-pick-search'); if(s){ s.value=''; s.focus(); }
+  dupPickRender();
+}
+function dupPickClose(){ const b=document.getElementById('dup-pick'); if(b) b.classList.remove('open'); dupPickSlot=null; }
+function dupPickRender(){
+  const list=document.getElementById('dup-pick-list'); if(!list) return;
+  const q=((document.getElementById('dup-pick-search')||{}).value||'').trim().toLowerCase();
+  const other = dupPickSlot==='a' ? dupManual.b : dupManual.a;
+  const rows=kanbanItems
+    .filter(m=>String(m.id)!==String(other||''))          // can't pair a record with itself
+    .filter(m=>!q || String(m.name).toLowerCase().includes(q))
+    .slice(0,200);
+  list.innerHTML = rows.length ? rows.map(m=>{
+    const asset=gridImgAsset(m); const url=asset?(kbHeadCache[asset]||''):'';
+    return `<div class="dup-pick-item" onclick="dupPickChoose('${m.id}')">
+      <span class="dup-pick-thumb">${url?`<img src="${escapeHtml(url)}" alt="">`:''}</span>
+      <span class="dup-pick-name">${escapeHtml(m.name)}</span>
+      <span class="dup-pick-meta">${escapeHtml(m.addedLabel||'')} · id ${m.id}</span></div>`;
+  }).join('') : `<div class="dup-pick-empty">No match${q?` for “${escapeHtml(q)}”`:''}.</div>`;
+}
+function dupPickChoose(id){
+  if(!dupPickSlot) return;
+  dupManual[dupPickSlot]=String(id);
+  dupPickClose();
+  dupManualSync();
+}
+// ── the survive-name confirmation ─────────────────────────────────────────────────────────────
+let dupConfirmAction=null;
+function dupManualConfirmOpen(gid, action){
+  const g=getDupGroup(gid); if(!g) return false;
+  if(!g.confirmed){ alert('Tick “these two records are the same person” first — compare the photos above.'); return false; }
+  const keeperId = (g._plan && g._plan.keeperId) || g.keeperId;
+  const keeper=g.items.find(i=>i.id===keeperId);
+  const loser=g.items.find(i=>i.id!==keeperId);
+  if(!keeper||!loser) return false;
+  dupConfirmAction={gid, action, keeperId};
+  const body=document.getElementById('dup-confirm-body');
+  const nameBtn=(it,ok)=>`<button type="button" class="dup-confirm-name${ok?' is-keeper':''}" onclick="dupManualConfirmPick('${it.id}')">${escapeHtml(it.name)}</button>`;
+  body.innerHTML =
+    `<div class="dup-confirm-q">Click the name of the record that will <b>SURVIVE</b>.</div>`+
+    `<div class="dup-confirm-sub">The other record is <b>deleted</b> from Monday. Nothing is typed here — these are the two existing names.</div>`+
+    `<div class="dup-confirm-names">${nameBtn(g.items[0], g.items[0].id===keeperId)}${nameBtn(g.items[1], g.items[1].id===keeperId)}</div>`+
+    `<div class="dup-confirm-err" id="dup-confirm-err"></div>`;
+  document.getElementById('dup-confirm-modal').classList.add('open');
+  return true;
+}
+function dupManualConfirmClose(){ document.getElementById('dup-confirm-modal')?.classList.remove('open'); dupConfirmAction=null; }
+function dupManualConfirmPick(id){
+  if(!dupConfirmAction) return;
+  const {gid, action, keeperId}=dupConfirmAction;
+  if(String(id)!==String(keeperId)){
+    const g=getDupGroup(gid); const keeper=g&&g.items.find(i=>i.id===keeperId);
+    const err=document.getElementById('dup-confirm-err');
+    if(err) err.textContent=`That's the record that gets DELETED. The survivor is “${keeper?keeper.name:''}” — click that, or cancel and change the ◉ keeper.`;
+    return;
+  }
+  dupManualConfirmClose();
+  const g=getDupGroup(gid); if(g) g.humanForced=true;   // recorded in the Monday deletion comment
+  if(action==='merge') executeMerge(gid, true);
+  else executeKeepOnly(gid, true);
+}
 function setDupFilter(f){ dupFilter=f; renderDupGroups(); }
 
 function renderDupGroups(){
@@ -8274,37 +8496,52 @@ function renderDupGroups(){
   let shown = 0;
   dupGroups.forEach(group => {
     if(group.done) return;
+    if(group.manual) return;   // v7.73: the hand-paired group renders in its own always-visible mount
     const info = classifyType(group);
     if(dupFilter!=='ALL' && dupFilter!==info.type) return;
     if(dupSearch && !group.name.toLowerCase().includes(dupSearch)) return;
     shown++;
-    const gid = group.gid;
     const div = document.createElement('div');
-    div.className = 'dup-group'; div.id = `dup-group-${gid}`;
-    const oldest = group.items[0];
-    div.innerHTML = `
+    div.className = 'dup-group'; div.id = `dup-group-${group.gid}`;
+    div.innerHTML = dupGroupCardHtml(group, info);
+    container.appendChild(div);
+  });
+  if(!shown) container.innerHTML = `<div class="dup-empty">No groups in this filter.</div>`;
+}
+
+/* v7.73: factored out of renderDupGroups so the hand-paired group reuses the EXACT same card,
+   preview mount and log markup as a detected group — which is what lets previewMerge / executeMerge
+   / loadGroupDetails / selectKeeper work on it unchanged. They all resolve by gid through
+   getDupGroup(), so a manual group must live in dupGroups even though it renders elsewhere. */
+function dupGroupCardHtml(group, info){
+  const gid = group.gid;
+  const oldest = group.items[0];
+  const manual = !!group.manual;
+  const actions = info.type==='D'
+    ? `<div class="dup-locked-note">🔒 Placeholder name — these are different people. Merge is disabled.</div>
+       <button class="skip-btn" onclick="ignoreGroup('${gid}')" title="Keep all and hide permanently for everyone (stored on Monday)">Not duplicates — hide</button>
+       <button class="skip-btn" onclick="skipGroup('${gid}')">Skip (this session)</button>`
+    : manual
+      ? `<button class="merge-btn" onclick="previewMerge('${gid}')" id="merge-btn-${gid}">Preview changes →</button>
+         <button class="merge-btn" onclick="executeKeepOnly('${gid}')" title="Keep the ◉ selected record and delete the other WITHOUT merging any fields — for when the duplicate is empty">Keep one · delete other</button>
+         <button class="skip-btn" onclick="dupManualClear()">Clear pair</button>`
+      : `<button class="merge-btn" onclick="previewMerge('${gid}')" id="merge-btn-${gid}">Preview changes →</button>
+         <button class="merge-btn" onclick="executeKeepOnly('${gid}')" title="Keep the ◉ selected record and delete the other(s) WITHOUT merging any fields — for when a duplicate is empty">Keep one · delete rest</button>
+         <button class="skip-btn" onclick="ignoreGroup('${gid}')" title="Different people who share a name — keep both and hide permanently for everyone (stored on Monday)">Not a duplicate</button>
+         <button class="skip-btn" onclick="skipGroup('${gid}')">Skip (this session)</button>`;
+  return `
       <div class="dup-group-header">
         <div class="dup-group-name">${escapeHtml(group.name)}</div>
         <div class="dup-group-count">${group.items.length} records</div>
-        <div class="dup-case-badge ${info.cls}">Type ${info.type}: ${info.label}</div>
-        <div style="margin-left:auto;font-size:10px;color:var(--text-dim)">oldest ${oldest.created_at.slice(0,10)} · id ${oldest.id}</div>
+        <div class="dup-case-badge ${info.cls}">${manual?'Hand-paired':'Type '+info.type+': '+info.label}</div>
+        <div style="margin-left:auto;font-size:10px;color:var(--text-dim)">oldest ${(oldest.created_at||'').slice(0,10)} · id ${oldest.id}</div>
       </div>
       <div class="dup-items" id="dup-items-${gid}"><button class="dup-load-btn" onclick="loadGroupDetails('${gid}')">Load details</button></div>
       <div class="dup-preview" id="dup-preview-${gid}"></div>
       <div class="dup-actions">
-        ${info.type==='D'
-          ? `<div class="dup-locked-note">🔒 Placeholder name — these are different people. Merge is disabled.</div>
-             <button class="skip-btn" onclick="ignoreGroup('${gid}')" title="Keep all and hide permanently for everyone (stored on Monday)">Not duplicates — hide</button>
-             <button class="skip-btn" onclick="skipGroup('${gid}')">Skip (this session)</button>`
-          : `<button class="merge-btn" onclick="previewMerge('${gid}')" id="merge-btn-${gid}">Preview changes →</button>
-             <button class="merge-btn" onclick="executeKeepOnly('${gid}')" title="Keep the ◉ selected record and delete the other(s) WITHOUT merging any fields — for when a duplicate is empty">Keep one · delete rest</button>
-             <button class="skip-btn" onclick="ignoreGroup('${gid}')" title="Different people who share a name — keep both and hide permanently for everyone (stored on Monday)">Not a duplicate</button>
-             <button class="skip-btn" onclick="skipGroup('${gid}')">Skip (this session)</button>`}
+        ${actions}
         <div id="dup-log-${gid}" class="dup-merge-log"></div>
       </div>`;
-    container.appendChild(div);
-  });
-  if(!shown) container.innerHTML = `<div class="dup-empty">No groups in this filter.</div>`;
 }
 
 // Load every currently-visible group's details one after another (manual, on demand)
@@ -8611,7 +8848,7 @@ async function retryFailedDeletes(gid){
   }
 }
 
-async function executeMerge(gid){
+async function executeMerge(gid, confirmed){
   const group = getDupGroup(gid);
   const plan  = group && group._plan;
   const log   = document.getElementById(`dup-log-${gid}`);
@@ -8619,8 +8856,16 @@ async function executeMerge(gid){
   if(!group || !plan){ alert('Please run Preview again.'); return; }
   // v7.25: compare by the SAME normalized key the grouping uses, so a "(NEEDS STAGE NAME)" twin is allowed
   // to merge with its plain twin; genuinely different names still trip the safety stop.
-  const names = new Set(group.items.map(it=>dupNameKey(it.name)));
-  if(names.size!==1){ alert('Safety stop: names differ ('+[...names].join(', ')+'). Aborted.'); return; }
+  // v7.73: a HAND-PAIRED group is exempt from the name check by definition — differing names are the
+  // whole reason it exists — but only once BOTH human gates have been cleared: the same-person
+  // checkbox, and clicking the surviving record's name in the confirm modal (which sets `confirmed`
+  // via dupManualConfirmOpen and passes confirmed=true here). Never reachable by a single click.
+  if(group.manual){
+    if(!confirmed){ dupManualConfirmOpen(gid,'merge'); return; }
+  } else {
+    const names = new Set(group.items.map(it=>dupNameKey(it.name)));
+    if(names.size!==1){ alert('Safety stop: names differ ('+[...names].join(', ')+'). Aborted.'); return; }
+  }
   if(pv){ pv.querySelectorAll('button,select,input').forEach(b=>b.disabled=true); }
   log.className='dup-merge-log visible'; log.innerHTML='';
   const addLog=(m,c='')=>{ log.innerHTML+=`<span class="${c}">${escapeHtml(m)}</span>\n`; log.scrollTop=log.scrollHeight; };
@@ -8647,7 +8892,12 @@ async function executeMerge(gid){
 
     const failedDeletes=[];
     for(const s of plan.sources){
-      const body=`MERGED INTO ${plan.keeperId} (${plan.keeperName}) on ${new Date().toISOString().slice(0,10)}. Conflicts logged in the kept record's General Notes.`;
+      // v7.73: a hand-paired merge is flagged in the audit trail. The name matcher did NOT agree
+      // these were the same person — a human overrode it — and that has to be visible on Monday.
+      const forced = group.manual
+        ? `\n[HAND-PAIRED OVERRIDE] Names did not match ("${group.items.map(i=>i.name).join('" / "')}"). A human confirmed the same person and clicked the surviving name.`
+        : '';
+      const body=`MERGED INTO ${plan.keeperId} (${plan.keeperName}) on ${new Date().toISOString().slice(0,10)}. Conflicts logged in the kept record's General Notes.${forced}`;
       try { await gqlRetry(`mutation($i:ID!,$b:String!){create_update(item_id:$i,body:$b){id}}`,{i:s.id,b:body}); }
       catch(e){ addLog(`  (comment on ${s.id} failed: ${e.message})`,'log-warn'); }
       try {
@@ -8802,11 +9052,16 @@ async function ignoreGroup(gid){
   showToast(persisted ? 'Marked “not a duplicate” — hidden for everyone' : 'Hidden for this session only (add a Long Text column to the save-states board to make it stick)', persisted?'success':'error');
 }
 // Keep the selected record, delete the other(s) with NO field/photo merge (for when a duplicate is empty).
-async function executeKeepOnly(gid){
+async function executeKeepOnly(gid, confirmed){
   const group=getDupGroup(gid); if(!group) return;
   if(!group.keeperId){ alert('Pick which record to KEEP first (the ◉ button on a card).'); return; }
-  const names=new Set(group.items.map(it=>dupNameKey(it.name)));
-  if(names.size!==1){ alert('Safety stop: names differ ('+[...names].join(', ')+'). Aborted.'); return; }
+  // v7.73: same two-gate exemption as executeMerge — see the note there.
+  if(group.manual){
+    if(!confirmed){ dupManualConfirmOpen(gid,'keeponly'); return; }
+  } else {
+    const names=new Set(group.items.map(it=>dupNameKey(it.name)));
+    if(names.size!==1){ alert('Safety stop: names differ ('+[...names].join(', ')+'). Aborted.'); return; }
+  }
   const keeper=group.items.find(i=>i.id===group.keeperId);
   const sources=group.items.filter(i=>i.id!==group.keeperId);
   if(!sources.length){ alert('Nothing to delete — only one record.'); return; }
