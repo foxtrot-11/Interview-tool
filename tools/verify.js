@@ -705,9 +705,18 @@ has('.am-tile.picker-open{overflow:visible;z-index:40;content-visibility:visible
 // (D3) v7.70 — sticky grid toolbars, scroll restore, grabbable scrollbar, back-to-top.
 // #form-area is the ONLY scrolling element (html,body{overflow:hidden}), so every one of these
 // must target it. window.scrollY is permanently 0; window.scrollTo() is a silent no-op.
-has('.tb-sticky{position:sticky;top:-24px;z-index:45', 'pinned row offsets past #form-area padding so tiles cannot bleed above it');
-has('margin:-24px -32px 10px;padding:32px 32px 8px', 'negative margin cancels the cover padding, keeping at-rest layout unchanged');
-has('body.is-mobile .tb-sticky{top:-18px;margin:-18px -14px 10px', 'mobile offsets match the mobile #form-area padding');
+// v7.72.1: the padding-top hack is GONE. #form-area has padding-top:0 plus a ::before spacer, so a
+// sticky top:0 pins to the visible top with no strip and no negative margins. The previous approach
+// (top:-24px + margin-top:-24px) pulled the row's opaque box over the title row and clipped it.
+has('.form-area{padding:0 32px 24px;overflow-y:auto;height:100%}', 'scroll container has no padding-top');
+has(".form-area::before{content:'';display:block;height:24px}", 'top breathing room is a scrolling spacer, not container padding');
+has('body.is-mobile .form-area{padding:0 14px 18px}', 'mobile scroll container has no padding-top');
+has('body.is-mobile .form-area::before{height:18px}', 'mobile spacer matches the mobile gutter');
+has('.tb-sticky{position:sticky;top:0;z-index:45', 'pinned row uses a plain top:0');
+has('margin:0 -32px 10px;padding:8px 32px', 'only horizontal negative margins remain (side gutters)');
+has('body.is-mobile .tb-sticky{margin:0 -14px 10px;padding:8px 14px}', 'mobile sticky row has no vertical offset hack');
+lacks('.tb-sticky{position:sticky;top:-24px', 'the negative-top sticky hack is gone');
+lacks('margin:-24px -32px 10px', 'the negative-margin cover hack is gone');
 has("parseFloat(getComputedStyle(fa).paddingTop)", 'save-bar offset derives padding from live computed style, not a second constant');
 has('class="am-toolbar-row tb-sticky"', 'All Models controls row carries the sticky class');
 has('am-toolbar am-toolbar-titleonly', 'title row split into its own wrapper so the controls row can be a direct child of #am-view');

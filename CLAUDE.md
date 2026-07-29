@@ -1,6 +1,7 @@
 # CLAUDE.md — Carnal Media Model Dashboard ("MODEL INTERVIEW v2")
 
-Context file for AI assistants working in this repo. Current release: **v7.70** on production.
+Context file for AI assistants working in this repo.
+Production (`main`): **v7.70**. Staging (`staging`): **v7.72.1**, awaiting the owner's review.
 
 ---
 
@@ -96,8 +97,8 @@ duplicate review, and (as of v7.67, with a write path since v7.68) name QA.
 | `server.js` | CommonJS Express server. Auth gate + hardened monday.com GraphQL proxy + file/photo endpoints. |
 | `tools/preflight.js` | **Run before every push.** The release checklist as code — see §0.3. Must exit 0. |
 | `.githooks/pre-push` | Blocks pushes to `main` without `ALLOW_MAIN_PUSH=1`; runs preflight. Enable: `git config core.hooksPath .githooks` |
-| `tools/*.js` | Test suite (6 files, 769 assertions). Plain Node, no framework. |
-| `CHANGE-LOG-v*.md` | Per-release write-ups (v7.67, v7.69, v7.70). Longer-form companions to the in-file changelog comment block. |
+| `tools/*.js` | Test suite (6 files, 810 assertions). Plain Node, no framework. |
+| `CHANGE-LOG-v*.md` | Per-release write-ups (v7.67, v7.69–v7.72.1). Longer-form companions to the in-file changelog comment block. |
 | `package.json` / `package-lock.json` | Deps. Render runs `npm install`. |
 | `render.yaml` | Render service config. |
 | `public/logo-carnal.png` | Logo. |
@@ -179,13 +180,13 @@ Every release, without exception:
 
 | File | Assertions | Covers |
 |---|---|---|
-| `verify.js` | 605 | Substring checks + **CSS structural integrity** (§2b) against client source |
+| `verify.js` | 646 | Substring checks + **CSS structural integrity** (§2b) against client source |
 | `scrape-logic.test.js` | 53 | Bluesky/Twitter URL + media parsing (real functions extracted from `server.js`) |
 | `nameqa-logic.test.js` | 41 | Name-matching engine, run against **real** Content Tracker strings |
 | `server-guard.test.js` | 38 | GraphQL allow-list guard, credential hygiene, SDK-loading rules |
 | `sandbox-logic.test.js` | 20 | Casting sandbox planning + note normalization |
 | `dedup-logic.test.js` | 12 | Duplicate grouping |
-| **Total** | **769** | |
+| **Total** | **810** | |
 
 **`verify.js` is substring matching — it cannot see a layout bug, and a substring assert can pass
 on text that is in the wrong place.** Both v7.70 failures prove it: the sticky row was pinned
@@ -311,7 +312,7 @@ boards with zero code change. Add new boards to this pattern rather than hardcod
   the row must be a direct child of the tall `*-view` wrapper, not of `.am-toolbar`), and sticky
   `top:0` pins to the scrollport's **content** box — 24px down, past `#form-area`'s padding —
   which leaves a strip that tiles scroll through. Hence `top:-24px` + `padding-top:32px` +
-  `margin-top:-24px`. **If `.form-area{padding:...}` changes, those three must move with it.**
+  `margin-top:-24px`. **v7.72.1 removed that coupling: `#form-area` has NO padding-top, so a plain `top:0` is the visible top.**
 - **Layout, for anything sticky:** `body` → `header` (z 100) → `.selector-bar` (z 90) →
   `.main` (z 1) → `.sidebar` + `#form-area` (the scroll box, `padding:24px 32px`). Every
   `*-view` is a direct child of `#form-area` and is only ever `display:none`'d, never
