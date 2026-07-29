@@ -291,7 +291,12 @@ has('const SB_MIN_SLOTS=8, SB_ALT_MIN=4;', 'main/alt slot minimums');
 // v7.71: alternates are no longer inside each column — they are three rows in one collapsible
 // block below the primary rows. Still labelled per role, which is what this assert now guards.
 has("label+' ALTERNATES'", 'alternates rows still labelled per role');
-has("['ab','av','at'].forEach(z=>(sbState.zones[z]||[]).forEach(id=>{ const m=byId[id]; if(m){ altNum++;", 'alternates numbered globally in column order at port');
+// v7.72: the Port alternate numbering used a hardcoded ['ab','av','at'] that stopped matching the
+// on-screen order once the rows were reordered to TOP/BOTTOM/VERS. It now derives from SB_MAIN, so
+// assert the derivation AND that the stale literal is gone — that pairing is the actual guarantee.
+has("SB_ALT_ORDER.forEach(z=>(sbState.zones[z]||[]).forEach(id=>{ const m=byId[id]; if(m){ altNum++;", 'alternates numbered at port in DISPLAY order');
+has('const SB_ALT_ORDER=SB_MAIN.map(([z])=>SB_ALT[z]);', 'port alternate order derived from SB_MAIN, not hand-written');
+lacks("['ab','av','at'].forEach", 'the hardcoded alternates order is gone');
 has('const slots=(z,alt)=>', 'slot renderer takes an alt flag');
 /* v7.23 asserts */
 has('v7.23:', 'v7.23 deploy marker present');
@@ -746,6 +751,19 @@ has('if(String(sbDelId)===String(sbCurrentSaveId', 'deleting the open save clear
 has('id="sb-update-btn"', 'Update button in the markup');
 has('id="sb-saveas-btn"', 'Save-as-new button in the markup');
 has('.sb-save-chip.open', 'open save chip is visually marked');
+// (D5) v7.72 — one-tap promote/demote + TOP/BOTTOM/VERS order
+has("const SB_MAIN=[['t','TOP'],['b','BOTTOM'],['v','VERS']];", 'rows ordered TOP, BOTTOM, VERS');
+has("const SB_ALT_REV={ab:'b',av:'v',at:'t'};", 'alternates→main reverse map present');
+has('function sbBump(e,id){', 'one-tap promote/demote present');
+has('const target = SB_ALT_REV[cur] || SB_ALT[cur];', 'bump direction derived from which zone the tile is in');
+has('sbMove(id, target, null);', 'bump appends to the next free slot, reusing sbMove');
+has('function sbZoneLabel(z){', 'zone label helper for the bump toast');
+has('const tile=(id,alt)=>', 'tile knows whether it is in an alternates row');
+has("tile(id,alt)", 'slot renderer passes the alt flag to the tile');
+has('class="sb-bump-btn ${bumpUp?', 'bump button rendered with a direction class');
+has("${bumpUp?'↑':'↓'}", 'arrow points up from alternates, down from a main row');
+has('.sb-bump-btn{position:absolute;top:3px;left:3px', 'bump button sits top-left of the tile');
+has('.sb-slot.filled .sb-slotnum{top:40px', 'slot label moved clear of the bump button on filled slots');
 // (E) sandbox tab not clipped by toolbar style
 has('.sb-btn:not(.mode-btn)', 'toolbar .sb-btn scoped away from the mode tab');
 // (F) airport note fields → subitem port

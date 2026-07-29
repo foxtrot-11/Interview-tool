@@ -292,6 +292,19 @@
   .sb-slot.empty{border-color:var(--border);background:rgba(255,255,255,.02)}
   .sb-slot.empty:hover,.sb-slot.over{border-color:var(--accent);background:rgba(255,120,60,.06)}
   .sb-slotnum{position:absolute;top:2px;left:4px;font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--text-muted);opacity:.7;pointer-events:none;z-index:1}
+  /* v7.72: the promote/demote button took the tile's top-left, where this label used to sit. On a
+     FILLED slot the label drops below the button and gets a chip background so it stays readable
+     over the headshot. Empty slots are unaffected (their label is centred — see the rule below). */
+  .sb-slot.filled .sb-slotnum{top:40px;left:7px;opacity:.95;color:var(--text);background:rgba(0,0,0,.62);padding:1px 5px;border-radius:4px}
+  /* v7.72: one-tap promote (↑ from alternates) / demote (↓ from a main row). Mirrors .sb-note-caret
+     on the opposite corner, same 28px hit target — sized for a thumb, since dragging between rows
+     was the thing that didn't work on a phone. */
+  .sb-bump-btn{position:absolute;top:3px;left:3px;width:28px;height:28px;line-height:25px;padding:0;border-radius:7px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;font-weight:700;cursor:pointer;opacity:.95;transition:transform .1s;z-index:2}
+  .sb-bump-btn:hover{transform:scale(1.12)}
+  .sb-bump-btn.bump-up{border-color:#2ea043;color:#3fb950}
+  .sb-bump-btn.bump-up:hover{background:#2ea043;color:#fff}
+  .sb-bump-btn.bump-down{border-color:var(--border);color:var(--text-muted)}
+  .sb-bump-btn.bump-down:hover{background:var(--surface);border-color:var(--accent,#3AA2E0);color:var(--text)}
   .sb-slot.empty .sb-slotnum{position:static;margin:auto;opacity:.5;font-size:11px;letter-spacing:.08em}
   .sb-slot-add{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:10px;color:var(--accent,#3AA2E0);opacity:0;transition:opacity .12s;pointer-events:none}
   .sb-slot.empty:hover .sb-slot-add{opacity:.9}
@@ -3685,8 +3698,14 @@ function sbToggleAlts(){
   const el=document.getElementById('sb-altblock');
   if(el) el.classList.toggle('collapsed', sbAltCollapsed);   // no re-render: keeps scroll + thumbs
 }
-const SB_MAIN=[['b','BOTTOM'],['v','VERS'],['t','TOP']];
+// v7.72: display order is TOP, BOTTOM, VERS. This array is the SINGLE source of zone order — the
+// primary rows, the alternates rows, and the alternate numbering at Port all derive from it, so they
+// can't drift apart. (Before v7.72 the Port numbering used its own hardcoded ['ab','av','at'].)
+const SB_MAIN=[['t','TOP'],['b','BOTTOM'],['v','VERS']];
 const SB_ALT={b:'ab',v:'av',t:'at'};                                  // each main column's alternates zone (v7.22)
+const SB_ALT_REV={ab:'b',av:'v',at:'t'};                              // v7.72: alternates zone → its main zone
+// Alternates zones in DISPLAY order — derived, never hand-written (see the note on SB_MAIN).
+const SB_ALT_ORDER=SB_MAIN.map(([z])=>SB_ALT[z]);
 const SB_TYPE={b:'BOTTOM',v:'VERSE',t:'TOP',ab:'ALTERNATE',av:'ALTERNATE',at:'ALTERNATE'};
 const SB_MIN_SLOTS=8, SB_ALT_MIN=4;   // main columns show ≥8 slots, alternates ≥4; both grow if fuller
 // Coerce incoming zones (fresh, share-link, save) to the 6-zone shape {b,v,t,ab,av,at}.
@@ -3844,16 +3863,21 @@ async function renderSandbox(){
   if(!mem.length && !sbState.pendingLabel){ empty.style.display=''; empty.textContent='Nobody carries this shoot tag yet (rejected, retired, delete, duplicate, and Evernote-import models are excluded). Add the tag to a model first — from any editor.'; board.style.display='none'; return; }
   empty.style.display='none'; board.style.display='';
   if(sbState.pendingLabel){ const c2=document.getElementById('sb-count'); if(c2) c2.textContent=`New tag “${sbState.pendingLabel}” — add the first person to create it in Monday`; }
-  const tile=id=>{ const m=byId[id]; const ia=gridImgAsset(m); const url=ia?(kbHeadCache[ia]||''):''; const nt=sbState.notes[String(id)];
+  const tile=(id,alt)=>{ const m=byId[id]; const ia=gridImgAsset(m); const url=ia?(kbHeadCache[ia]||''):''; const nt=sbState.notes[String(id)];
     const flds=[nt&&nt.pay, nt&&nt.dates, nt&&nt.startAirport, nt&&nt.endAirport].map(v=>!!(v&&String(v).trim()));
     const filled=flds.filter(Boolean).length;
     const noteState = filled===4?'both':(filled>0?'partial':'none'); // v7.49: green only when pay+dates+both airports set
     const noteTitle = noteState==='both'?'Pay + dates + airports logged — click to edit':(noteState==='partial'?`${filled}/4 logged — click to complete`:'Add pay / dates / airports');
-    return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-note-caret note-${noteState}" title="${noteTitle}" onclick="sbOpenNote(event,'${id}')">▾</button><button type="button" class="sb-edit-btn" title="Open full editor" onclick="sbOpenFullEditor(event,'${id}')">✎</button><button type="button" class="sb-trash-btn" title="Remove this shoot tag from ${escapeHtml(m?m.name:id)}" onclick="sbRemoveFromTag(event,'${id}')">🗑</button></div>`; };
+    // v7.72: one-tap promote/demote, top-left. Dragging an alternate up to its main row meant
+    // scrolling the row sideways AND the page vertically — clunky on a desktop, near unusable on a
+    // phone. ↑ from an alternates row appends to that role's main row; ↓ from a main row appends to
+    // its alternates row. Always appends (next free slot), never displaces anyone.
+    const bumpUp = !!alt;
+    return `<div class="sb-tile${sbSelected===id?' sel':''}" draggable="true" data-id="${id}" ondragstart="sbDragStart(event)" onclick="sbTileClick(event,'${id}')"><div class="sb-thumb" id="sbthumb-${id}">${url?`<img loading="lazy" src="${escapeHtml(url)}" alt="">`:''}</div><div class="sb-name">${escapeHtml(m?m.name:id)}</div><button type="button" class="sb-bump-btn ${bumpUp?'bump-up':'bump-down'}" title="${bumpUp?'Move up into the main row (appends to the end)':'Move down into alternates (appends to the end)'}" onclick="sbBump(event,'${id}')">${bumpUp?'↑':'↓'}</button><button type="button" class="sb-note-caret note-${noteState}" title="${noteTitle}" onclick="sbOpenNote(event,'${id}')">▾</button><button type="button" class="sb-edit-btn" title="Open full editor" onclick="sbOpenFullEditor(event,'${id}')">✎</button><button type="button" class="sb-trash-btn" title="Remove this shoot tag from ${escapeHtml(m?m.name:id)}" onclick="sbRemoveFromTag(event,'${id}')">🗑</button></div>`; };
   // A zone renders as fixed numbered slots (main ≥8, alt ≥4). Slot position = subitem number at Port.
   const slots=(z,alt)=>{ const ids=sbState.zones[z]||[]; const n=Math.max(alt?SB_ALT_MIN:SB_MIN_SLOTS, ids.length); let h='';
     for(let i=0;i<n;i++){ const id=ids[i]; const lbl=alt?'ALT':(SB_TYPE[z].slice(0,1)+(i+1));
-      h+=`<div class="sb-slot ${id!=null?'filled':'empty'}" data-zone="${z}" data-index="${i}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDropSlot(event)" onclick="sbSlotClick(event,'${z}',${i})"><span class="sb-slotnum">${lbl}</span>${id!=null?tile(id):'<span class="sb-slot-add">+ add</span>'}</div>`; }
+      h+=`<div class="sb-slot ${id!=null?'filled':'empty'}" data-zone="${z}" data-index="${i}" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDropSlot(event)" onclick="sbSlotClick(event,'${z}',${i})"><span class="sb-slotnum">${lbl}</span>${id!=null?tile(id,alt):'<span class="sb-slot-add">+ add</span>'}</div>`; }
     return h; };
   // v7.71: one horizontal ROW per zone instead of three vertical columns, so vertical cost is
   // fixed regardless of headcount. Primary rows first, then the three ALTERNATES rows in a
@@ -3919,6 +3943,34 @@ function sbMove(id,zone,index){
   target.splice(idx,0,id);
   sbSelected=null; renderSandbox();
 }
+// Human-readable zone label, for the bump confirmation toast.
+function sbZoneLabel(z){
+  const main=SB_MAIN.find(([k])=>k===z);
+  if(main) return main[1];
+  const mz=SB_ALT_REV[z];
+  const m=SB_MAIN.find(([k])=>k===mz);
+  return m ? m[1]+' ALTERNATES' : z;
+}
+/* v7.72: one-tap promote/demote between a role's main row and its alternates row.
+   Dragging required scrolling the row sideways AND the page vertically to get between the two —
+   awkward on a desktop and effectively broken on a phone. Appends to the target (next free slot)
+   rather than inserting, so nobody already placed gets displaced or renumbered above.
+   Reuses sbMove, which already handles removal from the old zone, the index bookkeeping and the
+   re-render — so this adds a shortcut, not a second movement code path. */
+function sbBump(e,id){
+  e.stopPropagation();
+  id=String(id);
+  let cur=null;
+  for(const z of Object.keys(sbState.zones)) if((sbState.zones[z]||[]).includes(id)) cur=z;
+  if(!cur) return;
+  const target = SB_ALT_REV[cur] || SB_ALT[cur];   // in alternates → main; in main → alternates
+  if(!target) return;
+  const nm=(byIdName(id)||'That person');
+  sbMove(id, target, null);                        // null index = append = next available slot
+  showToast(`${nm} → ${sbZoneLabel(target)}`,'success');
+}
+// Name lookup that doesn't depend on renderSandbox's local byId closure.
+function byIdName(id){ const m=modelById(id); return m?m.name:null; }
 function sbTileClick(e,id){ e.stopPropagation(); sbSelected=(sbSelected===id)?null:id; renderSandbox(); }   // tap-to-move fallback (touch)
 function sbSlotClick(e,zone,index){
   e.stopPropagation();
@@ -4264,7 +4316,10 @@ async function sbPortOpen(){
   const entries=[];
   ['b','v','t'].forEach(z=>(sbState.zones[z]||[]).forEach((id,i)=>{ const m=byId[id]; if(m){ const nt=sbState.notes[String(id)]||{}; entries.push({model:m, type:SB_TYPE[z], num:i+1, pay:nt.pay||'', dates:nt.dates||'', startAirport:nt.startAirport||'', endAirport:nt.endAirport||''}); } }));
   let altNum=0;
-  ['ab','av','at'].forEach(z=>(sbState.zones[z]||[]).forEach(id=>{ const m=byId[id]; if(m){ altNum++; const nt=sbState.notes[String(id)]||{}; entries.push({model:m, type:'ALTERNATE', num:altNum, pay:nt.pay||'', dates:nt.dates||'', startAirport:nt.startAirport||'', endAirport:nt.endAirport||''}); } }));
+  // v7.72: was a hardcoded ['ab','av','at'], which no longer matched the on-screen order once the
+  // rows were reordered to TOP/BOTTOM/VERS — the numbers written to Monday would have disagreed with
+  // what you see. Derived from SB_MAIN now, so display order and Port numbering cannot drift apart.
+  SB_ALT_ORDER.forEach(z=>(sbState.zones[z]||[]).forEach(id=>{ const m=byId[id]; if(m){ altNum++; const nt=sbState.notes[String(id)]||{}; entries.push({model:m, type:'ALTERNATE', num:altNum, pay:nt.pay||'', dates:nt.dates||'', startAirport:nt.startAirport||'', endAirport:nt.endAirport||''}); } }));
   if(!entries.length){ showToast('Nothing to port','error'); return; }
   const tagOpt=(boardDropdownOptions[SHOOT_COL]||[]).find(o=>String(o.id)===String(sbState.tag));
   await portShowPlan(null, null, `Sandbox “${tagOpt?tagOpt.label:sbState.tag}” → row “${portSelectedRowName||portSelectedRowId}” (order = subitem number)`, slots=>sbBuildPlan(entries, slots));
@@ -7933,6 +7988,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.72: (Casting Sandbox — one-tap promote/demote, and rows reordered TOP/BOTTOM/VERS) Client-only, builds on v7.71. (1) BUMP BUTTON: moving somebody between a role's main row and its alternates row meant dragging, which after v7.71 required scrolling the row SIDEWAYS and the page VERTICALLY at the same time — awkward with a mouse and effectively broken on a phone. Every filled tile now carries a 28px arrow at its top-left: ↑ on a tile in an alternates row promotes it to that role's main row, ↓ on a tile in a main row demotes it to that role's alternates row. It always APPENDS to the next free slot rather than inserting, so nobody already placed is displaced or renumbered above. Direction is decided from where the tile actually is (SB_ALT_REV[cur] || SB_ALT[cur]), not from a flag that could go stale, and the move goes through the existing sbMove() — so this is a shortcut over the one movement code path, not a second one. ROLE IS NEVER CROSSED: a VERS alternate can only ever land in VERS. Verified headlessly against the real extracted functions (13 checks): promote appends to the end and leaves the source zone, demote does the same in reverse, VERS→VERS only, a round trip restores the original role, no id can appear in two zones, and bumping an unknown id is a no-op rather than a crash. (2) THE TILE'S TOP-LEFT WAS ALREADY OCCUPIED by .sb-slotnum, the T1/B2/ALT position label. On a FILLED slot that label now drops to top:40px with a chip background so it stays readable over the headshot; empty slots are untouched (their label is centred by a separate rule). Measured in a browser: 5px clearance between label and button, all four tile buttons independently hit-testable, no two overlapping, empty-slot label still centred. (3) ROW ORDER is now TOP, BOTTOM, VERS for both the primary and the alternates rows. NOT just a cosmetic swap: the alternate numbering at Port used its own hardcoded ['ab','av','at'], so reordering the display alone would have made the subitem numbers written to Monday disagree with what is on screen. SB_MAIN is now the single source of zone order and SB_ALT_ORDER derives from it, so display order and Port numbering cannot drift apart again; verify.js asserts the derivation AND that the old literal is gone. NOTE FOR THE OWNER: because alternates are numbered in display order, an alternate's subitem number at Port changes with this release (TOP alternates are now numbered before BOTTOM and VERS).
    v7.71: (Casting Sandbox — rows instead of columns, and save-in-place) Client-only. TWO CHANGES, both in the sandbox. (1) LAYOUT: BOTTOM / VERS / TOP were three vertical columns (.sb-cols, a 3-up CSS grid of minmax(320px,1fr)). Slots are a fixed 142px wide inside a wrapping flex zone, so at ~320px of column width they wrapped 2-per-row and a shoot with 8 people ran far below the fold — measured, one column of 8 was ~792px tall and there were three of them side by side. Each zone is now ONE horizontal row, a single slot high, scrolling sideways: .sb-rows (flex column) > .sb-rowwrap > .sb-rowhead + .sb-zone.sb-rowzone, where the row zone is flex-wrap:nowrap + overflow-x:auto. Vertical cost per zone is now FIXED regardless of headcount. The three ALTERNATES rows moved out of their parent columns into one collapsible block BELOW all three primary rows — previously alternates sat inside each column, which pushed the primary cast of VERS and TOP even further down. Collapse state persists in localStorage (a view preference, never data). MEASURED IN A BROWSER against a 300-slot fixture carrying the real .sb-slot/.sb-zone/.sb-tile rules: each zone renders 206px tall (one 180px slot + padding) instead of wrapping; all 8 slots of a full row sit on ONE line (1 distinct y-position); the row overflows 1212px into 1061px and scrolls, with the last slot still hit-testable after scrolling; the three primary rows total 792px against an 837px viewport, so the whole primary cast now fits on screen; collapsing alternates saves 712px. THE DRAG-AND-DROP NEEDED ZERO CHANGES — drop targets are identified purely by data-zone + data-index with no geometry, no clientY comparison and no insert-before maths anywhere, which is why rotating the layout is safe; verified the slots still carry both data attributes and tiles are still draggable. The horizontal row scrollbar is styled (10px) for the same reason the v7.70 vertical one was: the 4px default cannot be grabbed. (2) SAVE IN PLACE: sbSaveState() unconditionally called create_item and sbLoadSave() threw the loaded id away, so editing a saved arrangement meant "save a second copy, then delete the old one". The open save's id and name are now tracked (sbCurrentSaveId / sbCurrentSaveName); Step 3 shows "Update <name>" alongside "Save as new", and the open save's chip is highlighted so it is unambiguous what Update overwrites. Update uses change_multiple_column_values on the existing item — the same create-or-update shape dupIgnorePersist already uses against this very board and column — and is gqlRetry-safe because overwriting a column with a fixed value is idempotent; Save-as-new deliberately stays on plain gql because create_item is NOT idempotent and a retry could double-create. Save-as-new then ADOPTS the new item as the open save, so a further edit updates it rather than making a third copy. Overwriting prompts for confirmation because it replaces a shared record for every coworker with no recovery. The tracked id is cleared everywhere the arrangement stops being that save — shoot-tag change, new tag, a #sb= share link, and deletion of the save itself — because a stale id would silently overwrite the wrong arrangement.
    v7.70: (grid navigation — pinned controls, scroll memory, a scrollbar you can actually grab) Client-only, CSS + a small scroll-plumbing block. THE UNDERLYING FACT BEHIND ALL THREE: `#form-area` is the app's ONLY scrolling element — `html,body{height:100%;overflow:hidden}` — so `window.scrollY` is permanently 0 and `window.scrollTo()` is a silent no-op. That is not theoretical: the Casting Sandbox's "return to where you were" (sbReturnScroll, v7.42) read window.scrollY and wrote window.scrollTo, so it had NEVER worked. Both ends now use `#form-area.scrollTop`. (1) STICKY CONTROLS ROW on All Models / 2 / 3 / 4 / 5-APPROVED, Kanban, Duplicates and Name QA via an opt-in `.tb-sticky` class — deliberately not on bare `.am-toolbar`, because the Casting Sandbox reuses that class inside `.sb-side`, which is already sticky with its own overflow-y:auto, and nesting a sticky there pins it to the wrong scroll box. TWO NON-OBVIOUS THINGS, both measured rather than reasoned about: (a) A STICKY ELEMENT IS CONFINED TO ITS CONTAINING BLOCK. The controls row was nested in `.am-toolbar`, an ~80px flex box, so it unpinned again after ~80px of scroll — useless. The row (and the port row) are now DIRECT CHILDREN of `#am-view`, which spans the whole grid; the title row keeps its own `.am-toolbar-titleonly` wrapper. Kanban/Duplicates/Name QA rows were already direct children of their views. Do not move the row back inside `.am-toolbar`. (b) A sticky `top:0` pins to the scrollport's CONTENT box, which is 24px down because `#form-area` has `padding:24px 32px` — leaving a 24px strip above the toolbar that grid tiles scroll through in full view (42 sampled x-positions showed a tile in it). So the row pins at `top:-24px`, raises padding-top by the same 24px to cover the strip, and takes `margin-top:-24px` to cancel that padding in normal flow — at-rest layout is bit-for-bit unchanged and the pinned controls land at the identical offset, with no JS and nothing that can jitter. `.grid-save-bar` is ALSO sticky at the top and is a LATER sibling, so it would hide underneath; its offset now tracks `--tb-sticky-h`, measured live by tbSyncStickyOffset() (the row wraps to two lines on narrow windows, so a constant would drift) minus #form-area's computed padding-top. (2) SCROLL MEMORY: opening a model from a grid captured nothing, so Back-to-grid always dumped you at the top of ~950 tiles. Position is now captured BEFORE `hide('am-view')` (a hidden element reports scrollTop 0) and restored after `renderAllModels()` — which rebuilds `#am-grid.innerHTML` wholesale, so the restore waits two rAFs for layout and clamps to the live scrollHeight, since the grid can be shorter than it was. Keyed by gridScope so 5-APPROVED and All Models cannot restore onto each other. Filters, search and sort already survived the round trip (the view is only display:none'd, never destroyed) — scroll was the missing piece. (3) SCROLLBAR: `.form-area::-webkit-scrollbar` was 4px, below what a pointer can reliably grab, which is why the mouse wheel was the only practical way back up. Now 12px with a track, an inset thumb and a hover state, plus scrollbar-width/color for Firefox, which ignores the ::-webkit- pseudo-elements entirely. Also a fixed back-to-top button (appears past 400px, below the modal band so it can never float over a dialog).
    v7.68.1: (Name QA — manual override no longer blocked by its own guardrail) Client-only. The manual free-text checkbox was disabled whenever candidate profiles existed above it, on the theory that a row with candidates doesn't need hand-typing. Real rows disproved that: sometimes every suggestion is close but wrong, and the human still needs to type the right name. The checkbox is now always clickable; the "only meant for rows with no matching profile" text stays as a STEER rather than a hard block enforced by disabling the input. Rows sent this way are still tagged MANUAL in both the UI and the audit log, so a hand-typed value is never mistaken for a verified profile match.  [ENTRY BACKFILLED IN v7.69 — this release shipped without one, so `grep -o "v7.68.1:"` had no deploy-verification target at the time.]
