@@ -126,7 +126,11 @@ head('[4] Server');
     pass('server.js syntax valid');
   } catch (e) { fail('server.js syntax valid', String(e.stderr || e.message).split('\n')[0]); }
   try {
-    const diff = execFileSync('git', ['diff', '--name-only', 'origin/main', '--', 'server.js'],
+    // --no-optional-locks: without it, git opportunistically refreshes the index and creates
+    // .git/index.lock. On some mounts that lockfile can be left behind and then blocks every
+    // later git command with "Another git process seems to be running" — which has already
+    // cost real time here. This check is read-only, so it never needs the lock.
+    const diff = execFileSync('git', ['--no-optional-locks', 'diff', '--name-only', 'origin/main', '--', 'server.js'],
                               { cwd: ROOT, stdio: ['pipe', 'pipe', 'pipe'] }).toString().trim();
     if (diff) console.log('  \x1b[33mNOTE\x1b[0m server.js DIFFERS from origin/main — this is not a client-only release.');
     else pass('client-only release (server.js matches origin/main)');

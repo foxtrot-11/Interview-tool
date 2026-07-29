@@ -277,14 +277,20 @@ has('async function sbSaveState()', 'save-state function present');
 has('create_item(board_id:$b,item_name:$n,column_values:$c)', 'save creates a Monday item');
 has('function sbLoadSaves(force)', 'saved-states loader present');
 has('function sbLoadSave(id)', 'load-a-save present');
-has('onclick="sbSaveState()"', 'Save state button wired');
+// v7.71 split the single Save button into Update / Save-as-new; sbSaveState() is kept as a
+// back-compat shim that picks the right branch. Assert the shim and both wired buttons.
+has('async function sbSaveState(){ return sbCurrentSaveId ? sbUpdateCurrentSave() : sbSaveStateAsNew(); }', 'sbSaveState kept as a branching shim');
+has('onclick="sbUpdateCurrentSave()"', 'Update button wired');
+has('onclick="sbSaveStateAsNew()"', 'Save-as-new button wired');
 has('id="sb-saves-list"', 'saved-states strip present');
 has('sbLoadSaves(false);', 'saves load when sandbox opens');
 /* v7.22 asserts (per-column alternates) */
 has('v7.22:', 'v7.22 deploy marker present');
 has("const SB_ALT={b:'ab',v:'av',t:'at'};", 'per-column alternates map present');
 has('const SB_MIN_SLOTS=8, SB_ALT_MIN=4;', 'main/alt slot minimums');
-has('${label} ALTERNATES', 'each column renders its own ALTERNATES header');
+// v7.71: alternates are no longer inside each column — they are three rows in one collapsible
+// block below the primary rows. Still labelled per role, which is what this assert now guards.
+has("label+' ALTERNATES'", 'alternates rows still labelled per role');
 has("['ab','av','at'].forEach(z=>(sbState.zones[z]||[]).forEach(id=>{ const m=byId[id]; if(m){ altNum++;", 'alternates numbered globally in column order at port');
 has('const slots=(z,alt)=>', 'slot renderer takes an alt flag');
 /* v7.23 asserts */
@@ -717,6 +723,29 @@ has('function faScrollTop(', 'back-to-top action present');
 has('id="to-top-btn"', 'back-to-top button in the markup');
 has("addEventListener('scroll', faToggleTopBtn", 'back-to-top driven by the #form-area scroll event');
 lacks('window.scrollTo(0, sbReturnScroll', 'the no-op window.scrollTo sandbox restore is gone');
+// (D4) v7.71 — sandbox rows instead of columns, and save-in-place.
+// Reminder: these are substring checks. The row geometry was verified by measuring a real browser
+// fixture (one slot high, 8 slots on one line, horizontal scroll, last slot hit-testable).
+has('.sb-zone.sb-rowzone{border:none;flex-wrap:nowrap;overflow-x:auto', 'row zone is one line with horizontal scroll');
+has('.sb-rows{display:flex;flex-direction:column', 'zones stack vertically as rows');
+has('.sb-altblock.collapsed .sb-rows{display:none}', 'alternates block is collapsible');
+has('const row=(z,label,alt)=>', 'renderSandbox emits rows, not columns');
+has("SB_MAIN.map(([z,label])=>row(SB_ALT[z], label+' ALTERNATES', true))", 'alternates render below, still split by role');
+has('function sbToggleAlts(', 'alternates toggle present');
+has("localStorage.setItem('sbAltCollapsed'", 'collapse state persisted as a view preference');
+has('.sb-zone.sb-rowzone::-webkit-scrollbar{height:10px}', 'row scrollbar is grabbable, not the 4px default');
+// save-in-place
+has('let sbCurrentSaveId=null', 'the open save is tracked');
+has('function sbUpdateCurrentSave(', 'update-in-place path exists');
+has('function sbSaveStateAsNew(', 'save-as-new path exists');
+has('function sbBuildSavePayload(', 'both save paths share one payload builder');
+has('change_multiple_column_values(item_id:$i,board_id:$b,column_values:$c,create_labels_if_missing:false){id}}`,\n      {i:String(sbCurrentSaveId)', 'update writes to the existing save item');
+has('sbClearCurrentSave();   // v7.71: fresh arrangement', 'tag change clears the open save');
+has("sbClearCurrentSave();   // v7.71: a #sb= share link", 'share link does not adopt an open save');
+has('if(String(sbDelId)===String(sbCurrentSaveId', 'deleting the open save clears the tracker');
+has('id="sb-update-btn"', 'Update button in the markup');
+has('id="sb-saveas-btn"', 'Save-as-new button in the markup');
+has('.sb-save-chip.open', 'open save chip is visually marked');
 // (E) sandbox tab not clipped by toolbar style
 has('.sb-btn:not(.mode-btn)', 'toolbar .sb-btn scoped away from the mode tab');
 // (F) airport note fields → subitem port

@@ -1,7 +1,6 @@
 # CLAUDE.md — Carnal Media Model Dashboard ("MODEL INTERVIEW v2")
 
-Context file for AI assistants working in this repo. Current release: **v7.69** on production
-(v7.70 was rolled back — see §0.1).
+Context file for AI assistants working in this repo. Current release: **v7.70** on production.
 
 ---
 
@@ -31,6 +30,10 @@ rule above is the actual constraint.
 Also yours-only: `git tag` / tag pushes for `beta-vNN`, any `--force`, and rollbacks.
 
 ### 0.1 Why this rule exists (do not rationalize around it)
+
+*(Resolved: the CSS was fixed, a human verified staging, and v7.70 went to production properly on
+2026-07-29 as `af77e9d` — 786 CSS rules parsing, confirmed in a browser. The rule below stands
+regardless.)*
 
 On 2026-07-29, v7.70 shipped a **broken stylesheet to production while a coworker was mid-task.**
 Two CSS comment edits left prose sitting after the closing `*/`. The CSS parser read that prose as
@@ -234,9 +237,19 @@ cycle here (see §7). `git add -A` also sweeps up untracked strays — check the
 serves the expected marker and that `document.styleSheets` rule count is healthy in a browser.
 
 **Rollback tags:** `beta-vNN` where `NN = minor − 16`. v7.60 → `beta-v44`; v7.67 → `beta-v51`;
-**v7.69 → `beta-v53` ← current production.**
-**`beta-v54` (v7.70) IS A BROKEN RELEASE — never roll forward to it.** It ships the unstyled-app
-CSS bug from §0.1. The fix exists but has not been re-verified on staging by a human.
+v7.69 → `beta-v53`; **v7.70 → `beta-v54` ← current production.**
+
+⚠️ **`beta-v54` may still point at the BROKEN v7.70 commit (`f9bd0a1`), not the shipped one
+(`af77e9d`).** The tag was created before the CSS fix and needs force-moving; check before
+trusting it as a rollback target:
+
+```bash
+git ls-remote --tags origin | grep beta-v54
+```
+
+If it shows `f9bd0a1`, that commit is the unstyled build from §0.1 — **do not roll back to it.**
+Fix with `git tag -f -a beta-v54 -m "production v7.70" af77e9d && git push -f origin beta-v54`
+(owner only). The known-good fallback either way is `beta-v53` (v7.69).
 
 **Step 5 is not optional.** v7.68 and v7.68.1 both shipped with no `vN.NN:` entry in the
 `index.html` changelog block, which left `grep -o "v7.68:"` with nothing to match — the deploy
