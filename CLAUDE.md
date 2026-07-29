@@ -1,7 +1,8 @@
 # CLAUDE.md — Carnal Media Model Dashboard ("MODEL INTERVIEW v2")
 
 Context file for AI assistants working in this repo.
-Production (`main`): **v7.70**. Staging (`staging`): **v7.73**, awaiting the owner's review.
+Production (`main`): **v7.72.1** (`326c895`, verified in a browser — 817 CSS rules parsing).
+Staging (`staging`): **v7.73**, awaiting the owner's review.
 
 ---
 
@@ -238,7 +239,12 @@ cycle here (see §7). `git add -A` also sweeps up untracked strays — check the
 serves the expected marker and that `document.styleSheets` rule count is healthy in a browser.
 
 **Rollback tags:** `beta-vNN` where `NN = minor − 16`. v7.60 → `beta-v44`; v7.67 → `beta-v51`;
-v7.69 → `beta-v53`; **v7.70 → `beta-v54` ← current production.**
+v7.69 → `beta-v53`; v7.70 → `beta-v54`; **v7.72.1 → `beta-v56` ← current production (`326c895`).**
+
+⚠️ **`beta-v56` may not exist yet.** v7.71 / v7.72 / v7.72.1 were promoted together as `326c895`;
+if no tag was pushed, production has no rollback marker. Create it with
+`git tag -a beta-v56 -m "production v7.72.1" 326c895 && git push origin beta-v56` (owner only).
+Known-good fallbacks: `beta-v53` (v7.69). **`beta-v54` points at the BROKEN v7.70 build** — see below.
 
 ⚠️ **`beta-v54` may still point at the BROKEN v7.70 commit (`f9bd0a1`), not the shipped one
 (`af77e9d`).** The tag was created before the CSS fix and needs force-moving; check before
