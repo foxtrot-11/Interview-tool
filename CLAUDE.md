@@ -227,9 +227,16 @@ through to production (§0.1). Staging is OK when a **human says so**.
 ```bash
 ALLOW_MAIN_PUSH=1 git push origin staging:main
 ```
+Then tag the promoted commit with the next unused number (see "Rollback tags" below — and pass the
+SHA explicitly, so the tag can't land on whatever HEAD happens to be):
+
 ```bash
-git tag -a beta-vNN -m "production vN.NN" && git push origin beta-vNN
+git tag -a beta-vNN -m "production vN.NN" <sha> && git push origin beta-vNN
 ```
+
+If git says `tag 'beta-vNN' already exists`, that number is taken by an earlier promotion — use the
+next one. **Do not `-f` an existing tag** to reuse the number; that erases the rollback marker for
+the release it points at.
 
 **Always** end the commit step with `git show --stat HEAD` and confirm the expected file
 count. A commit silently containing fewer files than intended has burned a full deploy
@@ -238,25 +245,41 @@ cycle here (see §7). `git add -A` also sweeps up untracked strays — check the
 **Rollback:** `ALLOW_MAIN_PUSH=1 git push --force origin <good-sha>:main`, then confirm production
 serves the expected marker and that `document.styleSheets` rule count is healthy in a browser.
 
-**Rollback tags:** `beta-vNN` where `NN = minor − 16`. v7.60 → `beta-v44`; v7.67 → `beta-v51`;
-v7.69 → `beta-v53`; v7.70 → `beta-v54`; **v7.72.1 → `beta-v56` ← current production (`326c895`).**
+### Rollback tags
 
-⚠️ **`beta-v56` may not exist yet.** v7.71 / v7.72 / v7.72.1 were promoted together as `326c895`;
-if no tag was pushed, production has no rollback marker. Create it with
-`git tag -a beta-v56 -m "production v7.72.1" 326c895 && git push origin beta-v56` (owner only).
-Known-good fallbacks: `beta-v53` (v7.69). **`beta-v54` points at the BROKEN v7.70 build** — see below.
+**One tag per PROMOTION, using the next unused `beta-vNN`.** Numbers are sequential and carry no
+meaning beyond order.
 
-⚠️ **`beta-v54` may still point at the BROKEN v7.70 commit (`f9bd0a1`), not the shipped one
-(`af77e9d`).** The tag was created before the CSS fix and needs force-moving; check before
-trusting it as a rollback target:
+> The old rule here was `NN = minor − 16` (v7.69 → `beta-v53`). **It's been dropped**: it yields one
+> number per *minor* version, but a single minor can be promoted more than once. v7.75 was promoted
+> twice — v7.75.1 took `beta-v59` and v7.75.2 needed `beta-v60`, which the formula cannot express.
+> Never force-move an existing tag to free up a number: that destroys the rollback marker for the
+> release it already points at.
+
+Actual state, verified against the remote on 2026-07-30:
+
+| Tag | Commit | Release |
+|---|---|---|
+| `beta-v52` | `ea6dc95` | v7.68.1 |
+| `beta-v53` | `1042dac` | v7.69 |
+| `beta-v54` | `af77e9d` | v7.70 + guardrails — **correctly force-moved off the broken build** |
+| `beta-v56` | `326c895` | v7.72.1 (v7.71 / v7.72 / v7.72.1 promoted together) |
+| `beta-v57` | `1a2592b` | v7.73.1 |
+| `beta-v58` | `1cd2dd9` | v7.74.1 |
+| `beta-v59` | `8b70959` | v7.75.1 |
+| `beta-v60` | `451ce97` | **v7.75.2 ← current production** |
+
+`beta-v51` and `beta-v55` don't exist — those minors were never promoted on their own. Gaps are
+fine; don't backfill them.
+
+**Nearest known-good fallbacks:** `beta-v59` (v7.75.1), then `beta-v58` (v7.74.1).
+`beta-v54` is safe — it was moved to the fixed `af77e9d`, not the unstyled `f9bd0a1` from §0.1.
+
+Before trusting any tag as a rollback target, check what it actually points at:
 
 ```bash
-git ls-remote --tags origin | grep beta-v54
+git ls-remote --tags origin | grep beta-v
 ```
-
-If it shows `f9bd0a1`, that commit is the unstyled build from §0.1 — **do not roll back to it.**
-Fix with `git tag -f -a beta-v54 -m "production v7.70" af77e9d && git push -f origin beta-v54`
-(owner only). The known-good fallback either way is `beta-v53` (v7.69).
 
 **Step 5 is not optional.** v7.68 and v7.68.1 both shipped with no `vN.NN:` entry in the
 `index.html` changelog block, which left `grep -o "v7.68:"` with nothing to match — the deploy
