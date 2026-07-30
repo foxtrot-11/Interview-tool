@@ -60,6 +60,9 @@
   .nq-manual-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);margin-bottom:6px}
   .nq-manual-toggle input[disabled]{cursor:not-allowed}
   .nq-field-label{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);margin-bottom:3px}
+  /* v7.74.1: the box is pre-filled with the top suggestion applied. Mark it clearly as a PROPOSAL —
+     Send to Monday stays disabled until a candidate is actually clicked. */
+  .nq-field-label.nq-field-preview{color:#f5c518}
   .nq-input{width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:12px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)}
   .nq-input[disabled]{color:var(--text-dim);background:var(--surface2)}
   .nq-orig{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-top:4px}
@@ -5925,11 +5928,21 @@ async function nqRunScan(){
           if(res.flagged>0){
             for(const seg of res.segments){
               if(seg.status!=='flag') continue;
+              const _tok=seg.raw.trim(), _prb=(seg.probe||seg.raw).trim();
+              /* v7.74.1: PRE-FILL the box with the top suggestion already applied, so the proposed
+                 composite ("Boy Jace (Jace Jaxson)") is visible at a glance instead of the box just
+                 echoing `was:` until something is clicked. This is a PREVIEW ONLY — resolutionType
+                 stays null, so nqCanSend() still returns false and Send to Monday stays disabled
+                 until a candidate is explicitly clicked. Nothing can be written from un-clicked
+                 text, so the "a value only ever comes from a real Model DB profile" rule holds. */
+              const _top=(seg.suggestions||[])[0];
+              const _pre=_top ? nqApplyPick(val, _tok, _prb, _top.name) : val;
               nqRows.push({ itemId:it.id, itemName:it.name, group:(it.group||{}).title||'',
                 colId:col.id, colLabel:col.label, original:val,
-                token:seg.raw.trim(), probe:(seg.probe||seg.raw).trim(),   // v7.74: the part that matched
+                token:_tok, probe:_prb,                    // v7.74: the part that matched
                 category:seg.category, suggestions:seg.suggestions||[],
-                corrected:val, manualOn:false, chosenId:null, chosenName:null,
+                corrected:_pre, preview:(_pre!==val),      // v7.74.1: previewed, not resolved
+                manualOn:false, chosenId:null, chosenName:null,
                 resolutionType:null, sent:false, sentAt:null });
             }
           }
@@ -6004,7 +6017,10 @@ function nqRender(){
             <input type="checkbox" id="nq-man-${i}" ${r.manualOn?'checked':''} onchange="nqToggleManual(${i}, this.checked)">
             Enable manual entry (only meant for rows with no matching profile above — don't use it if one exists)
           </label>
-          <label class="nq-field-label">Full field value${r.resolutionType==='matched'?' (set from the profile you picked above)':''}</label>
+          <label class="nq-field-label${r.preview?' nq-field-preview':''}">Full field value${
+            r.resolutionType==='matched' ? ' (set from the profile you picked above)'
+            : (r.preview ? ' — PREVIEW, click a name above to confirm' : '')
+          }</label>
           <input class="nq-input" id="nq-in-${i}" value="${escapeHtml(r.corrected)}" ${(r.manualOn && !r.sent)?'':'disabled'} oninput="nqEdit(${i}, this.value)">
         </div>
         <div class="nq-orig">was: ${escapeHtml(r.original)}</div>
@@ -6021,6 +6037,7 @@ function nqRender(){
 function nqEdit(i, v){
   const r=nqRows[i]; if(!r) return;
   r.corrected=v;
+  r.preview=false;   // v7.74.1: typed over the preview — it's the human's value now, not a proposal
   // Free typing after picking a suggestion means the human is overriding it by hand — don't
   // leave a stale "Matched" badge/id pointing at a profile that no longer matches the text.
   if(r.resolutionType==='matched'){ r.resolutionType = r.manualOn ? 'manual' : null; r.chosenId=null; r.chosenName=null; }
@@ -6039,21 +6056,26 @@ function nqToggleManual(i, checked){
 // Picking a candidate replaces the unrecognised token inside the full field value with that
 // EXACT profile's name — never free text — and records which profile id was chosen so the
 // audit log and the write-back both know precisely which model this was verified against.
+/* Apply a profile name to a field value by replacing the PART THAT MATCHED.
+   A Content Tracker value is often a composite — "Boy Jace (Jace Jaxon)" is a character name with
+   the performer in parentheses, and the match is made against the parenthetical only. Replacing the
+   whole segment (the pre-v7.74 behaviour) collapsed it to "Jace Jaxson" and threw the character name
+   away. `probe` falls back to the whole token, so a plain "Sean Xaiver" → "Sean Xavier" still works.
+
+   v7.74.1: ALWAYS resolves from r.original, never from the box. Once the box is pre-filled with the
+   preview it no longer contains r.probe, so computing from the box meant clicking a SECOND candidate
+   found nothing to replace and silently did nothing. Resolving from the original is deterministic:
+   whichever chip you click, you get the original with that one part swapped. */
+function nqApplyPick(original, token, probe, name){
+  const base=String(original==null?'':original);
+  const target = (probe && base.includes(probe)) ? probe : token;
+  return base.split(target).join(name);
+}
 function nqUseSuggestion(i, sIdx){
   const r=nqRows[i]; if(!r) return;
   const sg=(r.suggestions||[])[sIdx]; if(!sg) return;
-  const box=document.getElementById('nq-in-'+i);
-  const cur=box?box.value:r.corrected;
-  /* v7.74: substitute the PART THAT MATCHED, not the whole segment.
-     A Content Tracker value is often a composite — "Boy Jace (Jace Jaxon)" is a character name
-     with the performer in parentheses, and the match was made against the parenthetical only.
-     Replacing the whole segment (the pre-v7.74 behaviour) collapsed it to "Jace Jaxson" and threw
-     away the character name. Replacing just the probe gives "Boy Jace (Jace Jaxson)".
-     `probe` falls back to the whole token, so a plain "Sean Xaiver" → "Sean Xavier" is unchanged.
-     Guarded: if the probe somehow isn't present in the current text (hand-edited in between), fall
-     back to replacing the whole token rather than silently doing nothing. */
-  const target = (r.probe && cur.includes(r.probe)) ? r.probe : r.token;
-  r.corrected = cur.split(target).join(sg.name);
+  r.corrected = nqApplyPick(r.original, r.token, r.probe, sg.name);
+  r.preview=false;   // v7.74.1: no longer a preview — a profile was explicitly chosen
   r.resolutionType='matched'; r.chosenId=sg.id; r.chosenName=sg.name; r.manualOn=false;
   nqRender();
 }
@@ -8112,6 +8134,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.74.1: (Name QA — the proposed value is now visible without clicking) Client-only. The v7.74 fix was correct but invisible: it changed what happens ON CLICK, and the FULL FIELD VALUE box just echoed `was:` until a candidate chip was clicked, so the screen looked identical before and after and the fix read as "still broken". The box is now PRE-FILLED with the top suggestion already applied — "Boy Jace (Jace Jaxon)" shows "Boy Jace (Jace Jaxson)" immediately — with the label switching to "— PREVIEW, click a name above to confirm" in amber. IT IS A PREVIEW ONLY: resolutionType stays null, so nqCanSend() still returns false and Send to Monday stays DISABLED until a candidate is explicitly clicked. Nothing can be written from un-clicked text, so the standing rule that a value only ever comes from a real Model DB profile is untouched. Rows with no candidates are not pre-filled (there is nothing to propose), and typing in the box clears the preview flag because it's then the human's value rather than a proposal. THE PRE-FILL WOULD HAVE INTRODUCED A BUG, now avoided: nqUseSuggestion computed the substitution from the BOX, and once the box is pre-filled it no longer contains r.probe — so clicking a SECOND candidate found nothing to replace and silently did nothing. The substitution is now factored into nqApplyPick() and always resolves from r.original, which makes it deterministic: whichever chip you click, you get the original with that one part swapped, and switching between candidates never compounds edits. Verified against the real functions (18 checks): pre-fill applies the top suggestion, the row is flagged as preview and NOT resolved, Send is disabled until a chip is clicked and enabled after, the SECOND chip applies correctly, switching back and forth stays clean, typing clears the preview, and a no-candidate row keeps its original. 9 of those checks are now permanent in nameqa-logic.test.js (57 → 66).
    v7.74: (Name QA — composite names were being flattened, and shared surnames were scoring like typos) Client-only, two reported bugs in the matcher. (1) COMPOSITE SUBSTITUTION. A Content Tracker value is often "CharacterName (PerformerName)" — e.g. "Boy Jace (Jace Jaxon)". nqSegmentParts returns [whole, before-parens, inside-parens] and nqScanValue probes the LAST one, so the match is correctly made against the parenthetical performer name. But nqUseSuggestion replaced `r.token` — the WHOLE segment — so picking "Jace Jaxson" collapsed the value to just "Jace Jaxson" and threw the character name away. The scan now records which part it probed and carries it onto the row, and nqUseSuggestion substitutes only that part: "Boy Jace (Jace Jaxon)" → "Boy Jace (Jace Jaxson)". A plain segment is unaffected because `probe` falls back to the whole token, so "Sean Xaiver" → "Sean Xavier" as before. Guarded: if the probe is no longer present in the box (hand-edited in between) it falls back to replacing the whole token rather than silently doing nothing. (2) GIVEN-NAME GATE. Whole-string edit distance overstates similarity when two people share a surname, because the matching half swamps the differing half. Reported from live data: "Zander Woods" vs "Lance Woods" scored 75% — the same band as a genuine typo — purely on " Woods", while the actual typo "Zander Woodz" scored 92%; the two were barely distinguishable. A personal name is STRUCTURED: get the given name wrong and it is a different person however well the surname matches. So when both strings have 2+ tokens and their FIRST tokens are clearly different (below NQ_GIVEN_GATE = 0.70), the score is multiplied by that first-token similarity. Deliberately a GATE rather than a general reweighting, because real typos land in given names too and must not be penalised — measured and unchanged: sean/sean 100%, jace/jace 100%, and critically cyurs/cyrus 80% (a live transposition typo, comfortably above the gate, so "Cyurs Stark" vs "Cyrus Stark" stays at 91%). Penalised: zander/lance 50%, so "Lance Woods" drops from 75% to 38%. CONSEQUENCE WORTH KNOWING: 38% is below nqSuggest's 0.75 floor, so a different-person surname match is no longer OFFERED at all rather than being offered with a low score. Single-token names are never gated (no given/surname structure to reason about). All 41 pre-existing Name QA assertions still pass untouched; 16 new ones added (41 → 57) covering both fixes, including that the gate does NOT catch given-name typos and that an already-correct composite is left intact.
    v7.73.1: (bugfix — blank conflict lines in a merged record's General Notes) Client-only. FOUND ON A REAL MERGE: after hand-pairing TEST2/TEST3 on staging, the keeper's General Notes contained `[DUPLICATE INFO — Other Studios Notes:  (from id 12414377237)]` — a logged conflict with no value. ROOT CAUSE: monday KEEPS METADATA AFTER A FIELD IS CLEARED. A long_text that once held content comes back as `{"text":"","changed_at":"…"}`, not a bare `{}`. isEmptyVal() only recognised `{}`, `{"ids":[]}` and `{"labels":[]}`, so a cleared field counted as HAVING a value (hasVal ORs text against value), passed the `if(!hasVal(sc)) return` gate, then rendered as an empty string in the conflict line. Fixed in isEmptyVal itself rather than at the log site: after parsing, bookkeeping keys (changed_at / changed_at_ms / is_valid / isValid) are ignored and emptiness is judged on the CONTENT keys — so cleared long_text, cleared dates (`{"date":null}`), cleared links (`{"url":"","text":""}`) and empty file columns all now read as empty. CRITICALLY, ZERO IS STILL A VALUE: the test is String(val).trim()==='' rather than a falsy check, so status `index:0` and the number `0` survive — a falsy check here would have silently started dropping real data, which is a far worse bug than the one being fixed. Also added a one-line belt-and-braces guard in computePlan (skip when the source's rendered text is blank), so no future exotic value shape can put an empty line in the notes. isEmptyVal and hasVal are now unit-tested in dedup-logic.test.js (12 → 32 assertions) against the real monday value shapes, including the exact `{"text":"","changed_at":…}` that caused this and the index:0 / number-0 cases that must not regress. No change to what gets WRITTEN to a keeper — this only stops a useless audit line being appended.
    v7.73: (Duplicates — pair two records by hand) Client-only. WHY: detection groups by exact normalized name (dupNameKey), so a genuine duplicate whose two records are spelled differently is invisible to the tool — while being obvious to a human looking at the two headshots. A "Pair two records by hand" panel at the top of the DUPLICATES tab now takes two slots; each opens a searchable list of every model (thumbnail + name + id + date, sourced from the shared kanbanItems store, so no extra fetch), and once both are chosen the pair renders as a normal duplicate group with the same cards, the same field-by-field preview and the same merge/keep-one actions. THE REUSE IS THE POINT: computePlan() already took a GROUP OBJECT rather than a detected pair, reading only items[].{id,name,created_at,board} and keeperId — so a synthesised group needs no changes to the planner, the preview, the photo merge, the verifier or the audit log. The group-card markup was factored out of renderDupGroups into dupGroupCardHtml() so both paths render identically; the manual group lives in dupGroups (that's how getDupGroup, previewMerge, executeMerge, loadGroupDetails and selectKeeper find it) but is skipped by the filtered list and rendered into its own always-visible mount, and it is re-inserted after a Refresh so an in-progress review isn't silently discarded. SAFETY, which is the whole design problem: executeMerge DELETES the source record, and its last automated check was that both names normalize identically. A hand-picked pair fails that BY DEFINITION — differing names are the entire reason the feature exists — so for a manual group only, that check is replaced by TWO human gates, and NEITHER involves typing (the owner's explicit constraint: these names have genuinely odd spellings and a typo-prone confirm box is worse than none): (1) a "these two records are the same person, I've compared the photos" checkbox, unticked by default; and (2) a modal that asks you to CLICK THE NAME of the record that will SURVIVE, offering only the two names that already exist on the records — clicking the other one is REFUSED with an explanation that it's the record being deleted. It is a comprehension check, not an OK button. Both gates apply to "Keep one · delete other" as well. The override is written into the Monday deletion comment as [HAND-PAIRED OVERRIDE] with both original names, so the audit trail shows a human forced it rather than the matcher having agreed. THE EXISTING PATH IS UNTOUCHED: detected groups still hit the name guard exactly as before, and it turned out that guard — the single most important check in the app — had NO test at all, so v7.73 adds one that counts its occurrences across BOTH destructive paths and fails if either is removed (verified by deleting one: found 1, expected 2). Manual pairing is MAIN-BOARD ONLY, because kanbanItems is the main board; detected duplicates can still span the Evernote batch board since those carry their own per-item board id. Verified against the real extracted functions, 18 checks: the pair builds from two different names with the gate untocked, nothing executes without confirmation (routes to the modal instead), clicking the doomed record does not merge, clicking the survivor proceeds and records the override, keep-one is gated identically, a record cannot be paired with itself, and Clear removes both the group and the slots.

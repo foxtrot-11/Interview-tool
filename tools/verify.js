@@ -933,7 +933,17 @@ has('function nqRunScan(', 'scan is a human-triggered function');
 has('function nqScanValue(', 'scan engine present');
 has('function nqUseSuggestion(', 'suggestions are click-to-apply into an editable field');
 has('let CONTENT_TRACKER_BOARD_ID', 'CT board id is env-overridable via /config');
-lacks('nqApply', 'v7.67 has NO write path (read-only phase)');
+/* This used to be lacks('nqApply', 'v7.67 has NO write path') — true in v7.67, but v7.68 ADDED the
+   write path, so the assertion has been wrong ever since and only kept passing because no identifier
+   happened to contain that substring. v7.74.1's nqApplyPick() finally tripped it.
+   Replaced with the constraint that actually matters and that the owner set explicitly: the write
+   path exists, it is PER-ROW, and there is deliberately NO bulk apply. */
+has('async function nqSendToMonday(i)', 'Name QA write path is per-row (takes a row index)');
+has('id="nq-send-btn-${i}"', 'one Send button per row');
+lacks('function nqSendAll', 'there is NO bulk send — the owner ruled it out explicitly');
+lacks('nqSendAllRows', 'no bulk-send helper crept in');
+// and a send must always resolve to a real profile id, never free text (unless manual is on)
+has("if(r.resolutionType==='matched') return !!r.chosenId;", 'a matched send requires a real profile id');
 /* v7.66: budgets aligned to vendor default */
 has('v7.66:', 'v7.66 deploy marker present');
 has('capMs=fresh?290000:200000', 'client cap above server budget');

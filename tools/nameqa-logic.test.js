@@ -11,9 +11,9 @@ function grab(names) {
   return new Function(body + '\nreturn {' + names.join(',') + '};')();
 }
 const { nqNormalize, nqSplitSegments, nqSegmentParts, nqIsIgnorable, nqIsMalformed,
-        nqSimilarity, nqSuggest, nqCategorize, nqScanValue } =
+        nqSimilarity, nqSuggest, nqCategorize, nqScanValue, nqApplyPick, nqCanSend } =
   grab(['nqNormalize','nqSplitSegments','nqSegmentParts','nqIsIgnorable','nqIsMalformed',
-        'nqSimilarity','nqSuggest','nqCategorize','nqScanValue']);
+        'nqSimilarity','nqSuggest','nqCategorize','nqScanValue','nqApplyPick','nqCanSend']);
 
 let n = 0, fails = 0;
 function eq(actual, expected, label) {
@@ -172,6 +172,49 @@ console.log('[11] v7.74: composite name substitution');
   const flag = scan.segments.find(s => s.status === 'flag');
   eq(!!flag, true, 'the composite is flagged');
   eq(flag && flag.probe, 'Jace Jaxon', 'the flagged row carries the probe through to the UI');
+}
+
+/* ── v7.74.1: PREVIEW PRE-FILL ──────────────────────────────────────────────────────────────────
+   The box used to echo `was:` until a candidate was clicked, so the proposed composite was never
+   visible up front. It is now pre-filled with the top suggestion applied — as a PREVIEW ONLY:
+   resolutionType stays null so Send to Monday remains disabled until a profile is explicitly
+   clicked, and nothing can be written from un-clicked text.
+   The important regression guard here is nqApplyPick resolving from the ORIGINAL rather than the
+   box: once the box is pre-filled it no longer contains the probe, so a box-based substitution made
+   clicking a SECOND candidate silently do nothing. */
+console.log('[12] v7.74.1: preview pre-fill resolves from the original');
+{
+  const original = 'Boy Jace (Jace Jaxon)';
+  const parts = nqSegmentParts(original);
+  const probe = parts[parts.length - 1];
+  const token = original;
+  // nqApplyPick is the shared helper both the pre-fill and the chip click use
+  eq(nqApplyPick(original, token, probe, 'Jace Jaxson'), 'Boy Jace (Jace Jaxson)',
+     'top suggestion pre-fills the composite');
+  // clicking the SECOND candidate must still work off the original, not the pre-filled box
+  eq(nqApplyPick(original, token, probe, 'Ace Jaxon'), 'Boy Jace (Ace Jaxon)',
+     'a second candidate applies from the ORIGINAL, not the pre-filled box');
+  // switching back and forth must not compound
+  eq(nqApplyPick(original, token, probe, 'Jace Jaxson'), 'Boy Jace (Jace Jaxson)',
+     'switching candidates never compounds edits');
+  // plain (no parens) still replaced wholesale
+  const p2 = nqSegmentParts('Sean Xaiver');
+  eq(nqApplyPick('Sean Xaiver', 'Sean Xaiver', p2[p2.length-1], 'Sean Xavier'), 'Sean Xavier',
+     'plain name still replaced wholesale');
+  // a value with no probe match falls back to the whole token rather than doing nothing
+  eq(nqApplyPick('Boy Jace (Jace Jaxon)', 'Boy Jace (Jace Jaxon)', 'NOT PRESENT', 'X'), 'X',
+     'unmatched probe falls back to the whole token instead of silently no-oping');
+  // nqCanSend must refuse a previewed-but-unclicked row
+  const previewed = { corrected:'Boy Jace (Jace Jaxson)', original, preview:true,
+                      resolutionType:null, chosenId:null, manualOn:false, sent:false };
+  eq(nqCanSend(previewed), false, 'a PREVIEWED row cannot be sent — no profile chosen yet');
+  eq(nqCanSend({ ...previewed, preview:false, resolutionType:'matched', chosenId:'P0' }), true,
+     'once a profile is clicked it can be sent');
+  eq(nqCanSend({ ...previewed, resolutionType:'matched', chosenId:null }), false,
+     'matched without a profile id still cannot be sent');
+  // hand-typed text alone is not sendable unless the manual box is on
+  eq(nqCanSend({ ...previewed, preview:false, corrected:'Hand Typed' }), false,
+     'hand-typed text alone cannot be sent');
 }
 
 console.log(`\n${n} assertions, ${fails} failed`);

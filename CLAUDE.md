@@ -2,7 +2,7 @@
 
 Context file for AI assistants working in this repo.
 Production (`main`): **v7.73.1** (promoted 2026-07-29).
-Staging (`staging`): **v7.74**, awaiting the owner's review.
+Staging (`staging`): **v7.74.1**, awaiting the owner's review.
 
 ---
 
@@ -98,8 +98,8 @@ duplicate review, and (as of v7.67, with a write path since v7.68) name QA.
 | `server.js` | CommonJS Express server. Auth gate + hardened monday.com GraphQL proxy + file/photo endpoints. |
 | `tools/preflight.js` | **Run before every push.** The release checklist as code — see §0.3. Must exit 0. |
 | `.githooks/pre-push` | Blocks pushes to `main` without `ALLOW_MAIN_PUSH=1`; runs preflight. Enable: `git config core.hooksPath .githooks` |
-| `tools/*.js` | Test suite (6 files, 864 assertions). Plain Node, no framework. |
-| `CHANGE-LOG-v*.md` | Per-release write-ups (v7.67, v7.69–v7.74). Longer-form companions to the in-file changelog comment block. |
+| `tools/*.js` | Test suite (6 files, 877 assertions). Plain Node, no framework. |
+| `CHANGE-LOG-v*.md` | Per-release write-ups (v7.67, v7.69–v7.74.1). Longer-form companions to the in-file changelog comment block. |
 | `package.json` / `package-lock.json` | Deps. Render runs `npm install`. |
 | `render.yaml` | Render service config. |
 | `public/logo-carnal.png` | Logo. |
@@ -181,13 +181,13 @@ Every release, without exception:
 
 | File | Assertions | Covers |
 |---|---|---|
-| `verify.js` | 664 | Substring checks + **CSS structural integrity** (§2b) against client source |
+| `verify.js` | 668 | Substring checks + **CSS structural integrity** (§2b) against client source |
 | `scrape-logic.test.js` | 53 | Bluesky/Twitter URL + media parsing (real functions extracted from `server.js`) |
-| `nameqa-logic.test.js` | 57 | Name-matching engine, run against **real** Content Tracker strings |
+| `nameqa-logic.test.js` | 66 | Name-matching engine, run against **real** Content Tracker strings |
 | `server-guard.test.js` | 38 | GraphQL allow-list guard, credential hygiene, SDK-loading rules |
 | `sandbox-logic.test.js` | 20 | Casting sandbox planning + note normalization |
 | `dedup-logic.test.js` | 32 | Duplicate grouping + `isEmptyVal`/`hasVal` against real monday value shapes |
-| **Total** | **864** | |
+| **Total** | **877** | |
 
 **`verify.js` is substring matching — it cannot see a layout bug, and a substring assert can pass
 on text that is in the wrong place.** Both v7.70 failures prove it: the sticky row was pinned
