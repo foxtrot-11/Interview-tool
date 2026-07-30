@@ -63,6 +63,9 @@
   /* v7.74.1: the box is pre-filled with the top suggestion applied. Mark it clearly as a PROPOSAL —
      Send to Monday stays disabled until a candidate is actually clicked. */
   .nq-field-label.nq-field-preview{color:#f5c518}
+  /* v7.75: a row rebased after a sibling send to the same field */
+  .nq-rebase{font-size:11px;line-height:1.5;color:#6cc0ec;background:rgba(58,162,224,.09);border:1px solid rgba(58,162,224,.35);border-radius:6px;padding:6px 9px;margin-bottom:8px}
+  .nq-rebase.nq-rebase-bad{color:#fca5a5;background:rgba(248,113,113,.09);border-color:rgba(248,113,113,.4)}
   .nq-input{width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:12px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)}
   .nq-input[disabled]{color:var(--text-dim);background:var(--surface2)}
   .nq-orig{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-top:4px}
@@ -5975,6 +5978,10 @@ function nqCandThumbHtml(sg){
 }
 function nqCanSend(r){
   if(!r || r.sent) return false;
+  // v7.75: a row whose target token vanished from the field (two flagged names overlapped) or whose
+  // hand-typed text predates another send to the same field must not be sent — it would clobber the
+  // earlier fix. Both need a human look, so refuse rather than guess.
+  if(r.conflict || r.staleManual) return false;
   if(!r.corrected || r.corrected===r.original) return false;
   if(r.resolutionType==='matched') return !!r.chosenId;
   if(r.resolutionType==='manual') return r.manualOn && r.corrected.trim().length>0;
@@ -6012,6 +6019,10 @@ function nqRender(){
           <span class="nq-col">${escapeHtml(r.colLabel)}</span>
         </div>
         ${cands || '<div class="nq-nosugg">No matching profile in the Model DB — check the box below to enter one manually.</div>'}
+        ${/* v7.75: this field was changed by another send in this session */''}
+        ${r.conflict ? `<div class="nq-rebase nq-rebase-bad">⚠ Another name in this same field was just fixed, and this row's name is no longer in the field. Re-scan before touching this one — sending it now would undo that fix.</div>`
+          : r.staleManual ? `<div class="nq-rebase nq-rebase-bad">⚠ Another name in this same field was just fixed, so what you typed here is out of date. Re-scan, or clear manual entry and pick a profile.</div>`
+          : r.rebased ? `<div class="nq-rebase">↻ Updated — another name in this same field was fixed, so this row now builds on that change instead of overwriting it.</div>` : ''}
         <div class="nq-manual">
           <label class="nq-manual-toggle">
             <input type="checkbox" id="nq-man-${i}" ${r.manualOn?'checked':''} onchange="nqToggleManual(${i}, this.checked)">
@@ -6082,6 +6093,54 @@ function nqUseSuggestion(i, sIdx){
 // Writes the corrected value to Content Tracker ONLY (never the team boards — see the header
 // comment on why), then best-effort logs original → new on the shared audit pulse. The log
 // call is wrapped separately so a failed comment never hides that the real write succeeded.
+/* ══ v7.75: KEEP SIBLING ROWS IN STEP AFTER A SEND ═════════════════════════════════════════════
+   One Content Tracker field can contain several bad names ("lucky Cruz, Jake Matthews, Cyurs
+   Stark"), and each produces its OWN flagged row. Every row snapshots the WHOLE field value at scan
+   time, and a send writes that whole value — so sending the second row wrote a stale copy over the
+   first row's fix and silently reverted it.
+
+   PROVEN IN THE AUDIT LOG, twice, on item 10600078503 and 10599953886:
+     21:13:00  lucky Cruz, Jake Matthews, Cyurs Stark -> lucky Cruz, Jake Mathews, Cyurs Stark
+     21:13:03  lucky Cruz, Jake Matthews, Cyurs Stark -> lucky Cruz, Jake Matthews, Cyrus Stark
+   Note the second Original: still "Jake Matthews". The first fix was lost.
+
+   Fixed in memory rather than by re-scanning, because a rescan costs a full Content Tracker pass.
+   After a successful write, every other UNSENT row targeting the same item+column is rebased onto
+   the value we just wrote, and its own proposal is re-applied on top.
+
+   Three cases, deliberately handled differently:
+     - matched  : re-apply the chosen profile against the new base. Safe and automatic.
+     - preview  : re-apply the top suggestion against the new base.
+     - manual   : DO NOT touch the human's typed text — but flag it, because what they typed was
+                  based on the old field and sending it as-is would clobber this fix.
+   And if the row's own token is no longer present in the new value (the two rows overlapped), it is
+   marked conflicted and Send is refused — that needs a rescan, and guessing would risk data. */
+function nqPropagateSend(sent){
+  const written = sent.corrected;
+  let touched = 0;
+  for(const o of nqRows){
+    if(o===sent || o.sent) continue;
+    if(String(o.itemId)!==String(sent.itemId) || o.colId!==sent.colId) continue;
+    o.original = written;                     // rebase: `was:` now reflects reality
+    const present = written.includes(o.probe) || written.includes(o.token);
+    if(!present){
+      // The token this row targets is gone from the field — the two rows overlapped. Don't guess.
+      o.conflict = true; o.corrected = written; o.preview = false;
+    } else if(o.manualOn){
+      o.staleManual = true;                   // keep their text, but warn before it can be sent
+    } else if(o.resolutionType==='matched' && o.chosenName){
+      o.corrected = nqApplyPick(written, o.token, o.probe, o.chosenName);
+    } else {
+      const top=(o.suggestions||[])[0];
+      o.corrected = top ? nqApplyPick(written, o.token, o.probe, top.name) : written;
+      o.preview = (o.corrected!==written);
+    }
+    o.rebased = true;
+    touched++;
+  }
+  if(touched) showToast(`${touched} other flagged name${touched===1?'':'s'} in that same field updated to match`, 'success');
+  return touched;
+}
 async function nqSendToMonday(i){
   const r=nqRows[i]; if(!r || !nqCanSend(r)) return;
   const btn=document.getElementById('nq-send-btn-'+i);
@@ -6094,6 +6153,7 @@ async function nqSendToMonday(i){
       { i:r.itemId, b:CONTENT_TRACKER_BOARD_ID, c:r.colId, v:r.corrected }
     );
     r.sent=true; r.sentAt=new Date().toISOString();
+    nqPropagateSend(r);   // v7.75: keep sibling rows for this same field in step — see below
     if(statusEl) statusEl.innerHTML = `✓ Sent — <a href="https://carnalmedia-team.monday.com/boards/${escapeHtml(String(CONTENT_TRACKER_BOARD_ID))}/pulses/${escapeHtml(String(r.itemId))}" target="_blank" rel="noopener">pulse ${escapeHtml(String(r.itemId))}</a>`;
     const kind = r.resolutionType==='manual' ? 'MANUAL — no matching profile' : `MATCHED — ${r.chosenName||'?'} (${r.chosenId||'?'})`;
     const body = `NAME QA: CT item ${r.itemId} "${r.itemName}" — ${r.colLabel}\nOriginal: ${r.original}\nChanged to: ${r.corrected}\n[${kind}] — ${r.sentAt}`;
@@ -8134,6 +8194,7 @@ async function bootCheck(){
    v7.7: kanban — "Change headshot" button flow (pick photo → red box → Save → status/result, no more accidental hover-set); columns locked to equal 300px (long names no longer stretch them) + names wrap to 2 lines. Interview tab: Legal Name moved below FTM Notes.
    v7.8: kanban — loads once and caches (re-entering the tab no longer re-fetches; use Refresh to reload); headshot save shows an animated progress bar with stages; Save now commits the new headshot AND all other field edits together (one Save).
    v7.9: all-models grid — thumbnail grid of the entire board (incl. duplicates/unset), filters (Type/Role/Location/Site/Sexuality/Ethnicity/FTM/Tattoos, multi-select OR-within AND-across), search, sort by Height/Weight/Cock (parser verified against all prod values; blanks sink), lazy photos, same modal editor; shared data store with kanban (one load powers both), parallel photo fetching.
+   v7.75: (Name QA — a second fix in the same field no longer reverts the first) Client-only. FOUND IN THE LIVE AUDIT LOG, not by reasoning. One Content Tracker field can hold several bad names ("lucky Cruz, Jake Matthews, Cyurs Stark") and each produces its OWN flagged row. Every row snapshots the WHOLE field value at scan time, and a send writes that whole value — so sending the second row wrote a stale copy over the first row's fix and silently reverted it. Proven twice on production, items 10600078503 and 10599953886: at 21:13:00 "Jake Matthews"→"Jake Mathews" was written; at 21:13:03 the next send's Original STILL read "Jake Matthews", and it wrote "lucky Cruz, Jake Matthews, Cyrus Stark" — fixing Cyurs while undoing Jake. Nothing warned; the owner only got correct data by re-scanning between sessions. FIX: nqPropagateSend() rebases every other UNSENT row targeting the same item+column onto the value just written, then re-applies that row's own proposal on top. Done IN MEMORY, not by re-scanning, because a rescan is a full Content Tracker pass and the owner explicitly did not want to wait for one mid-batch. Three cases handled deliberately differently: a MATCHED row re-applies its chosen profile against the new base; a PREVIEW row re-applies its top suggestion; a MANUAL row's hand-typed text is NEVER overwritten but is flagged staleManual, because what the human typed was based on the old field and sending it as-is would clobber the fix. If the row's own token is no longer present in the new value (two flagged rows overlapped) it is marked conflict — nqCanSend now refuses both conflict and staleManual rows, so neither can silently undo an earlier write; those need a rescan and guessing would risk data. The UI explains each state inline (blue "↻ Updated" when rebased cleanly, red warnings otherwise) and a toast reports how many sibling rows moved, so a value changing on screen is never unexplained. VERIFIED by replaying the exact audit-log sequence against the real functions: both fixes now survive and the field ends as "lucky Cruz, Jake Mathews, Cyrus Stark". Also confirmed a row on a DIFFERENT column of the same item is untouched, and that a rebased preview stays a preview (Send still requires clicking a chip). 8 checks added to nameqa-logic.test.js (66 → 74). SEPARATELY CONFIRMED WITH THE OWNER: "Jake Mathews" with one t is the correct spelling — the Model DB profile (id 10014964840) is right and the Content Tracker double-t was the error, so those writes were correct. Note tools/nameqa-logic.test.js's CANON fixture still lists "Jake Matthews", which contradicts production; harmless (it is only a fixture) but do not treat it as authoritative.
    v7.74.1: (Name QA — the proposed value is now visible without clicking) Client-only. The v7.74 fix was correct but invisible: it changed what happens ON CLICK, and the FULL FIELD VALUE box just echoed `was:` until a candidate chip was clicked, so the screen looked identical before and after and the fix read as "still broken". The box is now PRE-FILLED with the top suggestion already applied — "Boy Jace (Jace Jaxon)" shows "Boy Jace (Jace Jaxson)" immediately — with the label switching to "— PREVIEW, click a name above to confirm" in amber. IT IS A PREVIEW ONLY: resolutionType stays null, so nqCanSend() still returns false and Send to Monday stays DISABLED until a candidate is explicitly clicked. Nothing can be written from un-clicked text, so the standing rule that a value only ever comes from a real Model DB profile is untouched. Rows with no candidates are not pre-filled (there is nothing to propose), and typing in the box clears the preview flag because it's then the human's value rather than a proposal. THE PRE-FILL WOULD HAVE INTRODUCED A BUG, now avoided: nqUseSuggestion computed the substitution from the BOX, and once the box is pre-filled it no longer contains r.probe — so clicking a SECOND candidate found nothing to replace and silently did nothing. The substitution is now factored into nqApplyPick() and always resolves from r.original, which makes it deterministic: whichever chip you click, you get the original with that one part swapped, and switching between candidates never compounds edits. Verified against the real functions (18 checks): pre-fill applies the top suggestion, the row is flagged as preview and NOT resolved, Send is disabled until a chip is clicked and enabled after, the SECOND chip applies correctly, switching back and forth stays clean, typing clears the preview, and a no-candidate row keeps its original. 9 of those checks are now permanent in nameqa-logic.test.js (57 → 66).
    v7.74: (Name QA — composite names were being flattened, and shared surnames were scoring like typos) Client-only, two reported bugs in the matcher. (1) COMPOSITE SUBSTITUTION. A Content Tracker value is often "CharacterName (PerformerName)" — e.g. "Boy Jace (Jace Jaxon)". nqSegmentParts returns [whole, before-parens, inside-parens] and nqScanValue probes the LAST one, so the match is correctly made against the parenthetical performer name. But nqUseSuggestion replaced `r.token` — the WHOLE segment — so picking "Jace Jaxson" collapsed the value to just "Jace Jaxson" and threw the character name away. The scan now records which part it probed and carries it onto the row, and nqUseSuggestion substitutes only that part: "Boy Jace (Jace Jaxon)" → "Boy Jace (Jace Jaxson)". A plain segment is unaffected because `probe` falls back to the whole token, so "Sean Xaiver" → "Sean Xavier" as before. Guarded: if the probe is no longer present in the box (hand-edited in between) it falls back to replacing the whole token rather than silently doing nothing. (2) GIVEN-NAME GATE. Whole-string edit distance overstates similarity when two people share a surname, because the matching half swamps the differing half. Reported from live data: "Zander Woods" vs "Lance Woods" scored 75% — the same band as a genuine typo — purely on " Woods", while the actual typo "Zander Woodz" scored 92%; the two were barely distinguishable. A personal name is STRUCTURED: get the given name wrong and it is a different person however well the surname matches. So when both strings have 2+ tokens and their FIRST tokens are clearly different (below NQ_GIVEN_GATE = 0.70), the score is multiplied by that first-token similarity. Deliberately a GATE rather than a general reweighting, because real typos land in given names too and must not be penalised — measured and unchanged: sean/sean 100%, jace/jace 100%, and critically cyurs/cyrus 80% (a live transposition typo, comfortably above the gate, so "Cyurs Stark" vs "Cyrus Stark" stays at 91%). Penalised: zander/lance 50%, so "Lance Woods" drops from 75% to 38%. CONSEQUENCE WORTH KNOWING: 38% is below nqSuggest's 0.75 floor, so a different-person surname match is no longer OFFERED at all rather than being offered with a low score. Single-token names are never gated (no given/surname structure to reason about). All 41 pre-existing Name QA assertions still pass untouched; 16 new ones added (41 → 57) covering both fixes, including that the gate does NOT catch given-name typos and that an already-correct composite is left intact.
    v7.73.1: (bugfix — blank conflict lines in a merged record's General Notes) Client-only. FOUND ON A REAL MERGE: after hand-pairing TEST2/TEST3 on staging, the keeper's General Notes contained `[DUPLICATE INFO — Other Studios Notes:  (from id 12414377237)]` — a logged conflict with no value. ROOT CAUSE: monday KEEPS METADATA AFTER A FIELD IS CLEARED. A long_text that once held content comes back as `{"text":"","changed_at":"…"}`, not a bare `{}`. isEmptyVal() only recognised `{}`, `{"ids":[]}` and `{"labels":[]}`, so a cleared field counted as HAVING a value (hasVal ORs text against value), passed the `if(!hasVal(sc)) return` gate, then rendered as an empty string in the conflict line. Fixed in isEmptyVal itself rather than at the log site: after parsing, bookkeeping keys (changed_at / changed_at_ms / is_valid / isValid) are ignored and emptiness is judged on the CONTENT keys — so cleared long_text, cleared dates (`{"date":null}`), cleared links (`{"url":"","text":""}`) and empty file columns all now read as empty. CRITICALLY, ZERO IS STILL A VALUE: the test is String(val).trim()==='' rather than a falsy check, so status `index:0` and the number `0` survive — a falsy check here would have silently started dropping real data, which is a far worse bug than the one being fixed. Also added a one-line belt-and-braces guard in computePlan (skip when the source's rendered text is blank), so no future exotic value shape can put an empty line in the notes. isEmptyVal and hasVal are now unit-tested in dedup-logic.test.js (12 → 32 assertions) against the real monday value shapes, including the exact `{"text":"","changed_at":…}` that caused this and the index:0 / number-0 cases that must not regress. No change to what gets WRITTEN to a keeper — this only stops a useless audit line being appended.

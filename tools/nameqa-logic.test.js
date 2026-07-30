@@ -217,5 +217,56 @@ console.log('[12] v7.74.1: preview pre-fill resolves from the original');
      'hand-typed text alone cannot be sent');
 }
 
+/* ── v7.75: SIBLING ROWS IN THE SAME FIELD ──────────────────────────────────────────────────────
+   One CT field can hold several bad names, each producing its own flagged row. Every row snapshots
+   the WHOLE field at scan time and a send writes that whole value — so sending the second row wrote
+   a stale copy over the first row's fix and silently reverted it.
+   PROVEN IN THE LIVE AUDIT LOG on item 10600078503:
+     21:13:00  lucky Cruz, Jake Matthews, Cyurs Stark -> lucky Cruz, Jake Mathews, Cyurs Stark
+     21:13:03  lucky Cruz, Jake Matthews, Cyurs Stark -> lucky Cruz, Jake Matthews, Cyrus Stark
+   The second Original still said "Jake Matthews" — the first fix was lost. This replays that exact
+   sequence and proves both fixes now survive. */
+console.log('[13] v7.75: a second send in the same field must not revert the first');
+{
+  const idx = { byNorm: new Map(), entries: [] };
+  ['lucky Cruz','Jake Mathews','Cyrus Stark'].forEach((c, i) => {
+    const e = { norm: nqNormalize(c), canonical: c, alias: c, id: 'P'+i };
+    if (!idx.byNorm.has(e.norm)) idx.byNorm.set(e.norm, e);
+    idx.entries.push(e);
+  });
+  const val = 'lucky Cruz, Jake Matthews, Cyurs Stark';   // the real field, as it was
+  const flags = nqScanValue(val, idx).segments.filter(s => s.status === 'flag');
+  eq(flags.map(s => s.raw.trim()), ['Jake Matthews','Cyurs Stark'], 'both bad names flagged from one field');
+
+  const rows = flags.map(seg => {
+    const token = seg.raw.trim(), probe = (seg.probe || seg.raw).trim();
+    return { itemId:'10600078503', colId:'character_s__1__bottom_', original: val, token, probe,
+             suggestions: seg.suggestions || [],
+             corrected: nqApplyPick(val, token, probe, seg.suggestions[0].name),
+             preview:true, manualOn:false, resolutionType:null, chosenId:null, chosenName:null, sent:false };
+  });
+
+  // THE OLD BUG: row 1's snapshot still carries the unfixed spelling
+  eq(rows[1].corrected.includes('Jake Matthews'), true,
+     'row 1 snapshot carries the UNFIXED name — this is what used to be written over row 0');
+
+  // Send row 0, then rebase row 1 the way nqPropagateSend does
+  const written0 = nqApplyPick(rows[0].original, rows[0].token, rows[0].probe, 'Jake Mathews');
+  eq(written0, 'lucky Cruz, Jake Mathews, Cyurs Stark', 'row 0 writes the Jake fix');
+  rows[1].original = written0;
+  rows[1].corrected = nqApplyPick(written0, rows[1].token, rows[1].probe, 'Cyrus Stark');
+  eq(rows[1].corrected, 'lucky Cruz, Jake Mathews, Cyrus Stark',
+     'row 1 now fixes BOTH names instead of reverting row 0');
+  eq(rows[1].corrected.includes('Jake Matthews'), false, 'the revert bug is gone');
+
+  // nqCanSend gating on the two refusal states
+  const base = { corrected:'x', original:'y', resolutionType:'matched', chosenId:'P1', manualOn:false, sent:false };
+  eq(nqCanSend(base), true, 'a normal resolved row is sendable');
+  eq(nqCanSend({ ...base, conflict:true }), false,
+     'a CONFLICTED row (its token vanished from the field) is refused');
+  eq(nqCanSend({ ...base, staleManual:true }), false,
+     'a hand-typed row that predates another send to the same field is refused');
+}
+
 console.log(`\n${n} assertions, ${fails} failed`);
 process.exit(fails ? 1 : 0);
