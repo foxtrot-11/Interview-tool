@@ -268,5 +268,41 @@ console.log('[13] v7.75: a second send in the same field must not revert the fir
      'a hand-typed row that predates another send to the same field is refused');
 }
 
+/* ── v7.75.1: a SENT row is frozen history, and gets flagged when superseded ─────────────────────
+   A sent row keeps the value THAT send wrote and never updates again. Sitting next to a rebased row
+   showing a different value, that read as a bug — it was reported as one. `superseded` marks a sent
+   row whose field was changed by a LATER send, so the UI can say so instead of leaving the reader to
+   guess. Replays the reported sequence: Cyurs sent first, then Jake. */
+console.log('[14] v7.75.1: sent rows are history; later sends mark them superseded');
+{
+  const V0 = 'lucky Cruz, Jake Matthews, Cyurs Stark';
+  const mk = (token, name, corrected) => ({
+    itemId:'12642778427', colId:'c1', original:V0, token, probe:token,
+    suggestions:[{ name, id:name[0] }], corrected,
+    preview:true, manualOn:false, resolutionType:null, chosenId:null, chosenName:null, sent:false });
+  const jake  = mk('Jake Matthews', 'Jake Mathews', 'lucky Cruz, Jake Mathews, Cyurs Stark');
+  const cyurs = mk('Cyurs Stark',   'Cyrus Stark',  'lucky Cruz, Jake Matthews, Cyrus Stark');
+
+  // Cyurs is sent first — simulate nqPropagateSend's effect on the other row
+  cyurs.resolutionType='matched'; cyurs.chosenName='Cyrus Stark'; cyurs.chosenId='C'; cyurs.sent=true;
+  jake.original  = cyurs.corrected;
+  jake.corrected = nqApplyPick(cyurs.corrected, jake.token, jake.probe, 'Jake Mathews');
+  jake.rebased   = true;
+  eq(jake.original, 'lucky Cruz, Jake Matthews, Cyrus Stark', 'the pending row rebases onto what was written');
+  eq(jake.corrected, 'lucky Cruz, Jake Mathews, Cyrus Stark', 'and then proposes BOTH fixes');
+  eq(!!cyurs.superseded, false, 'the first send is not superseded until something follows it');
+
+  // now Jake is sent — the earlier row becomes superseded history
+  jake.resolutionType='matched'; jake.chosenName='Jake Mathews'; jake.chosenId='J'; jake.sent=true;
+  cyurs.superseded = true;
+  eq(cyurs.superseded, true, 'the earlier sent row is flagged superseded');
+  eq(cyurs.corrected, 'lucky Cruz, Jake Matthews, Cyrus Stark',
+     'its frozen value is NOT rewritten — it is the audit record of that send');
+  eq(jake.corrected, 'lucky Cruz, Jake Mathews, Cyrus Stark', 'the final write carries both fixes');
+  // neither can be re-sent
+  eq(nqCanSend(jake), false, 'a sent row cannot be re-sent');
+  eq(nqCanSend(cyurs), false, 'nor can a superseded one');
+}
+
 console.log(`\n${n} assertions, ${fails} failed`);
 process.exit(fails ? 1 : 0);
