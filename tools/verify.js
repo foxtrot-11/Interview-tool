@@ -172,6 +172,50 @@ console.log('[2b] CSS structural integrity');
   }
 }
 
+/* ── 2c. EVERY BOARD-LEVEL VIEW MUST BE HIDDEN BY setMode (added v7.75.2) ──
+   #nameqa-view was never hidden anywhere in setMode — a gap present since v7.67 — so once Name QA
+   had been opened it stayed rendered underneath every other tab. It produced two symptoms that
+   looked unrelated: the Name QA list appearing at the bottom of All Models, and the Casting Sandbox
+   appearing not to load (because #sb-view sits AFTER #nameqa-view in the DOM and got pushed below
+   hundreds of flagged rows). No substring assert would have caught that — this walks setMode and
+   proves every *-view discovered in the markup is actually hidden. */
+console.log('[2c] setMode hides every board-level view');
+{
+  const i = src.indexOf('async function setMode(mode){');
+  if (i < 0) bad('setMode located');
+  else {
+    ok('setMode located');
+    let d = 0, end = i;
+    for (let k = src.indexOf('{', i); k < src.length; k++) {
+      if (src[k] === '{') d++;
+      else if (src[k] === '}') { d--; if (!d) { end = k + 1; break; } }
+    }
+    const body = src.slice(i, end);
+    // Views managed by the editor/candidate flow rather than by setMode's board-view swap.
+    const EDITOR_VIEWS = new Set(['full-view', 'interview-view', 'new-model-view']);
+    const views = [...src.matchAll(/<div id="([a-z-]+-view)"/g)].map(m => m[1])
+                    .filter(v => !EDITOR_VIEWS.has(v));
+    views.length >= 5 ? ok(`found ${views.length} board-level views in the markup`)
+                      : bad('found the board-level views', `only ${views.length}`);
+    const hidden = new Set([...body.matchAll(/hide\('([^']+)'\)/g)].map(m => m[1]));
+    const leaked = views.filter(v => !hidden.has(v));
+    leaked.length
+      ? bad('every board-level view is hidden somewhere in setMode',
+            `NEVER hidden: ${leaked.join(', ')} — it will render underneath other tabs`)
+      : ok('every board-level view is hidden somewhere in setMode');
+    // Stronger: they must be hidden in the PREAMBLE (before any mode branch), so a new branch
+    // can't forget one. Anything hidden only inside a branch is a latent version of this bug.
+    const firstBranch = body.search(/if\(mode==='/);
+    const preamble = firstBranch > 0 ? body.slice(0, firstBranch) : body;
+    const preHidden = new Set([...preamble.matchAll(/hide\('([^']+)'\)/g)].map(m => m[1]));
+    const notUpFront = views.filter(v => !preHidden.has(v));
+    notUpFront.length
+      ? bad('board-level views are hidden up front, before any mode branch',
+            `only hidden inside a branch: ${notUpFront.join(', ')}`)
+      : ok('board-level views are hidden up front, before any mode branch');
+  }
+}
+
 /* ── 3. v7.16 structural asserts ───────────────────────────────────────── */
 console.log('[3] v7.16 structural asserts');
 const has = (needle, label) => src.includes(needle) ? ok(label) : bad(label, 'missing: ' + needle);
